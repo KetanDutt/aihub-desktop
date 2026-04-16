@@ -40,11 +40,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Utility Functions ---
   const showStatus = (message, type = 'info') => {
-    elements.statusMessage.textContent = message;
-    elements.statusMessage.className = `status-message ${type}`;
+    const statusText = document.getElementById('status-text');
+    if (statusText) statusText.textContent = message;
+
+    // elements.statusMessage could be the container now
+    const container = document.getElementById('status-message');
+    if (container) container.className = `status-message ${type}`;
+
+    const loadingIndicator = document.getElementById('loading-indicator');
+    if (loadingIndicator) {
+      if (type === 'loading') {
+        loadingIndicator.classList.remove('hidden');
+      } else {
+        loadingIndicator.classList.add('hidden');
+      }
+    }
+
     setTimeout(() => {
-      elements.statusMessage.textContent = 'Ready';
-      elements.statusMessage.className = 'status-message';
+      if (statusText) statusText.textContent = 'Ready';
+      if (container) container.className = 'status-message';
+      if (loadingIndicator) loadingIndicator.classList.add('hidden');
     }, 3000);
   };
 
@@ -105,7 +120,11 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const applyDarkMode = (enabled) => {
-    document.body.classList.toggle('dark-mode', enabled);
+    if (enabled) {
+      document.body.classList.remove('light-mode');
+    } else {
+      document.body.classList.add('light-mode');
+    }
   };
 
   // --- Render Functions ---
@@ -138,9 +157,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const card = document.createElement('div');
       card.className = 'service-card';
 
+      const isActive = activeTabs.find(t => t.id === id);
+      const activeIndicator = isActive ? '🟢 ' : '';
+
       card.innerHTML = `
       <div class="service-header" style="background-color: ${bgColor}">
-      <h3 class="service-name">${name}</h3>
+      <h3 class="service-name">${activeIndicator}${name}</h3>
       </div>
       <div class="service-body">
       <p class="service-type">${type || 'AI Service'}</p>
@@ -151,6 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
       card.addEventListener('click', () => {
         createTab(id, url, name);
         elements.sidebar.classList.add('hidden');
+        renderEnabledServices(); // re-render to update the active indicator
       });
 
       elements.servicesList.appendChild(card);
@@ -213,7 +236,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Tab Management ---
 
-  const createTab = (serviceId, url, title) => {
+  const updateViewBounds = () => {
+      const containerBounds = elements.webviewsContainer.getBoundingClientRect();
+      window.electronAPI.setViewBounds({
+          x: Math.round(containerBounds.x),
+          y: Math.round(containerBounds.y),
+          width: Math.round(containerBounds.width),
+          height: Math.round(containerBounds.height)
+      });
+  };
+
+  const createTab = async (serviceId, url, title) => {
     if (activeTabs.length >= config.maxActiveServices) {
       showStatus(`Memory limit reached (${config.maxActiveServices} services). Close a tab first.`, 'warning');
       return;
@@ -235,12 +268,6 @@ document.addEventListener('DOMContentLoaded', () => {
     <button class="btn-close-tab">✕</button>
     `;
 
-    // Create webview
-    const webview = document.createElement('webview');
-    webview.dataset.id = serviceId;
-    webview.src = url;
-    webview.style.display = 'flex';
-
     // Add event listeners
     tab.addEventListener('click', (e) => {
       if (!e.target.classList.contains('btn-close-tab')) {
@@ -253,32 +280,43 @@ document.addEventListener('DOMContentLoaded', () => {
       closeTab(serviceId);
     });
 
-    webview.addEventListener('did-start-loading', () => {
-      console.log(`Loading: ${title}`);
-    });
-
-    webview.addEventListener('did-finish-load', () => {
-      console.log(`Loaded: ${title}`);
-    });
-
-    webview.addEventListener('did-fail-load', (e) => {
-      console.error(`Failed to load ${title}:`, e.errorDescription);
-      showStatus(`Error loading ${title}: ${e.errorDescription}`, 'error');
+    tab.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        // A minimal context menu simulation
+        if (confirm(`Close all OTHER tabs?`)) {
+            const tabsToClose = activeTabs.filter(t => t.id !== serviceId).map(t => t.id);
+            tabsToClose.forEach(id => closeTab(id));
+        }
     });
 
     // Add to DOM
     elements.tabsList.appendChild(tab);
-    elements.webviewsContainer.appendChild(webview);
 
-    // Update state
-    activeTabs.push({ id: serviceId, url, title, webview });
-    switchToTab(serviceId);
+    // Instead of <webview>, invoke main process WebContentsView
+    try {
+        const result = await window.electronAPI.createTab(serviceId, url, '');
+        if (result && result.success === false) {
+             showStatus(`Cannot create tab: ${result.error}`, 'error');
+             tab.remove();
+             return;
+        }
 
-    // Hide welcome screen
-    elements.welcomeScreen.style.display = 'none';
+        // Update state
+        activeTabs.push({ id: serviceId, url, title });
+        switchToTab(serviceId);
 
-    // Set active service for blocking
-    window.electronAPI.setActiveService(serviceId);
+        // Ensure bounds are correct after a new tab is initialized
+        updateViewBounds();
+
+        // Hide welcome screen
+        elements.welcomeScreen.style.display = 'none';
+
+        // Set active service for blocking
+        window.electronAPI.setActiveService(serviceId);
+    } catch(err) {
+        showStatus(`Error creating tab: ${err}`, 'error');
+        tab.remove();
+    }
   };
 
   const switchToTab = (id) => {
@@ -287,12 +325,11 @@ document.addEventListener('DOMContentLoaded', () => {
       tab.classList.toggle('active', tab.dataset.id === id);
     });
 
-    // Update webviews visibility
-    document.querySelectorAll('webview').forEach(wv => {
-      wv.style.display = (wv.dataset.id === id) ? 'flex' : 'none';
-    });
-
     currentTabId = id;
+
+    // Ask main process to show specific WebContentsView
+    window.electronAPI.switchTab(id);
+    updateViewBounds();
 
     // Update active service for blocking
     window.electronAPI.setActiveService(id);
@@ -301,16 +338,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const closeTab = (id) => {
     // Remove from DOM
     const tab = document.querySelector(`.tab-item[data-id="${id}"]`);
-    const webview = document.querySelector(`webview[data-id="${id}"]`);
-
     if (tab) tab.remove();
-    if (webview) webview.remove();
 
     // Remove from state
     const index = activeTabs.findIndex(t => t.id === id);
     if (index !== -1) {
       activeTabs.splice(index, 1);
     }
+
+    // Ask main process to destroy WebContentsView
+    window.electronAPI.closeTab(id);
 
     // Switch to another tab or show welcome
     if (activeTabs.length > 0) {
@@ -321,6 +358,9 @@ document.addEventListener('DOMContentLoaded', () => {
       currentTabId = null;
     }
   };
+
+  // Keep views in sync when window resizes
+  window.addEventListener('resize', updateViewBounds);
 
   // --- Settings Management ---
 
@@ -416,10 +456,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Show welcome message if no enabled services
     if (!config.enabledServices || config.enabledServices.length === 0) {
-      elements.welcomeScreen.innerHTML = `
-      <h2>Welcome to AI Hub Desktop</h2>
-      <p>No services enabled. Go to <strong>Settings</strong> to enable services.</p>
-      `;
+      const heading = elements.welcomeScreen.querySelector('h2');
+      if (heading) heading.textContent = 'Welcome to AI Hub Desktop (No services enabled)';
+    } else {
+      // Restore Session Tabs
+      if (config.openTabs && config.openTabs.length > 0) {
+        for (const savedTab of config.openTabs) {
+          // Find matching service metadata to get the title
+          const serviceMeta = allServices.find(s => generateId(s[0]) === savedTab.id);
+          const title = serviceMeta ? serviceMeta[0] : savedTab.id;
+          await createTab(savedTab.id, savedTab.url, title);
+        }
+
+        // Restore active tab
+        if (config.activeTabId && config.openTabs.find(t => t.id === config.activeTabId)) {
+          switchToTab(config.activeTabId);
+        } else {
+          // Switch to the first tab if the last active was closed
+          switchToTab(config.openTabs[0].id);
+        }
+      }
     }
   };
 

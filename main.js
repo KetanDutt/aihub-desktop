@@ -1,308 +1,78 @@
-// main.js - Main Process
-const { app, BrowserWindow, ipcMain, session } = require('electron');
-const path = require('path');
-const fs = require('fs');
-const https = require('https');
-const http = require('http');
+const { app, session, dialog } = require('electron');
+const log = require('electron-log');
+const dataStore = require('./src/data');
+const windowManager = require('./src/window');
+const blockingManager = require('./src/blocking');
+const ipcManager = require('./src/ipc');
+const updaterManager = require('./src/updater');
 
-// Paths
-const configPath = path.join(app.getPath('userData'), 'config.json');
-const dataDir = path.join(app.getPath('userData'), 'data');
-const servicesPath = path.join(dataDir, 'remote_services.json');
-const rulesPath = path.join(dataDir, 'remote_rules.json');
+// Global error handling
+process.on('uncaughtException', (error) => {
+    log.error('Uncaught Exception:', error);
+    dialog.showErrorBox('Unexpected Error', error.message);
+});
 
-// Default Configuration
-const defaultConfig = {
-  lastUpdate: null,
-  blockingEnabled: true,
-  maxActiveServices: 3,
-  darkMode: true,
-  enabledServices: ['chatgpt', 'claude', 'gemini'], // Enabled by default
-  lastActiveService: null,
-  remoteUrls: {
-    services: "https://raw.githubusercontent.com/SilentCoderHere/aihub-config-data/main/ai_services_list.json",
-    rules: "https://raw.githubusercontent.com/SilentCoderHere/aihub-config-data/main/domain_filtering_rules.json"
-  }
-};
+process.on('unhandledRejection', (reason, promise) => {
+    log.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
 
-let config = {...defaultConfig};
-let commonAuthDomains = new Set();
-let rulesCache = null;
+// App Lifecycle
+const gotTheLock = app.requestSingleInstanceLock();
 
-// ==========================================
-// CONFIGURATION MANAGEMENT
-// ==========================================
-
-function loadConfig() {
-  try {
-    if (fs.existsSync(configPath)) {
-      const data = fs.readFileSync(configPath, 'utf8');
-      const savedConfig = JSON.parse(data);
-      // Deep merge with defaults to ensure all keys exist
-      config = {
-        ...defaultConfig,
-        ...savedConfig,
-        // Ensure arrays exist
-        enabledServices: savedConfig.enabledServices || defaultConfig.enabledServices
-      };
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Someone tried to run a second instance, we should focus our window.
+    const mainWindow = windowManager.getMainWindow();
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      if (!mainWindow.isVisible()) mainWindow.show();
+      mainWindow.focus();
     }
-    saveConfig();
-    console.log('Config loaded:', config);
-  } catch (error) {
-    console.error('Error loading config:', error);
-    config = {...defaultConfig};
-    saveConfig();
-  }
-}
 
-function saveConfig() {
-  try {
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-    console.log('Config saved');
-  } catch (error) {
-    console.error('Error saving config:', error);
-  }
-}
-
-// ==========================================
-// DATA MANAGEMENT
-// ==========================================
-
-function fetchUrl(url) {
-  return new Promise((resolve, reject) => {
-    const protocol = url.startsWith('https') ? https : http;
-
-    protocol.get(url, (response) => {
-      if (response.statusCode === 301 || response.statusCode === 302) {
-        if (response.headers.location) {
-          return fetchUrl(response.headers.location).then(resolve).catch(reject);
-        }
-      }
-
-      if (response.statusCode !== 200) {
-        return reject(new Error(`HTTP Status ${response.statusCode}`));
-      }
-
-      let data = '';
-      response.on('data', chunk => data += chunk);
-      response.on('end', () => resolve(data));
-    }).on('error', reject);
-  });
-}
-
-async function updateRemoteData() {
-  try {
-    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-
-    console.log("Downloading services...");
-    const servicesData = await fetchUrl(config.remoteUrls.services);
-    fs.writeFileSync(servicesPath, servicesData);
-
-    console.log("Downloading rules...");
-    const rulesData = await fetchUrl(config.remoteUrls.rules);
-    fs.writeFileSync(rulesPath, rulesData);
-
-    // Clear cache
-    rulesCache = null;
-
-    config.lastUpdate = new Date().toISOString();
-    saveConfig();
-
-    loadRules();
-    return { success: true };
-  } catch (error) {
-    console.error('Error updating data:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-function loadServices() {
-  try {
-    if (fs.existsSync(servicesPath)) {
-      const data = fs.readFileSync(servicesPath, 'utf8');
-      if (!data) return null;
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    console.error('Error loading services:', error);
-  }
-  return null;
-}
-
-function loadRules() {
-  try {
-    if (rulesCache) return rulesCache;
-
-    if (fs.existsSync(rulesPath)) {
-      const data = fs.readFileSync(rulesPath, 'utf8');
-      if (!data) return null;
-
-      const rules = JSON.parse(data);
-      rulesCache = rules;
-
-      if (rules.common_auth_domains) {
-        commonAuthDomains = new Set(rules.common_auth_domains);
-        console.log('Common Auth Domains Updated:', rules.common_auth_domains);
-      }
-
-      return rules;
-    }
-  } catch (error) {
-    console.error('Error loading rules:', error);
-  }
-  return null;
-}
-
-// ==========================================
-// DOMAIN BLOCKING LOGIC
-// ==========================================
-
-function isDomainAllowed(hostname, serviceDomains) {
-  if (!config.blockingEnabled) return true;
-
-  // Always allow common auth domains
-  for (const domain of commonAuthDomains) {
-    if (hostname === domain || hostname.endsWith('.' + domain)) {
-      return true;
-    }
-  }
-
-  // Check service whitelist
-  if (serviceDomains && serviceDomains.length > 0) {
-    for (const domain of serviceDomains) {
-      if (hostname === domain || hostname.endsWith('.' + domain)) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-function setupWebRequestBlocking() {
-  const ses = session.defaultSession;
-
-  ses.webRequest.onBeforeRequest(
-    { urls: ['*://*/*'] },
-    (details, callback) => {
-      try {
-        const url = new URL(details.url);
-        const hostname = url.hostname;
-
-        // Allow local resources
-        if (details.url.startsWith('devtools://') ||
-          details.url.startsWith('file://') ||
-          details.url.startsWith('chrome-extension://')) {
-          return callback({});
-          }
-
-          const serviceId = config.lastActiveService;
-        let serviceDomains = [];
-
-        if (serviceId) {
-          const rules = loadRules();
-          if (rules && rules.service_domains && rules.service_domains[serviceId]) {
-            serviceDomains = rules.service_domains[serviceId];
-          }
-        }
-
-        if (isDomainAllowed(hostname, serviceDomains)) {
-          callback({}); // Allow
-        } else {
-          console.log(`Blocked: ${hostname} (Service: ${serviceId || 'none'})`);
-          callback({ cancel: true }); // Block
-        }
-      } catch (e) {
-        console.error('Error in blocker:', e);
-        callback({});
-      }
-    }
-  );
-}
-
-// ==========================================
-// WINDOW MANAGEMENT
-// ==========================================
-
-function createMainWindow() {
-  const mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 800,
-    minHeight: 600,
-    title: 'AI Hub Desktop',
-    backgroundColor: '#202124',
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
-                                       webviewTag: true,
-                                       sandbox: false
+    // Deep link handling in windows/linux
+    const url = commandLine.find(arg => arg.startsWith('aihub://'));
+    if (url) {
+        log.info('Opened via deep link:', url);
+        // We could route this to switch to a specific tab
     }
   });
 
-  mainWindow.loadFile(path.join(__dirname, 'ui', 'index.html'));
-  mainWindow.on('closed', () => { mainWindow = null; });
+  app.on('open-url', (event, url) => {
+      // macOS deep link handling
+      event.preventDefault();
+      log.info('Opened via deep link (macOS):', url);
+  });
 
-  return mainWindow;
+  app.whenReady().then(() => {
+    log.info('App starting...');
+
+    // Initialize IPC handlers
+    ipcManager.setupIpcHandlers();
+
+    // Load initial data
+    dataStore.loadRules();
+
+    // Set up blocking
+    blockingManager.setupWebRequestBlocking();
+
+    // Create UI
+    windowManager.createMainWindow();
+    windowManager.setupTray();
+    windowManager.setupGlobalShortcuts();
+
+    // Auto Update
+    updaterManager.setupAutoUpdater();
+  });
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+  });
+
+  app.on('will-quit', () => {
+    if (session.defaultSession) {
+        session.defaultSession.webRequest.onBeforeRequest(null);
+    }
+  });
 }
-
-// ==========================================
-// IPC HANDLERS
-// ==========================================
-
-ipcMain.handle('get-config', () => config);
-
-ipcMain.handle('get-services', () => {
-  const services = loadServices();
-  return services;
-});
-
-ipcMain.handle('get-rules', () => loadRules());
-
-ipcMain.handle('update-remote-data', async () => await updateRemoteData());
-
-ipcMain.handle('save-config', (event, newConfig) => {
-  // Merge with existing config
-  if (newConfig.enabledServices) {
-    config.enabledServices = [...new Set(newConfig.enabledServices)]; // Remove duplicates
-  }
-
-  config = { ...config, ...newConfig };
-  saveConfig();
-  return config;
-});
-
-ipcMain.handle('toggle-service', (event, serviceId) => {
-  const index = config.enabledServices.indexOf(serviceId);
-  if (index === -1) {
-    config.enabledServices.push(serviceId);
-  } else {
-    config.enabledServices.splice(index, 1);
-  }
-  saveConfig();
-  return config.enabledServices;
-});
-
-ipcMain.on('set-active-service', (event, serviceId) => {
-  config.lastActiveService = serviceId;
-});
-
-// ==========================================
-// APP LIFECYCLE
-// ==========================================
-
-app.whenReady().then(() => {
-  loadConfig();
-  loadRules();
-  setupWebRequestBlocking();
-  createMainWindow();
-});
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
-
-app.on('will-quit', () => {
-  session.defaultSession.webRequest.onBeforeRequest(null);
-});

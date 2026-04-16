@@ -49,6 +49,10 @@
         <h2>Welcome to AI Hub Desktop</h2>
         <p>Click the <strong>+</strong> button to add a service.</p>
         <p>Configure services in Settings.</p>
+        <div id="quick-start-guide" class="quick-start-guide">
+          <h3>Quick Start</h3>
+          <div id="quick-start-services" class="quick-start-services-grid"></div>
+        </div>
       </div>
       <div id="webviews-container">
         <!-- Webviews will be attached here -->
@@ -119,7 +123,10 @@
 
     <!-- Status Bar -->
     <footer class="status-bar">
-      <div id="status-message" class="status-message">Ready</div>
+      <div id="status-message" class="status-message">
+        <span class="loading-indicator hidden" id="loading-indicator">⏳</span>
+        <span id="status-text">Ready</span>
+      </div>
       <div class="blocking-status">
         <span id="blocking-indicator" class="indicator active"></span>
         <span id="blocking-text">Blocking Active</span>
