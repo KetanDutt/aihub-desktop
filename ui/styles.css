@@ -43,6 +43,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: background-color 0.3s, color 0.3s;
 }
 
 /* Layout */
@@ -51,6 +52,7 @@ body {
   flex-direction: column;
   height: 100vh;
   width: 100%;
+  transition: background-color 0.3s, color 0.3s;
 }
 
 /* Header */
@@ -633,3 +635,13 @@ webview {
 .quick-start-services-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--spacing-md); margin-top: var(--spacing-md); }
 .quick-start-item { background: var(--bg-tertiary); padding: var(--spacing-md); border-radius: 8px; cursor: pointer; text-align: center; border: 1px solid var(--border-color); transition: background 0.2s; }
 .quick-start-item:hover { background: var(--bg-secondary); }
+
+.nav-controls { display: flex; align-items: center; background-color: var(--bg-tertiary); border-top: 1px solid var(--border-color); padding-left: 8px; }
+.nav-controls button { font-size: 14px; padding: 4px; }
+
+.spin { display: inline-block; animation: spin 1s linear infinite; }
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+.tab-favicon { width: 14px; height: 14px; border-radius: 2px; }
+.tab-loading { font-size: 10px; }
+.tab-item.dragging { opacity: 0.5; }

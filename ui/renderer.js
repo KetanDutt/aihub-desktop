@@ -4,6 +4,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- DOM Elements ---
   const elements = {
     tabsList: document.getElementById('tabs-list'),
+                          btnNavBack: document.getElementById('btn-nav-back'),
+                          btnNavForward: document.getElementById('btn-nav-forward'),
+                          btnNavReload: document.getElementById('btn-nav-reload'),
                           addTabBtn: document.getElementById('btn-add-tab'),
                           sidebar: document.getElementById('sidebar'),
                           closeSidebarBtn: document.getElementById('btn-close-sidebar'),
@@ -17,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
                           maxServicesInput: document.getElementById('max-services'),
                           toggleDarkMode: document.getElementById('toggle-dark-mode'),
                           lastUpdate: document.getElementById('last-update'),
-                          btnSaveSettings: document.getElementById('btn-save-settings'),
+
                           btnCloseSettings: document.getElementById('btn-close-settings'),
                           statusMessage: document.getElementById('status-message'),
                           blockingIndicator: document.getElementById('blocking-indicator'),
@@ -39,38 +42,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentTabId = null;
 
   // --- Utility Functions ---
-  const showStatus = (message, type = 'info') => {
-    const statusText = document.getElementById('status-text');
-    if (statusText) statusText.textContent = message;
 
-    // elements.statusMessage could be the container now
-    const container = document.getElementById('status-message');
-    if (container) container.className = `status-message ${type}`;
 
-    const loadingIndicator = document.getElementById('loading-indicator');
-    if (loadingIndicator) {
-      if (type === 'loading') {
-        loadingIndicator.classList.remove('hidden');
-      } else {
-        loadingIndicator.classList.add('hidden');
-      }
-    }
-
-    setTimeout(() => {
-      if (statusText) statusText.textContent = 'Ready';
-      if (container) container.className = 'status-message';
-      if (loadingIndicator) loadingIndicator.classList.add('hidden');
-    }, 3000);
-  };
-
-  const formatDate = (isoString) => {
-    if (!isoString) return 'Never';
-    return new Date(isoString).toLocaleString('en-US');
-  };
-
-  const generateId = (name) => {
-    return name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
-  };
 
   // --- Core Logic ---
 
@@ -178,6 +151,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
       elements.servicesList.appendChild(card);
     });
+
+    // Populate quick start grid on welcome screen
+    const quickStartGrid = document.getElementById('quick-start-services');
+    if (quickStartGrid) {
+        quickStartGrid.innerHTML = '';
+        enabledServices.forEach(service => {
+            const [name, url, type, privacy, color] = service;
+            const id = generateId(name);
+            const item = document.createElement('div');
+            item.className = 'quick-start-item';
+            item.textContent = name;
+            item.style.borderLeft = `4px solid ${color ? '#' + color : '#4285f4'}`;
+            item.addEventListener('click', () => {
+                createTab(id, url, name);
+            });
+            quickStartGrid.appendChild(item);
+        });
+    }
   };
 
   // Render all services in settings with toggle
@@ -219,8 +210,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const serviceId = e.target.dataset.serviceId;
         try {
           const result = await window.electronAPI.toggleService(serviceId);
+
+          // Only re-render if the set actually changed lengths or elements
+          const changed = result.length !== config.enabledServices.length ||
+                          !result.every(val => config.enabledServices.includes(val));
+
           config.enabledServices = result;
-          renderEnabledServices();
+
+          if (changed) {
+              renderEnabledServices();
+          }
+
           showStatus(`Service ${e.target.checked ? 'enabled' : 'disabled'}`, 'success');
         } catch (error) {
           console.error('Error toggling service:', error);
@@ -236,17 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Tab Management ---
 
-  const updateViewBounds = () => {
-      const containerBounds = elements.webviewsContainer.getBoundingClientRect();
-      window.electronAPI.setViewBounds({
-          x: Math.round(containerBounds.x),
-          y: Math.round(containerBounds.y),
-          width: Math.round(containerBounds.width),
-          height: Math.round(containerBounds.height)
-      });
-  };
-
-  const createTab = async (serviceId, url, title) => {
+    const createTab = async (serviceId, url, title) => {
     if (activeTabs.length >= config.maxActiveServices) {
       showStatus(`Memory limit reached (${config.maxActiveServices} services). Close a tab first.`, 'warning');
       return;
@@ -263,10 +253,41 @@ document.addEventListener('DOMContentLoaded', () => {
     const tab = document.createElement('div');
     tab.className = 'tab-item active';
     tab.dataset.id = serviceId;
+    tab.setAttribute('draggable', 'true');
     tab.innerHTML = `
+    <img class="tab-favicon" src="https://${new URL(url).hostname}/favicon.ico" onerror="this.style.display='none'">
     <span class="tab-title">${title}</span>
+    <span class="tab-loading spin hidden">⏳</span>
     <button class="btn-close-tab">✕</button>
     `;
+
+    // Simple Drag and Drop
+    tab.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', serviceId);
+        e.currentTarget.classList.add('dragging');
+    });
+    tab.addEventListener('dragend', (e) => {
+        e.currentTarget.classList.remove('dragging');
+    });
+    tab.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const dragging = document.querySelector('.dragging');
+        if (dragging && dragging !== tab) {
+            const list = elements.tabsList;
+            const children = Array.from(list.children);
+            if (children.indexOf(dragging) < children.indexOf(tab)) {
+                tab.after(dragging);
+            } else {
+                tab.before(dragging);
+            }
+        }
+    });
+    tab.addEventListener('drop', (e) => {
+        e.preventDefault();
+        // Update activeTabs array based on DOM order
+        const newOrderIds = Array.from(elements.tabsList.children).map(el => el.dataset.id);
+        activeTabs.sort((a, b) => newOrderIds.indexOf(a.id) - newOrderIds.indexOf(b.id));
+    });
 
     // Add event listeners
     tab.addEventListener('click', (e) => {
@@ -306,17 +327,25 @@ document.addEventListener('DOMContentLoaded', () => {
         switchToTab(serviceId);
 
         // Ensure bounds are correct after a new tab is initialized
-        updateViewBounds();
 
         // Hide welcome screen
         elements.welcomeScreen.style.display = 'none';
 
         // Set active service for blocking
-        window.electronAPI.setActiveService(serviceId);
+        try { window.electronAPI.setActiveService(serviceId); } catch(err) { console.error(err); }
     } catch(err) {
         showStatus(`Error creating tab: ${err}`, 'error');
         tab.remove();
     }
+  };
+
+    const switchToNextTab = (direction) => {
+    if (activeTabs.length < 2) return;
+    const currentIndex = activeTabs.findIndex(t => t.id === currentTabId);
+    let nextIndex = currentIndex + direction;
+    if (nextIndex >= activeTabs.length) nextIndex = 0;
+    if (nextIndex < 0) nextIndex = activeTabs.length - 1;
+    switchToTab(activeTabs[nextIndex].id);
   };
 
   const switchToTab = (id) => {
@@ -328,8 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
     currentTabId = id;
 
     // Ask main process to show specific WebContentsView
-    window.electronAPI.switchTab(id);
-    updateViewBounds();
+    try { window.electronAPI.switchTab(id); } catch(err) { console.error(err); }
 
     // Update active service for blocking
     window.electronAPI.setActiveService(id);
@@ -347,7 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Ask main process to destroy WebContentsView
-    window.electronAPI.closeTab(id);
+    try { window.electronAPI.closeTab(id); } catch(err) { console.error(err); }
 
     // Switch to another tab or show welcome
     if (activeTabs.length > 0) {
@@ -360,9 +388,17 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // Keep views in sync when window resizes
-  window.addEventListener('resize', updateViewBounds);
 
   // --- Settings Management ---
+
+
+  let saveSettingsTimeout;
+  const debouncedSaveSettings = () => {
+    clearTimeout(saveSettingsTimeout);
+    saveSettingsTimeout = setTimeout(() => {
+      saveSettings();
+    }, 500);
+  };
 
   const saveSettings = async () => {
     const newConfig = {
@@ -404,12 +440,19 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.settingsPanel.classList.add('hidden');
   });
 
-  // Save settings
-  elements.btnSaveSettings.addEventListener('click', saveSettings);
+  // Auto-save settings
+
+  elements.toggleBlocking.addEventListener('change', debouncedSaveSettings);
+  elements.maxServicesInput.addEventListener('input', debouncedSaveSettings);
+  elements.toggleDarkMode.addEventListener('change', debouncedSaveSettings);
+
 
   // Update services
   elements.btnUpdate.addEventListener('click', async () => {
-    showStatus('Updating services...', 'info');
+    elements.btnUpdate.disabled = true;
+    const icon = elements.btnUpdate.querySelector('span');
+    if (icon) icon.classList.add('spin');
+    showStatus('Updating services...', 'loading');
 
     try {
       const result = await window.electronAPI.updateRemoteData();
@@ -422,6 +465,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (error) {
       showStatus('Update failed', 'error');
+    } finally {
+      elements.btnUpdate.disabled = false;
+      if (icon) icon.classList.remove('spin');
     }
   });
 
@@ -440,13 +486,45 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Keyboard shortcuts
+    // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
+    // Tab switching
+    if (e.ctrlKey && e.key === 'Tab') {
+      e.preventDefault();
+      switchToNextTab(e.shiftKey ? -1 : 1);
+      return;
+    }
+
+    // Close current tab
+    if (e.ctrlKey && e.key.toLowerCase() === 'w') {
+      e.preventDefault();
+      if (currentTabId) closeTab(currentTabId);
+      return;
+    }
+
+    // Open sidebar
+    if (e.ctrlKey && e.key.toLowerCase() === 't') {
+      e.preventDefault();
+      elements.sidebar.classList.remove('hidden');
+      return;
+    }
+
     // Close sidebar with Escape
     if (e.key === 'Escape') {
       elements.sidebar.classList.add('hidden');
       elements.settingsPanel.classList.add('hidden');
     }
+  });
+
+
+  elements.btnNavBack.addEventListener('click', () => {
+    if (currentTabId) try { window.electronAPI.navGoBack(currentTabId); } catch(e){}
+  });
+  elements.btnNavForward.addEventListener('click', () => {
+    if (currentTabId) try { window.electronAPI.navGoForward(currentTabId); } catch(e){}
+  });
+  elements.btnNavReload.addEventListener('click', () => {
+    if (currentTabId) try { window.electronAPI.navReload(currentTabId); } catch(e){}
   });
 
   // --- Initialization ---
@@ -461,23 +539,43 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       // Restore Session Tabs
       if (config.openTabs && config.openTabs.length > 0) {
+        let validTabs = [];
         for (const savedTab of config.openTabs) {
           // Find matching service metadata to get the title
           const serviceMeta = allServices.find(s => generateId(s[0]) === savedTab.id);
-          const title = serviceMeta ? serviceMeta[0] : savedTab.id;
-          await createTab(savedTab.id, savedTab.url, title);
+          if (serviceMeta) {
+              const title = serviceMeta[0];
+              await createTab(savedTab.id, savedTab.url, title);
+              validTabs.push(savedTab);
+          } else {
+              console.warn(`Skipping invalid saved tab: ${savedTab.id}`);
+              showStatus(`Skipped deprecated service: ${savedTab.id}`, 'warning');
+          }
         }
 
         // Restore active tab
-        if (config.activeTabId && config.openTabs.find(t => t.id === config.activeTabId)) {
+        if (config.activeTabId && validTabs.find(t => t.id === config.activeTabId)) {
           switchToTab(config.activeTabId);
-        } else {
-          // Switch to the first tab if the last active was closed
-          switchToTab(config.openTabs[0].id);
+        } else if (validTabs.length > 0) {
+          // Switch to the first valid tab if the last active was closed
+          switchToTab(validTabs[0].id);
         }
       }
     }
   };
+
+    // Deep link handling
+  if (window.electronAPI.onDeepLinkOpen) {
+      window.electronAPI.onDeepLinkOpen((serviceId) => {
+          const service = allServices.find(s => generateId(s[0]) === serviceId);
+          if (service) {
+              const [name, url] = service;
+              createTab(serviceId, url, name);
+          } else {
+              showStatus(`Service ${serviceId} not found`, 'warning');
+          }
+      });
+  }
 
   init();
 });

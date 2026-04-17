@@ -3,6 +3,8 @@ const path = require('path');
 const configStore = require('./config');
 const log = require('electron-log');
 
+const { HEADER_HEIGHT, TABS_HEIGHT, STATUS_BAR_HEIGHT } = require('./constants');
+
 let mainWindow = null;
 let tray = null;
 let views = {}; // Maps tab ID to WebContentsView instance
@@ -38,7 +40,7 @@ function createMainWindow() {
   });
 
   mainWindow.on('resize', () => {
-      updateViewsBounds();
+      applyViewBounds();
   });
 
   // Set up deep linking
@@ -51,8 +53,20 @@ function getMainWindow() {
 
 function setupTray() {
   try {
+    const { nativeImage } = require('electron');
     const iconPath = path.join(__dirname, '..', 'ui', 'favicon.png');
-    tray = new Tray(iconPath);
+    let trayIcon;
+    try {
+        if (require('fs').existsSync(iconPath)) {
+            trayIcon = nativeImage.createFromPath(iconPath);
+        } else {
+            trayIcon = nativeImage.createEmpty();
+            console.warn('Tray icon not found, using empty fallback');
+        }
+    } catch (e) {
+        trayIcon = nativeImage.createEmpty();
+    }
+    tray = new Tray(trayIcon);
     const contextMenu = Menu.buildFromTemplate([
       { label: 'Show Window', click: () => { if (mainWindow) mainWindow.show(); } },
       { type: 'separator' },
@@ -114,10 +128,24 @@ function createTab(serviceId, url, userAgent) {
     }
 
     view.webContents.loadURL(url);
+
+    view.webContents.on('context-menu', (event, params) => {
+        const { Menu } = require('electron');
+        const menu = Menu.buildFromTemplate([
+            { role: 'copy' },
+            { role: 'paste' },
+            { type: 'separator' },
+            { label: 'Reload', click: () => view.webContents.reload() },
+            { type: 'separator' },
+            { role: 'toggleDevTools' }
+        ]);
+        menu.popup();
+    });
+
     mainWindow.contentView.addChildView(view);
     views[serviceId] = view;
 
-    updateViewsBounds();
+    applyViewBounds();
     switchTab(serviceId);
 
     // Update config state
@@ -169,22 +197,43 @@ function closeTab(serviceId) {
     configStore.updateConfigItem('openTabs', openTabs);
 }
 
-function updateViewsBounds() {
-    if (!mainWindow) return;
 
-    const bounds = mainWindow.getBounds();
-    // Assuming top header/sidebar takes some space. Let's adjust based on index.html layout.
-    // Generally renderer will pass bounds, or we calculate it.
-    // For simplicity, we calculate a rough estimate based on a typical layout.
-    // Width: total - sidebar(320px, unless hidden). Let's let renderer tell us the bounds for better accuracy,
-    // or set a default.
-    // To properly handle dynamic bounds, renderer must update us. We will export an IPC handler.
+function calculateViewBounds() {
+    if (!mainWindow) return { x: 0, y: 0, width: 0, height: 0 };
+    const [windowWidth, windowHeight] = mainWindow.getContentSize();
+    return {
+        x: 0,
+        y: HEADER_HEIGHT + TABS_HEIGHT,
+        width: windowWidth,
+        height: windowHeight - (HEADER_HEIGHT + TABS_HEIGHT + STATUS_BAR_HEIGHT)
+    };
 }
 
-function setViewBounds(bounds) {
+function applyViewBounds() {
     if (!mainWindow) return;
+    const bounds = calculateViewBounds();
     for (const view of Object.values(views)) {
         view.setBounds(bounds);
+    }
+}
+
+
+
+
+
+function navGoBack(serviceId) {
+    if (views[serviceId] && views[serviceId].webContents.canGoBack()) {
+        views[serviceId].webContents.goBack();
+    }
+}
+function navGoForward(serviceId) {
+    if (views[serviceId] && views[serviceId].webContents.canGoForward()) {
+        views[serviceId].webContents.goForward();
+    }
+}
+function navReload(serviceId) {
+    if (views[serviceId]) {
+        views[serviceId].webContents.reload();
     }
 }
 
@@ -196,5 +245,7 @@ module.exports = {
   createTab,
   switchTab,
   closeTab,
-  setViewBounds
-};
+  navGoBack,
+  navGoForward,
+  navReload,
+  };

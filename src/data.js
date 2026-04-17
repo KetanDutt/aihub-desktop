@@ -1,6 +1,7 @@
 const { app } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const fsPromises = fs.promises;
 const https = require('https');
 const http = require('http');
 const configStore = require('./config');
@@ -51,18 +52,18 @@ async function updateRemoteData() {
 
     log.info("Downloading services...");
     const servicesData = await fetchUrl(config.remoteUrls.services);
-    fs.writeFileSync(servicesPath, servicesData);
+    await fsPromises.writeFile(servicesPath, servicesData);
 
     log.info("Downloading rules...");
     const rulesData = await fetchUrl(config.remoteUrls.rules);
-    fs.writeFileSync(rulesPath, rulesData);
+    await fsPromises.writeFile(rulesPath, rulesData);
 
     // Clear cache
     rulesCache = null;
 
     configStore.updateConfigItem('lastUpdate', new Date().toISOString());
 
-    loadRules();
+    await loadRules();
     return { success: true };
   } catch (error) {
     log.error('Error updating data:', error);
@@ -70,11 +71,11 @@ async function updateRemoteData() {
   }
 }
 
-function loadServices() {
+async function loadServices() {
   initPaths();
   try {
     if (fs.existsSync(servicesPath)) {
-      const data = fs.readFileSync(servicesPath, 'utf8');
+      const data = await fsPromises.readFile(servicesPath, 'utf8');
       if (!data) return null;
       return JSON.parse(data);
     }
@@ -84,13 +85,13 @@ function loadServices() {
   return null;
 }
 
-function loadRules() {
+async function loadRules() {
   initPaths();
   try {
     if (rulesCache) return rulesCache;
 
     if (fs.existsSync(rulesPath)) {
-      const data = fs.readFileSync(rulesPath, 'utf8');
+      const data = await fsPromises.readFile(rulesPath, 'utf8');
       if (!data) return null;
 
       const rules = JSON.parse(data);

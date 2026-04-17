@@ -1,3 +1,7 @@
+
+function matchesDomain(hostname, domain) {
+  return hostname === domain || hostname.endsWith('.' + domain);
+}
 const { session } = require('electron');
 const configStore = require('./config');
 const dataStore = require('./data');
@@ -8,7 +12,7 @@ function isDomainAllowed(hostname, serviceDomains, blockingEnabled, commonAuthDo
 
   // Always allow common auth domains
   for (const domain of commonAuthDomains) {
-    if (hostname === domain || hostname.endsWith('.' + domain)) {
+    if (matchesDomain(hostname, domain)) {
       return true;
     }
   }
@@ -16,13 +20,36 @@ function isDomainAllowed(hostname, serviceDomains, blockingEnabled, commonAuthDo
   // Check service whitelist
   if (serviceDomains && serviceDomains.length > 0) {
     for (const domain of serviceDomains) {
-      if (hostname === domain || hostname.endsWith('.' + domain)) {
+      if (matchesDomain(hostname, domain)) {
         return true;
       }
     }
   }
 
   return false;
+}
+
+
+let blockingState = {
+  enabled: true,
+  activeServiceId: null,
+  allowedDomains: [],
+  commonAuthDomains: []
+};
+
+function updateBlockingState(config, rules, serviceId) {
+  blockingState.enabled = config.blockingEnabled;
+  blockingState.activeServiceId = serviceId;
+
+  if (rules && rules.common_auth_domains) {
+    blockingState.commonAuthDomains = rules.common_auth_domains;
+  }
+
+  if (serviceId && rules && rules.service_domains && rules.service_domains[serviceId]) {
+    blockingState.allowedDomains = rules.service_domains[serviceId];
+  } else {
+    blockingState.allowedDomains = [];
+  }
 }
 
 function setupWebRequestBlocking() {
@@ -46,21 +73,10 @@ function setupWebRequestBlocking() {
         const url = new URL(details.url);
         const hostname = url.hostname;
 
-        const config = configStore.getConfig();
-        const serviceId = config.lastActiveService;
-        let serviceDomains = [];
-
-        if (serviceId) {
-          const rules = dataStore.getRulesCache() || dataStore.loadRules();
-          if (rules && rules.service_domains && rules.service_domains[serviceId]) {
-            serviceDomains = rules.service_domains[serviceId];
-          }
-        }
-
-        if (isDomainAllowed(hostname, serviceDomains, config.blockingEnabled, dataStore.getCommonAuthDomains())) {
+        if (isDomainAllowed(hostname, blockingState.allowedDomains, blockingState.enabled, blockingState.commonAuthDomains)) {
           callback({}); // Allow
         } else {
-          log.info(`Blocked: ${hostname} (Service: ${serviceId || 'none'})`);
+          log.info(`Blocked: ${hostname} (Service: ${blockingState.activeServiceId || 'none'})`);
           callback({ cancel: true }); // Block
         }
       } catch (e) {
@@ -72,6 +88,7 @@ function setupWebRequestBlocking() {
 }
 
 module.exports = {
+  updateBlockingState,
   isDomainAllowed,
   setupWebRequestBlocking
 };
