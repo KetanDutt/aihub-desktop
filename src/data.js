@@ -19,8 +19,11 @@ function initPaths() {
   }
 }
 
+
 let rulesCache = null;
+let servicesCache = null;
 let commonAuthDomains = new Set();
+
 
 function fetchUrl(url) {
   return new Promise((resolve, reject) => {
@@ -58,8 +61,11 @@ async function updateRemoteData() {
     const rulesData = await fetchUrl(config.remoteUrls.rules);
     await fsPromises.writeFile(rulesPath, rulesData);
 
+
     // Clear cache
     rulesCache = null;
+    servicesCache = null;
+
 
     configStore.updateConfigItem('lastUpdate', new Date().toISOString());
 
@@ -74,10 +80,15 @@ async function updateRemoteData() {
 async function loadServices() {
   initPaths();
   try {
+    if (servicesCache) return servicesCache;
+
     if (fs.existsSync(servicesPath)) {
       const data = await fsPromises.readFile(servicesPath, 'utf8');
       if (!data) return null;
-      return JSON.parse(data);
+
+      const services = JSON.parse(data);
+      servicesCache = services;
+      return services;
     }
   } catch (error) {
     log.error('Error loading services:', error);
