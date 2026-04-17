@@ -1,4 +1,5 @@
-const Store = require('electron-store');
+const StoreModule = require('electron-store');
+const Store = StoreModule.default || StoreModule;
 
 const schema = {
   lastUpdate: {
@@ -53,7 +54,7 @@ const schema = {
   }
 };
 
-const store = new Store({ schema });
+const store = new Store({ schema, projectName: 'aihub-desktop' });
 
 function getConfig() {
   return store.store;

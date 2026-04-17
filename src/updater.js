@@ -1,8 +1,9 @@
-const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
 const { dialog } = require('electron');
 
 function setupAutoUpdater() {
+    const { autoUpdater } = require('electron-updater');
+
     autoUpdater.logger = log;
     autoUpdater.logger.transports.file.level = 'info';
 

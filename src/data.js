@@ -6,9 +6,17 @@ const http = require('http');
 const configStore = require('./config');
 const log = require('electron-log');
 
-const dataDir = path.join(app.getPath('userData'), 'data');
-const servicesPath = path.join(dataDir, 'remote_services.json');
-const rulesPath = path.join(dataDir, 'remote_rules.json');
+let dataDir = null;
+let servicesPath = null;
+let rulesPath = null;
+
+function initPaths() {
+  if (!dataDir) {
+    dataDir = path.join(app.getPath('userData'), 'data');
+    servicesPath = path.join(dataDir, 'remote_services.json');
+    rulesPath = path.join(dataDir, 'remote_rules.json');
+  }
+}
 
 let rulesCache = null;
 let commonAuthDomains = new Set();
@@ -36,6 +44,7 @@ function fetchUrl(url) {
 }
 
 async function updateRemoteData() {
+  initPaths();
   try {
     const config = configStore.getConfig();
     if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
@@ -62,6 +71,7 @@ async function updateRemoteData() {
 }
 
 function loadServices() {
+  initPaths();
   try {
     if (fs.existsSync(servicesPath)) {
       const data = fs.readFileSync(servicesPath, 'utf8');
@@ -75,6 +85,7 @@ function loadServices() {
 }
 
 function loadRules() {
+  initPaths();
   try {
     if (rulesCache) return rulesCache;
 
