@@ -19,6 +19,11 @@ document.addEventListener('DOMContentLoaded', () => {
                           toggleBlocking: document.getElementById('toggle-blocking'),
                           maxServicesInput: document.getElementById('max-services'),
                           toggleDarkMode: document.getElementById('toggle-dark-mode'),
+                          toggleProxy: document.getElementById('toggle-proxy'),
+                          proxyUrlInput: document.getElementById('proxy-url'),
+                          btnClearSession: document.getElementById('btn-clear-session'),
+
+
                           lastUpdate: document.getElementById('last-update'),
 
                           btnCloseSettings: document.getElementById('btn-close-settings'),
@@ -45,29 +50,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+
+  window.elements = elements;
+  window.config = config;
+  window.allServices = allServices;
+  window.activeTabs = activeTabs;
+  window.currentTabId = currentTabId;
+
   // --- Core Logic ---
 
   const loadConfig = async () => {
     try {
-      config = await window.electronAPI.getConfig();
+      window.config = config = await window.electronAPI.getConfig();
       console.log('Config loaded:', config);
 
       elements.toggleBlocking.checked = config.blockingEnabled;
       elements.maxServicesInput.value = config.maxActiveServices;
       elements.toggleDarkMode.checked = config.darkMode;
-      elements.lastUpdate.textContent = formatDate(config.lastUpdate);
+      elements.lastUpdate.textContent = window.formatDate(config.lastUpdate);
 
-      updateBlockingUI(config.blockingEnabled);
-      applyDarkMode(config.darkMode);
+      window.updateBlockingUI(config.blockingEnabled);
+      window.applyDarkMode(config.darkMode);
+      window.elements.toggleProxy.checked = window.config.useProxy || false;
+      window.elements.proxyUrlInput.value = window.config.proxyUrl || 'https://eu.proxysite.com/includes/process.php?action=update';
+
 
       // Render enabled services in sidebar
-      renderEnabledServices();
+      window.renderEnabledServices();
 
       // Render all services in settings
-      renderAllServicesInSettings();
+      window.renderAllServicesInSettings();
     } catch (error) {
       console.error('Error loading config:', error);
-      showStatus('Error loading configuration', 'error');
+      window.showStatus('Error loading configuration', 'error');
     }
   };
 
@@ -75,9 +90,9 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const data = await window.electronAPI.getServices();
       if (data && data.ai_services) {
-        allServices = data.ai_services;
-        renderEnabledServices();
-        renderAllServicesInSettings();
+        window.allServices = allServices = data.ai_services;
+        window.renderEnabledServices();
+        window.renderAllServicesInSettings();
       } else {
         elements.servicesList.innerHTML = '<div class="error-message">No services found. Click Update.</div>';
       }
@@ -100,324 +115,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // --- Render Functions ---
+  // --- Render Functions (Moved to ui/services.js) ---
 
-  // Render only enabled services in sidebar
-  const renderEnabledServices = () => {
-    elements.servicesList.innerHTML = '';
+// --- Tab Management (Moved to ui/tabs.js) ---
 
-    if (!config.enabledServices || config.enabledServices.length === 0) {
-      elements.servicesList.innerHTML = '<div class="info-message">No services enabled. Go to Settings to enable services.</div>';
-      return;
-    }
+// --- Settings Management (Moved to ui/settings.js) ---
 
-    // Filter only enabled services
-    const enabledServices = allServices.filter(service => {
-      const serviceId = generateId(service[0]);
-      return config.enabledServices.includes(serviceId);
-    });
-
-    if (enabledServices.length === 0) {
-      elements.servicesList.innerHTML = '<div class="info-message">No services enabled. Go to Settings to enable services.</div>';
-      return;
-    }
-
-    enabledServices.forEach(service => {
-      const [name, url, type, privacy, color] = service;
-      const id = generateId(name);
-      const bgColor = color ? `#${color}` : '#4285f4';
-
-      const card = document.createElement('div');
-      card.className = 'service-card';
-
-      const isActive = activeTabs.find(t => t.id === id);
-      const activeIndicator = isActive ? '🟢 ' : '';
-
-      card.innerHTML = `
-      <div class="service-header" style="background-color: ${bgColor}">
-      <h3 class="service-name">${activeIndicator}${name}</h3>
-      </div>
-      <div class="service-body">
-      <p class="service-type">${type || 'AI Service'}</p>
-      <p class="service-description">${privacy || ''}</p>
-      </div>
-      `;
-
-      card.addEventListener('click', () => {
-        createTab(id, url, name);
-        elements.sidebar.classList.add('hidden');
-        renderEnabledServices(); // re-render to update the active indicator
-      });
-
-      elements.servicesList.appendChild(card);
-    });
-
-    // Populate quick start grid on welcome screen
-    const quickStartGrid = document.getElementById('quick-start-services');
-    if (quickStartGrid) {
-        quickStartGrid.innerHTML = '';
-        enabledServices.forEach(service => {
-            const [name, url, type, privacy, color] = service;
-            const id = generateId(name);
-            const item = document.createElement('div');
-            item.className = 'quick-start-item';
-            item.textContent = name;
-            item.style.borderLeft = `4px solid ${color ? '#' + color : '#4285f4'}`;
-            item.addEventListener('click', () => {
-                createTab(id, url, name);
-            });
-            quickStartGrid.appendChild(item);
-        });
-    }
-  };
-
-  // Render all services in settings with toggle
-  const renderAllServicesInSettings = () => {
-    elements.allServicesList.innerHTML = '';
-
-    if (allServices.length === 0) {
-      elements.allServicesList.innerHTML = '<div class="info-message">No services loaded. Click Update button.</div>';
-      return;
-    }
-
-    allServices.forEach(service => {
-      const [name, url, type, privacy, color] = service;
-      const id = generateId(name);
-      const bgColor = color ? `#${color}` : '#4285f4';
-      const isEnabled = config.enabledServices.includes(id);
-
-      const item = document.createElement('div');
-      item.className = 'service-item';
-      item.dataset.id = id;
-
-      item.innerHTML = `
-      <div class="service-item-color" style="background-color: ${bgColor}"></div>
-      <div class="service-item-info">
-      <h4 class="service-item-name">${name}</h4>
-      <p class="service-item-type">${type || 'AI Service'}</p>
-      </div>
-      <div class="service-item-toggle">
-      <label class="toggle-switch">
-      <input type="checkbox" ${isEnabled ? 'checked' : ''} data-service-id="${id}">
-      <span class="toggle-slider"></span>
-      </label>
-      </div>
-      `;
-
-      // Add toggle event
-      const toggle = item.querySelector('input[type="checkbox"]');
-      toggle.addEventListener('change', async (e) => {
-        const serviceId = e.target.dataset.serviceId;
-        try {
-          const result = await window.electronAPI.toggleService(serviceId);
-
-          // Only re-render if the set actually changed lengths or elements
-          const changed = result.length !== config.enabledServices.length ||
-                          !result.every(val => config.enabledServices.includes(val));
-
-          config.enabledServices = result;
-
-          if (changed) {
-              renderEnabledServices();
-          }
-
-          showStatus(`Service ${e.target.checked ? 'enabled' : 'disabled'}`, 'success');
-        } catch (error) {
-          console.error('Error toggling service:', error);
-          showStatus('Error updating service', 'error');
-          // Revert toggle
-          e.target.checked = !e.target.checked;
-        }
-      });
-
-      elements.allServicesList.appendChild(item);
-    });
-  };
-
-  // --- Tab Management ---
-
-    const createTab = async (serviceId, url, title) => {
-    if (activeTabs.length >= config.maxActiveServices) {
-      showStatus(`Memory limit reached (${config.maxActiveServices} services). Close a tab first.`, 'warning');
-      return;
-    }
-
-    // Check if tab already exists
-    const existingTab = activeTabs.find(t => t.id === serviceId);
-    if (existingTab) {
-      switchToTab(serviceId);
-      return;
-    }
-
-    // Create tab element
-    const tab = document.createElement('div');
-    tab.className = 'tab-item active';
-    tab.dataset.id = serviceId;
-    tab.setAttribute('draggable', 'true');
-    tab.innerHTML = `
-    <img class="tab-favicon" src="https://${new URL(url).hostname}/favicon.ico" onerror="this.style.display='none'">
-    <span class="tab-title">${title}</span>
-    <span class="tab-loading spin hidden">⏳</span>
-    <button class="btn-close-tab">✕</button>
-    `;
-
-    // Simple Drag and Drop
-    tab.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('text/plain', serviceId);
-        e.currentTarget.classList.add('dragging');
-    });
-    tab.addEventListener('dragend', (e) => {
-        e.currentTarget.classList.remove('dragging');
-    });
-    tab.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        const dragging = document.querySelector('.dragging');
-        if (dragging && dragging !== tab) {
-            const list = elements.tabsList;
-            const children = Array.from(list.children);
-            if (children.indexOf(dragging) < children.indexOf(tab)) {
-                tab.after(dragging);
-            } else {
-                tab.before(dragging);
-            }
-        }
-    });
-    tab.addEventListener('drop', (e) => {
-        e.preventDefault();
-        // Update activeTabs array based on DOM order
-        const newOrderIds = Array.from(elements.tabsList.children).map(el => el.dataset.id);
-        activeTabs.sort((a, b) => newOrderIds.indexOf(a.id) - newOrderIds.indexOf(b.id));
-    });
-
-    // Add event listeners
-    tab.addEventListener('click', (e) => {
-      if (!e.target.classList.contains('btn-close-tab')) {
-        switchToTab(serviceId);
-      }
-    });
-
-    tab.querySelector('.btn-close-tab').addEventListener('click', (e) => {
-      e.stopPropagation();
-      closeTab(serviceId);
-    });
-
-    tab.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        // A minimal context menu simulation
-        if (confirm(`Close all OTHER tabs?`)) {
-            const tabsToClose = activeTabs.filter(t => t.id !== serviceId).map(t => t.id);
-            tabsToClose.forEach(id => closeTab(id));
-        }
-    });
-
-    // Add to DOM
-    elements.tabsList.appendChild(tab);
-
-    // Instead of <webview>, invoke main process WebContentsView
-    try {
-        const result = await window.electronAPI.createTab(serviceId, url, '');
-        if (result && result.success === false) {
-             showStatus(`Cannot create tab: ${result.error}`, 'error');
-             tab.remove();
-             return;
-        }
-
-        // Update state
-        activeTabs.push({ id: serviceId, url, title });
-        switchToTab(serviceId);
-
-        // Ensure bounds are correct after a new tab is initialized
-
-        // Hide welcome screen
-        elements.welcomeScreen.style.display = 'none';
-
-        // Set active service for blocking
-        try { window.electronAPI.setActiveService(serviceId); } catch(err) { console.error(err); }
-    } catch(err) {
-        showStatus(`Error creating tab: ${err}`, 'error');
-        tab.remove();
-    }
-  };
-
-    const switchToNextTab = (direction) => {
-    if (activeTabs.length < 2) return;
-    const currentIndex = activeTabs.findIndex(t => t.id === currentTabId);
-    let nextIndex = currentIndex + direction;
-    if (nextIndex >= activeTabs.length) nextIndex = 0;
-    if (nextIndex < 0) nextIndex = activeTabs.length - 1;
-    switchToTab(activeTabs[nextIndex].id);
-  };
-
-  const switchToTab = (id) => {
-    // Update tabs UI
-    document.querySelectorAll('.tab-item').forEach(tab => {
-      tab.classList.toggle('active', tab.dataset.id === id);
-    });
-
-    currentTabId = id;
-
-    // Ask main process to show specific WebContentsView
-    try { window.electronAPI.switchTab(id); } catch(err) { console.error(err); }
-
-    // Update active service for blocking
-    window.electronAPI.setActiveService(id);
-  };
-
-  const closeTab = (id) => {
-    // Remove from DOM
-    const tab = document.querySelector(`.tab-item[data-id="${id}"]`);
-    if (tab) tab.remove();
-
-    // Remove from state
-    const index = activeTabs.findIndex(t => t.id === id);
-    if (index !== -1) {
-      activeTabs.splice(index, 1);
-    }
-
-    // Ask main process to destroy WebContentsView
-    try { window.electronAPI.closeTab(id); } catch(err) { console.error(err); }
-
-    // Switch to another tab or show welcome
-    if (activeTabs.length > 0) {
-      const newIndex = Math.min(index, activeTabs.length - 1);
-      switchToTab(activeTabs[newIndex].id);
-    } else {
-      elements.welcomeScreen.style.display = 'flex';
-      currentTabId = null;
-    }
-  };
-
-  // Keep views in sync when window resizes
-
-  // --- Settings Management ---
-
-
-  let saveSettingsTimeout;
-  const debouncedSaveSettings = () => {
-    clearTimeout(saveSettingsTimeout);
-    saveSettingsTimeout = setTimeout(() => {
-      saveSettings();
-    }, 500);
-  };
-
-  const saveSettings = async () => {
-    const newConfig = {
-      blockingEnabled: elements.toggleBlocking.checked,
-      maxActiveServices: parseInt(elements.maxServicesInput.value) || 3,
-                          darkMode: elements.toggleDarkMode.checked
-    };
-
-    try {
-      config = await window.electronAPI.saveConfig(newConfig);
-      showStatus('Settings saved', 'success');
-      updateBlockingUI(config.blockingEnabled);
-      applyDarkMode(config.darkMode);
-    } catch (error) {
-      showStatus('Error saving settings', 'error');
-    }
-  };
-
-  // --- Event Listeners ---
+// --- Event Listeners ---
 
   // Open sidebar
   elements.addTabBtn.addEventListener('click', () => {
@@ -432,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Open settings
   elements.btnSettings.addEventListener('click', () => {
     elements.settingsPanel.classList.remove('hidden');
-    renderAllServicesInSettings();
+    window.renderAllServicesInSettings();
   });
 
   // Close settings
@@ -442,29 +146,62 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Auto-save settings
 
-  elements.toggleBlocking.addEventListener('change', debouncedSaveSettings);
-  elements.maxServicesInput.addEventListener('input', debouncedSaveSettings);
-  elements.toggleDarkMode.addEventListener('change', debouncedSaveSettings);
+  elements.toggleBlocking.addEventListener('change', window.debouncedSaveSettings);
+  elements.maxServicesInput.addEventListener('input', window.debouncedSaveSettings);
+  elements.toggleDarkMode.addEventListener('change', window.debouncedSaveSettings);
+  elements.toggleProxy.addEventListener('change', window.debouncedSaveSettings);
+  elements.proxyUrlInput.addEventListener('input', window.debouncedSaveSettings);
 
 
+
+
+
+
+  // Proxy Listeners
+  window.elements.toggleProxy.addEventListener('change', window.debouncedSaveSettings);
+  window.elements.proxyUrlInput.addEventListener('input', window.debouncedSaveSettings);
+
+
+
+    if (elements.btnClearSession) {
+      elements.btnClearSession.addEventListener('click', async () => {
+          if (confirm('Are you sure you want to clear all session data? This will log you out of all AI services.')) {
+              try {
+                  const success = await window.electronAPI.clearSessionData();
+                  if (success) {
+                      window.showStatus('Session data cleared successfully', 'success');
+                      // Reload current tab to reflect cleared state
+                      if (window.currentTabId) {
+                          window.electronAPI.navReload(window.currentTabId);
+                      }
+                  } else {
+                      window.showStatus('Failed to clear session data', 'error');
+                  }
+              } catch (err) {
+                  console.error(err);
+                  window.showStatus('Error clearing session data', 'error');
+              }
+          }
+      });
+  }
   // Update services
   elements.btnUpdate.addEventListener('click', async () => {
     elements.btnUpdate.disabled = true;
     const icon = elements.btnUpdate.querySelector('span');
     if (icon) icon.classList.add('spin');
-    showStatus('Updating services...', 'loading');
+    window.showStatus('Updating services...', 'loading');
 
     try {
       const result = await window.electronAPI.updateRemoteData();
       if (result.success) {
         await loadServices();
-        elements.lastUpdate.textContent = formatDate(config.lastUpdate);
-        showStatus('Update successful', 'success');
+        elements.lastUpdate.textContent = window.formatDate(config.lastUpdate);
+        window.showStatus('Update successful', 'success');
       } else {
-        showStatus('Update failed: ' + result.error, 'error');
+        window.showStatus('Update failed: ' + result.error, 'error');
       }
     } catch (error) {
-      showStatus('Update failed', 'error');
+      window.showStatus('Update failed', 'error');
     } finally {
       elements.btnUpdate.disabled = false;
       if (icon) icon.classList.remove('spin');
@@ -491,14 +228,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Tab switching
     if (e.ctrlKey && e.key === 'Tab') {
       e.preventDefault();
-      switchToNextTab(e.shiftKey ? -1 : 1);
+      window.switchToNextTab(e.shiftKey ? -1 : 1);
       return;
     }
 
     // Close current tab
     if (e.ctrlKey && e.key.toLowerCase() === 'w') {
       e.preventDefault();
-      if (currentTabId) closeTab(currentTabId);
+      if (currentTabId) window.closeTab(currentTabId);
       return;
     }
 
@@ -542,23 +279,23 @@ document.addEventListener('DOMContentLoaded', () => {
         let validTabs = [];
         for (const savedTab of config.openTabs) {
           // Find matching service metadata to get the title
-          const serviceMeta = allServices.find(s => generateId(s[0]) === savedTab.id);
+          const serviceMeta = allServices.find(s => window.generateId(s[0]) === savedTab.id);
           if (serviceMeta) {
               const title = serviceMeta[0];
-              await createTab(savedTab.id, savedTab.url, title);
+              await window.createTab(savedTab.id, savedTab.url, title);
               validTabs.push(savedTab);
           } else {
               console.warn(`Skipping invalid saved tab: ${savedTab.id}`);
-              showStatus(`Skipped deprecated service: ${savedTab.id}`, 'warning');
+              window.showStatus(`Skipped deprecated service: ${savedTab.id}`, 'warning');
           }
         }
 
         // Restore active tab
         if (config.activeTabId && validTabs.find(t => t.id === config.activeTabId)) {
-          switchToTab(config.activeTabId);
+          window.switchToTab(config.activeTabId);
         } else if (validTabs.length > 0) {
           // Switch to the first valid tab if the last active was closed
-          switchToTab(validTabs[0].id);
+          window.switchToTab(validTabs[0].id);
         }
       }
     }
@@ -567,12 +304,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Deep link handling
   if (window.electronAPI.onDeepLinkOpen) {
       window.electronAPI.onDeepLinkOpen((serviceId) => {
-          const service = allServices.find(s => generateId(s[0]) === serviceId);
+          const service = allServices.find(s => window.generateId(s[0]) === serviceId);
           if (service) {
               const [name, url] = service;
-              createTab(serviceId, url, name);
+              window.createTab(serviceId, url, name);
           } else {
-              showStatus(`Service ${serviceId} not found`, 'warning');
+              window.showStatus(`Service ${serviceId} not found`, 'warning');
           }
       });
   }

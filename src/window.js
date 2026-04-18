@@ -127,7 +127,22 @@ function createTab(serviceId, url, userAgent) {
         view.webContents.userAgent = userAgent;
     }
 
-    view.webContents.loadURL(url);
+
+    const config = configStore.getConfig();
+    let finalUrl = url;
+    if (config.useProxy && config.proxyUrl) {
+        // Construct standard web proxy URL structure. Some proxy sites use query params, some use POST.
+        // For simplicity, we just pass the URL in the d query param if it looks like proxysite.
+        if (config.proxyUrl.includes('?')) {
+            finalUrl = `${config.proxyUrl}&d=${encodeURIComponent(url)}`;
+        } else {
+            finalUrl = `${config.proxyUrl}?d=${encodeURIComponent(url)}`;
+        }
+        log.info(`Using proxy: ${finalUrl}`);
+    }
+
+    view.webContents.loadURL(finalUrl);
+
 
     view.webContents.on('context-menu', (event, params) => {
         const { Menu } = require('electron');

@@ -104,14 +104,31 @@
             </div>
 
             <div class="setting-group">
+              <label class="setting-label">
+                <input type="checkbox" id="toggle-proxy">
+                <span>Use Proxy</span>
+              </label>
+              <small class="setting-hint">Route traffic through a web proxy to bypass IP detection.</small>
+            </div>
+            <div class="setting-group">
+              <label class="setting-label" for="proxy-url">Proxy Gateway URL</label>
+              <input type="text" id="proxy-url" class="input-field" placeholder="e.g., https://eu.proxysite.com/includes/process.php?action=update">
+            </div>
+
+
+            <div class="setting-group">
               <div class="info-box">
                 <p><strong>Last Updated:</strong> <span id="last-update">Never</span></p>
               </div>
             </div>
 
-            <div class="setting-actions">
 
+            <div class="setting-group" style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+              <button id="btn-clear-session" class="btn btn-secondary" style="color: var(--error-color); border-color: var(--error-color);">Clear Session Data</button>
+              <small class="setting-hint" style="margin-left: 0;">Removes all cookies, caches, and stored session data.</small>
             </div>
+
+            <div class="setting-actions"></div>
           </div>
 
           <!-- Services Tab -->

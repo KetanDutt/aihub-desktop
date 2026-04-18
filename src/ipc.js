@@ -7,6 +7,16 @@ const log = require('electron-log');
 function setupIpcHandlers() {
   ipcMain.handle('get-config', () => configStore.getConfig());
 
+  ipcMain.handle('clear-session-data', async () => {
+    const { session } = require('electron');
+    if (session.defaultSession) {
+      await session.defaultSession.clearStorageData();
+      return true;
+    }
+    return false;
+  });
+
+
   ipcMain.handle('get-services', async () => {
     return await dataStore.loadServices();
   });

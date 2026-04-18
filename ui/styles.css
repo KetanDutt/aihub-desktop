@@ -114,7 +114,10 @@ body {
   color: var(--text-secondary);
   font-size: 13px;
   white-space: nowrap;
-  transition: background-color 0.2s, transform 0.1s;
+  transition: background-color 0.2s;
+  min-width: 60px;
+  max-width: 200px;
+  flex: 1 1 auto;
 }
 
 .tab-item.active {
@@ -128,9 +131,10 @@ body {
 }
 
 .tab-title {
-  max-width: 150px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex-grow: 1;
 }
 
 .btn-close-tab {
