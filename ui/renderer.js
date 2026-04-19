@@ -139,9 +139,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Filter only enabled services
+    const enabledSet = new Set(config.enabledServices);
     const enabledServices = allServices.filter(service => {
       const serviceId = generateId(service[0]);
-      return config.enabledServices.includes(serviceId);
+      return enabledSet.has(serviceId);
     });
 
     if (enabledServices.length === 0) {
@@ -206,11 +207,12 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    const enabledSet = new Set(config.enabledServices);
     allServices.forEach(service => {
       const [name, url, type, privacy, color] = service;
       const id = generateId(name);
       const bgColor = color ? `#${color}` : '#4285f4';
-      const isEnabled = config.enabledServices.includes(id);
+      const isEnabled = enabledSet.has(id);
 
       const item = document.createElement('div');
       item.className = 'service-item';
