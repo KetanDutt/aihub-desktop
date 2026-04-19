@@ -4,6 +4,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- DOM Elements ---
   const elements = {
     tabsList: document.getElementById('tabs-list'),
+                          btnNavBack: document.getElementById('btn-nav-back'),
+                          btnNavForward: document.getElementById('btn-nav-forward'),
+                          btnNavReload: document.getElementById('btn-nav-reload'),
                           addTabBtn: document.getElementById('btn-add-tab'),
                           sidebar: document.getElementById('sidebar'),
                           closeSidebarBtn: document.getElementById('btn-close-sidebar'),
@@ -16,8 +19,13 @@ document.addEventListener('DOMContentLoaded', () => {
                           toggleBlocking: document.getElementById('toggle-blocking'),
                           maxServicesInput: document.getElementById('max-services'),
                           toggleDarkMode: document.getElementById('toggle-dark-mode'),
+                          toggleProxy: document.getElementById('toggle-proxy'),
+                          proxyUrlInput: document.getElementById('proxy-url'),
+                          btnClearSession: document.getElementById('btn-clear-session'),
+
+
                           lastUpdate: document.getElementById('last-update'),
-                          btnSaveSettings: document.getElementById('btn-save-settings'),
+
                           btnCloseSettings: document.getElementById('btn-close-settings'),
                           statusMessage: document.getElementById('status-message'),
                           blockingIndicator: document.getElementById('blocking-indicator'),
@@ -39,62 +47,42 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentTabId = null;
 
   // --- Utility Functions ---
-  const showStatus = (message, type = 'info') => {
-    const statusText = document.getElementById('status-text');
-    if (statusText) statusText.textContent = message;
 
-    // elements.statusMessage could be the container now
-    const container = document.getElementById('status-message');
-    if (container) container.className = `status-message ${type}`;
 
-    const loadingIndicator = document.getElementById('loading-indicator');
-    if (loadingIndicator) {
-      if (type === 'loading') {
-        loadingIndicator.classList.remove('hidden');
-      } else {
-        loadingIndicator.classList.add('hidden');
-      }
-    }
 
-    setTimeout(() => {
-      if (statusText) statusText.textContent = 'Ready';
-      if (container) container.className = 'status-message';
-      if (loadingIndicator) loadingIndicator.classList.add('hidden');
-    }, 3000);
-  };
 
-  const formatDate = (isoString) => {
-    if (!isoString) return 'Never';
-    return new Date(isoString).toLocaleString('en-US');
-  };
-
-  const generateId = (name) => {
-    return name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
-  };
+  window.elements = elements;
+  window.config = config;
+  window.allServices = allServices;
+  window.activeTabs = activeTabs;
+  window.currentTabId = currentTabId;
 
   // --- Core Logic ---
 
   const loadConfig = async () => {
     try {
-      config = await window.electronAPI.getConfig();
+      window.config = config = await window.electronAPI.getConfig();
       console.log('Config loaded:', config);
 
       elements.toggleBlocking.checked = config.blockingEnabled;
       elements.maxServicesInput.value = config.maxActiveServices;
       elements.toggleDarkMode.checked = config.darkMode;
-      elements.lastUpdate.textContent = formatDate(config.lastUpdate);
+      elements.lastUpdate.textContent = window.formatDate(config.lastUpdate);
 
-      updateBlockingUI(config.blockingEnabled);
-      applyDarkMode(config.darkMode);
+      window.updateBlockingUI(config.blockingEnabled);
+      window.applyDarkMode(config.darkMode);
+      window.elements.toggleProxy.checked = window.config.useProxy || false;
+      window.elements.proxyUrlInput.value = window.config.proxyUrl || 'https://eu.proxysite.com/includes/process.php?action=update';
+
 
       // Render enabled services in sidebar
-      renderEnabledServices();
+      window.renderEnabledServices();
 
       // Render all services in settings
-      renderAllServicesInSettings();
+      window.renderAllServicesInSettings();
     } catch (error) {
       console.error('Error loading config:', error);
-      showStatus('Error loading configuration', 'error');
+      window.showStatus('Error loading configuration', 'error');
     }
   };
 
@@ -102,9 +90,9 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const data = await window.electronAPI.getServices();
       if (data && data.ai_services) {
-        allServices = data.ai_services;
-        renderEnabledServices();
-        renderAllServicesInSettings();
+        window.allServices = allServices = data.ai_services;
+        window.renderEnabledServices();
+        window.renderAllServicesInSettings();
       } else {
         elements.servicesList.innerHTML = '<div class="error-message">No services found. Click Update.</div>';
       }
@@ -127,6 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  // --- Render Functions (Moved to ui/services.js) ---
   // --- Render Functions ---
 
   // Render only enabled services in sidebar
@@ -414,26 +403,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Keep views in sync when window resizes
   window.addEventListener('resize', updateViewBounds);
 
-  // --- Settings Management ---
+// --- Tab Management (Moved to ui/tabs.js) ---
 
-  const saveSettings = async () => {
-    const newConfig = {
-      blockingEnabled: elements.toggleBlocking.checked,
-      maxActiveServices: parseInt(elements.maxServicesInput.value) || 3,
-                          darkMode: elements.toggleDarkMode.checked
-    };
+// --- Settings Management (Moved to ui/settings.js) ---
 
-    try {
-      config = await window.electronAPI.saveConfig(newConfig);
-      showStatus('Settings saved', 'success');
-      updateBlockingUI(config.blockingEnabled);
-      applyDarkMode(config.darkMode);
-    } catch (error) {
-      showStatus('Error saving settings', 'error');
-    }
-  };
-
-  // --- Event Listeners ---
+// --- Event Listeners ---
 
   // Open sidebar
   elements.addTabBtn.addEventListener('click', () => {
@@ -448,7 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Open settings
   elements.btnSettings.addEventListener('click', () => {
     elements.settingsPanel.classList.remove('hidden');
-    renderAllServicesInSettings();
+    window.renderAllServicesInSettings();
   });
 
   // Close settings
@@ -456,24 +430,67 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.settingsPanel.classList.add('hidden');
   });
 
-  // Save settings
-  elements.btnSaveSettings.addEventListener('click', saveSettings);
+  // Auto-save settings
 
+  elements.toggleBlocking.addEventListener('change', window.debouncedSaveSettings);
+  elements.maxServicesInput.addEventListener('input', window.debouncedSaveSettings);
+  elements.toggleDarkMode.addEventListener('change', window.debouncedSaveSettings);
+  elements.toggleProxy.addEventListener('change', window.debouncedSaveSettings);
+  elements.proxyUrlInput.addEventListener('input', window.debouncedSaveSettings);
+
+
+
+
+
+
+  // Proxy Listeners
+  window.elements.toggleProxy.addEventListener('change', window.debouncedSaveSettings);
+  window.elements.proxyUrlInput.addEventListener('input', window.debouncedSaveSettings);
+
+
+
+    if (elements.btnClearSession) {
+      elements.btnClearSession.addEventListener('click', async () => {
+          if (confirm('Are you sure you want to clear all session data? This will log you out of all AI services.')) {
+              try {
+                  const success = await window.electronAPI.clearSessionData();
+                  if (success) {
+                      window.showStatus('Session data cleared successfully', 'success');
+                      // Reload current tab to reflect cleared state
+                      if (window.currentTabId) {
+                          window.electronAPI.navReload(window.currentTabId);
+                      }
+                  } else {
+                      window.showStatus('Failed to clear session data', 'error');
+                  }
+              } catch (err) {
+                  console.error(err);
+                  window.showStatus('Error clearing session data', 'error');
+              }
+          }
+      });
+  }
   // Update services
   elements.btnUpdate.addEventListener('click', async () => {
-    showStatus('Updating services...', 'info');
+    elements.btnUpdate.disabled = true;
+    const icon = elements.btnUpdate.querySelector('span');
+    if (icon) icon.classList.add('spin');
+    window.showStatus('Updating services...', 'loading');
 
     try {
       const result = await window.electronAPI.updateRemoteData();
       if (result.success) {
         await loadServices();
-        elements.lastUpdate.textContent = formatDate(config.lastUpdate);
-        showStatus('Update successful', 'success');
+        elements.lastUpdate.textContent = window.formatDate(config.lastUpdate);
+        window.showStatus('Update successful', 'success');
       } else {
-        showStatus('Update failed: ' + result.error, 'error');
+        window.showStatus('Update failed: ' + result.error, 'error');
       }
     } catch (error) {
-      showStatus('Update failed', 'error');
+      window.showStatus('Update failed', 'error');
+    } finally {
+      elements.btnUpdate.disabled = false;
+      if (icon) icon.classList.remove('spin');
     }
   });
 
@@ -492,13 +509,45 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Keyboard shortcuts
+    // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
+    // Tab switching
+    if (e.ctrlKey && e.key === 'Tab') {
+      e.preventDefault();
+      window.switchToNextTab(e.shiftKey ? -1 : 1);
+      return;
+    }
+
+    // Close current tab
+    if (e.ctrlKey && e.key.toLowerCase() === 'w') {
+      e.preventDefault();
+      if (currentTabId) window.closeTab(currentTabId);
+      return;
+    }
+
+    // Open sidebar
+    if (e.ctrlKey && e.key.toLowerCase() === 't') {
+      e.preventDefault();
+      elements.sidebar.classList.remove('hidden');
+      return;
+    }
+
     // Close sidebar with Escape
     if (e.key === 'Escape') {
       elements.sidebar.classList.add('hidden');
       elements.settingsPanel.classList.add('hidden');
     }
+  });
+
+
+  elements.btnNavBack.addEventListener('click', () => {
+    if (currentTabId) try { window.electronAPI.navGoBack(currentTabId); } catch(e){}
+  });
+  elements.btnNavForward.addEventListener('click', () => {
+    if (currentTabId) try { window.electronAPI.navGoForward(currentTabId); } catch(e){}
+  });
+  elements.btnNavReload.addEventListener('click', () => {
+    if (currentTabId) try { window.electronAPI.navReload(currentTabId); } catch(e){}
   });
 
   // --- Initialization ---
@@ -513,23 +562,43 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       // Restore Session Tabs
       if (config.openTabs && config.openTabs.length > 0) {
+        let validTabs = [];
         for (const savedTab of config.openTabs) {
           // Find matching service metadata to get the title
-          const serviceMeta = allServices.find(s => generateId(s[0]) === savedTab.id);
-          const title = serviceMeta ? serviceMeta[0] : savedTab.id;
-          await createTab(savedTab.id, savedTab.url, title);
+          const serviceMeta = allServices.find(s => window.generateId(s[0]) === savedTab.id);
+          if (serviceMeta) {
+              const title = serviceMeta[0];
+              await window.createTab(savedTab.id, savedTab.url, title);
+              validTabs.push(savedTab);
+          } else {
+              console.warn(`Skipping invalid saved tab: ${savedTab.id}`);
+              window.showStatus(`Skipped deprecated service: ${savedTab.id}`, 'warning');
+          }
         }
 
         // Restore active tab
-        if (config.activeTabId && config.openTabs.find(t => t.id === config.activeTabId)) {
-          switchToTab(config.activeTabId);
-        } else {
-          // Switch to the first tab if the last active was closed
-          switchToTab(config.openTabs[0].id);
+        if (config.activeTabId && validTabs.find(t => t.id === config.activeTabId)) {
+          window.switchToTab(config.activeTabId);
+        } else if (validTabs.length > 0) {
+          // Switch to the first valid tab if the last active was closed
+          window.switchToTab(validTabs[0].id);
         }
       }
     }
   };
+
+    // Deep link handling
+  if (window.electronAPI.onDeepLinkOpen) {
+      window.electronAPI.onDeepLinkOpen((serviceId) => {
+          const service = allServices.find(s => window.generateId(s[0]) === serviceId);
+          if (service) {
+              const [name, url] = service;
+              window.createTab(serviceId, url, name);
+          } else {
+              window.showStatus(`Service ${serviceId} not found`, 'warning');
+          }
+      });
+  }
 
   init();
 });

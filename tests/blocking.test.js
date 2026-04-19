@@ -38,6 +38,17 @@ jest.mock('electron-log', () => ({
 const { isDomainAllowed } = require('../src/blocking');
 
 describe('Domain Blocking Logic', () => {
+
+  it('should block domains without dot prefix incorrectly matching', () => {
+    const serviceDomains = ['openai.com'];
+    expect(isDomainAllowed('notopenai.com', serviceDomains, true, new Set())).toBe(false);
+  });
+
+  it('should allow exact subdomains matching', () => {
+    const serviceDomains = ['openai.com'];
+    expect(isDomainAllowed('api.openai.com', serviceDomains, true, new Set())).toBe(true);
+  });
+
   it('should allow domains when blocking is disabled', () => {
     expect(isDomainAllowed('evil.com', [], false, new Set())).toBe(true);
   });

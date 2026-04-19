@@ -14,6 +14,14 @@ const schema = {
     type: 'number',
     default: 3
   },
+    useProxy: {
+    type: 'boolean',
+    default: false
+  },
+  proxyUrl: {
+    type: 'string',
+    default: 'https://eu.proxysite.com/includes/process.php?action=update'
+  },
   darkMode: {
     type: 'boolean',
     default: true

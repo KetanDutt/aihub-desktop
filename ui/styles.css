@@ -43,6 +43,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: background-color 0.3s, color 0.3s;
 }
 
 /* Layout */
@@ -51,6 +52,7 @@ body {
   flex-direction: column;
   height: 100vh;
   width: 100%;
+  transition: background-color 0.3s, color 0.3s;
 }
 
 /* Header */
@@ -102,7 +104,7 @@ body {
 .tab-item {
   padding: var(--spacing-sm) var(--spacing-md);
   background-color: var(--bg-tertiary);
-  border-radius: 8px 8px 0 0;
+  border-radius: 12px 12px 0 0;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -113,6 +115,9 @@ body {
   font-size: 13px;
   white-space: nowrap;
   transition: background-color 0.2s;
+  min-width: 60px;
+  max-width: 200px;
+  flex: 1 1 auto;
 }
 
 .tab-item.active {
@@ -126,9 +131,10 @@ body {
 }
 
 .tab-title {
-  max-width: 150px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex-grow: 1;
 }
 
 .btn-close-tab {
@@ -255,10 +261,10 @@ webview {
 }
 
 .service-card {
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
   overflow: hidden;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s;
   border: 1px solid var(--border-color);
 }
 
@@ -301,7 +307,7 @@ webview {
 .info-message, .error-message {
   padding: var(--spacing-md);
   text-align: center;
-  border-radius: 8px;
+  border-radius: 12px;
   background-color: var(--bg-tertiary);
 }
 
@@ -414,14 +420,14 @@ webview {
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 14px;
 }
 
 .info-box {
   background-color: var(--bg-tertiary);
   padding: var(--spacing-md);
-  border-radius: 8px;
+  border-radius: 12px;
 }
 
 .setting-actions {
@@ -452,8 +458,8 @@ webview {
   gap: var(--spacing-md);
   padding: var(--spacing-md);
   background-color: var(--bg-primary);
-  border-radius: 8px;
-  transition: background-color 0.2s;
+  border-radius: 12px;
+  transition: background-color 0.2s, transform 0.1s;
 }
 
 .service-item:hover {
@@ -463,7 +469,7 @@ webview {
 .service-item-color {
   width: 40px;
   height: 40px;
-  border-radius: 8px;
+  border-radius: 12px;
   flex-shrink: 0;
 }
 
@@ -538,9 +544,9 @@ webview {
   color: var(--text-primary);
   cursor: pointer;
   padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 14px;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, transform 0.1s;
 }
 
 .btn-primary {
@@ -608,7 +614,12 @@ webview {
 }
 
 /* Utility */
-.hidden { display: none !important; }
+.hidden { opacity: 0 !important; pointer-events: none; }
+.sidebar, .settings-panel { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s; }
+.sidebar.hidden { transform: translateX(-100%); display: flex !important; }
+.settings-panel.hidden { transform: translateX(100%); display: flex !important; }
+.status-message { transition: opacity 0.3s; }
+.status-message.hidden { opacity: 0; }
 
 /* Scrollbar */
 ::-webkit-scrollbar {
@@ -622,7 +633,7 @@ webview {
 
 ::-webkit-scrollbar-thumb {
   background: var(--bg-tertiary);
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -631,5 +642,15 @@ webview {
 
 .quick-start-guide { margin-top: var(--spacing-lg); width: 80%; max-width: 600px; text-align: left;}
 .quick-start-services-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--spacing-md); margin-top: var(--spacing-md); }
-.quick-start-item { background: var(--bg-tertiary); padding: var(--spacing-md); border-radius: 8px; cursor: pointer; text-align: center; border: 1px solid var(--border-color); transition: background 0.2s; }
+.quick-start-item { background: var(--bg-tertiary); padding: var(--spacing-md); border-radius: 12px; cursor: pointer; text-align: center; border: 1px solid var(--border-color); transition: background 0.2s; }
 .quick-start-item:hover { background: var(--bg-secondary); }
+
+.nav-controls { display: flex; align-items: center; background-color: var(--bg-tertiary); border-top: 1px solid var(--border-color); padding-left: 8px; }
+.nav-controls button { font-size: 14px; padding: 4px; }
+
+.spin { display: inline-block; animation: spin 1s linear infinite; }
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+.tab-favicon { width: 14px; height: 14px; border-radius: 2px; }
+.tab-loading { font-size: 10px; }
+.tab-item.dragging { opacity: 0.5; }

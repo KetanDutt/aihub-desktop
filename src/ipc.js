@@ -7,16 +7,29 @@ const log = require('electron-log');
 function setupIpcHandlers() {
   ipcMain.handle('get-config', () => configStore.getConfig());
 
-  ipcMain.handle('get-services', () => {
-    return dataStore.loadServices();
+  ipcMain.handle('clear-session-data', async () => {
+    const { session } = require('electron');
+    if (session.defaultSession) {
+      await session.defaultSession.clearStorageData();
+      return true;
+    }
+    return false;
   });
 
-  ipcMain.handle('get-rules', () => dataStore.loadRules());
+
+  ipcMain.handle('get-services', async () => {
+    return await dataStore.loadServices();
+  });
+
+  ipcMain.handle('get-rules', async () => await dataStore.loadRules());
 
   ipcMain.handle('update-remote-data', async () => await dataStore.updateRemoteData());
 
   ipcMain.handle('save-config', (event, newConfig) => {
-    return configStore.saveConfig(newConfig);
+    const config = configStore.saveConfig(newConfig);
+    const { updateBlockingState } = require('./blocking');
+    updateBlockingState(config, dataStore.getRulesCache(), config.lastActiveService);
+    return config;
   });
 
   ipcMain.handle('toggle-service', (event, serviceId) => {
@@ -25,6 +38,8 @@ function setupIpcHandlers() {
 
   ipcMain.on('set-active-service', (event, serviceId) => {
     configStore.updateConfigItem('lastActiveService', serviceId);
+    const { updateBlockingState } = require('./blocking');
+    updateBlockingState(configStore.getConfig(), dataStore.getRulesCache(), serviceId);
   });
 
   // -- Tab Management --
@@ -39,13 +54,13 @@ function setupIpcHandlers() {
     windowManager.switchTab(serviceId);
   });
 
+    ipcMain.on('nav-go-back', (event, serviceId) => windowManager.navGoBack(serviceId));
+  ipcMain.on('nav-go-forward', (event, serviceId) => windowManager.navGoForward(serviceId));
+  ipcMain.on('nav-reload', (event, serviceId) => windowManager.navReload(serviceId));
+
   ipcMain.on('close-tab', (event, serviceId) => {
     log.info(`Closing tab ${serviceId}`);
     windowManager.closeTab(serviceId);
-  });
-
-  ipcMain.on('set-view-bounds', (event, bounds) => {
-      windowManager.setViewBounds(bounds);
   });
 }
 
