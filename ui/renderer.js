@@ -116,6 +116,292 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // --- Render Functions (Moved to ui/services.js) ---
+  // --- Render Functions ---
+
+  // Render only enabled services in sidebar
+  const renderEnabledServices = () => {
+    elements.servicesList.innerHTML = '';
+
+    if (!config.enabledServices || config.enabledServices.length === 0) {
+      elements.servicesList.innerHTML = '<div class="info-message">No services enabled. Go to Settings to enable services.</div>';
+      return;
+    }
+
+    // Filter only enabled services
+    const enabledSet = new Set(config.enabledServices);
+    const enabledServices = allServices.filter(service => {
+      const serviceId = generateId(service[0]);
+      return enabledSet.has(serviceId);
+    });
+
+    if (enabledServices.length === 0) {
+      elements.servicesList.innerHTML = '<div class="info-message">No services enabled. Go to Settings to enable services.</div>';
+      return;
+    }
+
+    enabledServices.forEach(service => {
+      const [name, url, type, privacy, color] = service;
+      const id = generateId(name);
+      const bgColor = color ? `#${color}` : '#4285f4';
+
+      const card = document.createElement('div');
+      card.className = 'service-card';
+
+      const isActive = activeTabs.find(t => t.id === id);
+      const activeIndicator = isActive ? '🟢 ' : '';
+
+      const header = document.createElement('div');
+      header.className = 'service-header';
+      header.style.backgroundColor = bgColor;
+
+      const nameEl = document.createElement('h3');
+      nameEl.className = 'service-name';
+      nameEl.textContent = `${activeIndicator}${name}`;
+
+      header.appendChild(nameEl);
+
+      const body = document.createElement('div');
+      body.className = 'service-body';
+
+      const typeEl = document.createElement('p');
+      typeEl.className = 'service-type';
+      typeEl.textContent = type || 'AI Service';
+
+      const descEl = document.createElement('p');
+      descEl.className = 'service-description';
+      descEl.textContent = privacy || '';
+
+      body.appendChild(typeEl);
+      body.appendChild(descEl);
+
+      card.appendChild(header);
+      card.appendChild(body);
+
+      card.addEventListener('click', () => {
+        createTab(id, url, name);
+        elements.sidebar.classList.add('hidden');
+        renderEnabledServices(); // re-render to update the active indicator
+      });
+
+      elements.servicesList.appendChild(card);
+    });
+  };
+
+  // Render all services in settings with toggle
+  const renderAllServicesInSettings = () => {
+    elements.allServicesList.innerHTML = '';
+
+    if (allServices.length === 0) {
+      elements.allServicesList.innerHTML = '<div class="info-message">No services loaded. Click Update button.</div>';
+      return;
+    }
+
+    const enabledSet = new Set(config.enabledServices);
+    allServices.forEach(service => {
+      const [name, url, type, privacy, color] = service;
+      const id = generateId(name);
+      const bgColor = color ? `#${color}` : '#4285f4';
+      const isEnabled = enabledSet.has(id);
+
+      const item = document.createElement('div');
+      item.className = 'service-item';
+      item.dataset.id = id;
+
+      const colorIndicator = document.createElement('div');
+      colorIndicator.className = 'service-item-color';
+      colorIndicator.style.backgroundColor = bgColor;
+
+      const info = document.createElement('div');
+      info.className = 'service-item-info';
+
+      const nameEl = document.createElement('h4');
+      nameEl.className = 'service-item-name';
+      nameEl.textContent = name;
+
+      const typeEl = document.createElement('p');
+      typeEl.className = 'service-item-type';
+      typeEl.textContent = type || 'AI Service';
+
+      info.appendChild(nameEl);
+      info.appendChild(typeEl);
+
+      const toggleContainer = document.createElement('div');
+      toggleContainer.className = 'service-item-toggle';
+
+      const label = document.createElement('label');
+      label.className = 'toggle-switch';
+
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = isEnabled;
+      input.dataset.serviceId = id;
+
+      const slider = document.createElement('span');
+      slider.className = 'toggle-slider';
+
+      label.appendChild(input);
+      label.appendChild(slider);
+      toggleContainer.appendChild(label);
+
+      item.appendChild(colorIndicator);
+      item.appendChild(info);
+      item.appendChild(toggleContainer);
+
+      // Add toggle event
+      const toggle = item.querySelector('input[type="checkbox"]');
+      toggle.addEventListener('change', async (e) => {
+        const serviceId = e.target.dataset.serviceId;
+        try {
+          const result = await window.electronAPI.toggleService(serviceId);
+          config.enabledServices = result;
+          renderEnabledServices();
+          showStatus(`Service ${e.target.checked ? 'enabled' : 'disabled'}`, 'success');
+        } catch (error) {
+          console.error('Error toggling service:', error);
+          showStatus('Error updating service', 'error');
+          // Revert toggle
+          e.target.checked = !e.target.checked;
+        }
+      });
+
+      elements.allServicesList.appendChild(item);
+    });
+  };
+
+  // --- Tab Management ---
+
+  const updateViewBounds = () => {
+      const containerBounds = elements.webviewsContainer.getBoundingClientRect();
+      window.electronAPI.setViewBounds({
+          x: Math.round(containerBounds.x),
+          y: Math.round(containerBounds.y),
+          width: Math.round(containerBounds.width),
+          height: Math.round(containerBounds.height)
+      });
+  };
+
+  const createTab = async (serviceId, url, title) => {
+    if (activeTabs.length >= config.maxActiveServices) {
+      showStatus(`Memory limit reached (${config.maxActiveServices} services). Close a tab first.`, 'warning');
+      return;
+    }
+
+    // Check if tab already exists
+    const existingTab = activeTabs.find(t => t.id === serviceId);
+    if (existingTab) {
+      switchToTab(serviceId);
+      return;
+    }
+
+    // Create tab element
+    const tab = document.createElement('div');
+    tab.className = 'tab-item active';
+    tab.dataset.id = serviceId;
+
+    const tabTitle = document.createElement('span');
+    tabTitle.className = 'tab-title';
+    tabTitle.textContent = title;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'btn-close-tab';
+    closeBtn.textContent = '✕';
+
+    tab.appendChild(tabTitle);
+    tab.appendChild(closeBtn);
+
+    // Add event listeners
+    tab.addEventListener('click', (e) => {
+      if (!e.target.classList.contains('btn-close-tab')) {
+        switchToTab(serviceId);
+      }
+    });
+
+    tab.querySelector('.btn-close-tab').addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeTab(serviceId);
+    });
+
+    tab.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        // A minimal context menu simulation
+        if (confirm(`Close all OTHER tabs?`)) {
+            const tabsToClose = activeTabs.filter(t => t.id !== serviceId).map(t => t.id);
+            tabsToClose.forEach(id => closeTab(id));
+        }
+    });
+
+    // Add to DOM
+    elements.tabsList.appendChild(tab);
+
+    // Instead of <webview>, invoke main process WebContentsView
+    try {
+        const result = await window.electronAPI.createTab(serviceId, url, '');
+        if (result && result.success === false) {
+             showStatus(`Cannot create tab: ${result.error}`, 'error');
+             tab.remove();
+             return;
+        }
+
+        // Update state
+        activeTabs.push({ id: serviceId, url, title });
+        switchToTab(serviceId);
+
+        // Ensure bounds are correct after a new tab is initialized
+        updateViewBounds();
+
+        // Hide welcome screen
+        elements.welcomeScreen.style.display = 'none';
+
+        // Set active service for blocking
+        window.electronAPI.setActiveService(serviceId);
+    } catch(err) {
+        showStatus(`Error creating tab: ${err}`, 'error');
+        tab.remove();
+    }
+  };
+
+  const switchToTab = (id) => {
+    // Update tabs UI
+    document.querySelectorAll('.tab-item').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.id === id);
+    });
+
+    currentTabId = id;
+
+    // Ask main process to show specific WebContentsView
+    window.electronAPI.switchTab(id);
+    updateViewBounds();
+
+    // Update active service for blocking
+    window.electronAPI.setActiveService(id);
+  };
+
+  const closeTab = (id) => {
+    // Remove from DOM
+    const tab = document.querySelector(`.tab-item[data-id="${id}"]`);
+    if (tab) tab.remove();
+
+    // Remove from state
+    const index = activeTabs.findIndex(t => t.id === id);
+    if (index !== -1) {
+      activeTabs.splice(index, 1);
+    }
+
+    // Ask main process to destroy WebContentsView
+    window.electronAPI.closeTab(id);
+
+    // Switch to another tab or show welcome
+    if (activeTabs.length > 0) {
+      const newIndex = Math.min(index, activeTabs.length - 1);
+      switchToTab(activeTabs[newIndex].id);
+    } else {
+      elements.welcomeScreen.style.display = 'flex';
+      currentTabId = null;
+    }
+  };
+
+  // Keep views in sync when window resizes
+  window.addEventListener('resize', updateViewBounds);
 
 // --- Tab Management (Moved to ui/tabs.js) ---
 
