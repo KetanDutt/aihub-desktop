@@ -10,7 +10,7 @@ jest.mock('electron-store', () => {
       }
     };
   });
-});
+}, { virtual: true });
 
 const configStore = require('../src/config');
 
