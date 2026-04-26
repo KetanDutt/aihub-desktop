@@ -18,5 +18,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     createTab: (serviceId, url, userAgent) => ipcRenderer.invoke('create-tab', { serviceId, url, userAgent }),
     switchTab: (serviceId) => ipcRenderer.send('switch-tab', serviceId),
     closeTab: (serviceId) => ipcRenderer.send('close-tab', serviceId),
-    setViewBounds: (bounds) => ipcRenderer.send('set-view-bounds', bounds)
+    setViewBounds: (bounds) => ipcRenderer.send('set-view-bounds', bounds),
+
+    // Deep Link
+    onDeepLinkOpen: (callback) => ipcRenderer.on('deep-link-open', (event, serviceId) => callback(serviceId))
 });
