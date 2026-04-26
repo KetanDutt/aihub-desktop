@@ -1,28 +1,65 @@
 
+const mockStore = {
+  get: jest.fn(),
+  set: jest.fn(),
+  store: {
+    enabledServices: ['chatgpt'],
+    blockingEnabled: true
+  }
+};
+
 jest.mock('electron-store', () => {
-  return jest.fn().mockImplementation(() => {
-    return {
-      get: jest.fn(),
-      set: jest.fn(),
-      store: {
-        enabledServices: ['chatgpt'],
-        blockingEnabled: true
-      }
-    };
-  });
-});
+  return {
+    __esModule: true,
+    default: jest.fn().mockImplementation(() => mockStore)
+  };
+}, { virtual: true });
 
 const configStore = require('../src/config');
 
 describe('Config Store Logic', () => {
-  it('should toggle service correctly', () => {
-    // Need to mock the electron-store instance correctly
-    const StoreModule = require('electron-store');
-    const storeInstance = new StoreModule();
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockStore.store = {
+      enabledServices: ['chatgpt'],
+      blockingEnabled: true
+    };
+  });
 
-    // We can just verify saveConfig removes duplicates
+  it('should get config correctly', () => {
+    const config = configStore.getConfig();
+    expect(config).toEqual(mockStore.store);
+  });
+
+  it('should update config item correctly', () => {
+    configStore.updateConfigItem('darkMode', true);
+    expect(mockStore.set).toHaveBeenCalledWith('darkMode', true);
+  });
+
+  it('should save config and remove duplicates from enabledServices', () => {
     const newConfig = { enabledServices: ['chatgpt', 'claude', 'chatgpt'] };
-    const saved = configStore.saveConfig(newConfig);
-    expect(saved.enabledServices).toEqual(['chatgpt']); // Mock store returns default
+    configStore.saveConfig(newConfig);
+
+    expect(mockStore.set).toHaveBeenCalledWith({
+      enabledServices: ['chatgpt', 'claude']
+    });
+  });
+
+  it('should toggle service correctly (add service)', () => {
+    mockStore.get.mockReturnValue(['chatgpt']);
+
+    const result = configStore.toggleService('claude');
+
+    expect(mockStore.set).toHaveBeenCalledWith('enabledServices', ['chatgpt', 'claude']);
+    expect(result).toEqual(['chatgpt', 'claude']);
+  });
+
+  it('should toggle service correctly (remove service)', () => {
+    mockStore.get.mockReturnValue(['chatgpt', 'claude']);
+
+    const result = configStore.toggleService('chatgpt');
+
+    expect(mockStore.set).toHaveBeenCalledWith('enabledServices', ['claude']);
+    expect(result).toEqual(['claude']);
   });
 });
