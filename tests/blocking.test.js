@@ -10,7 +10,7 @@ jest.mock('electron', () => ({
   app: {
     getPath: jest.fn().mockReturnValue('mockDataPath'),
   },
-}));
+}), { virtual: true });
 
 jest.mock('../src/config', () => ({
   getConfig: jest.fn().mockReturnValue({
@@ -33,7 +33,7 @@ jest.mock('../src/data', () => ({
 jest.mock('electron-log', () => ({
   info: jest.fn(),
   error: jest.fn(),
-}));
+}), { virtual: true });
 
 const { isDomainAllowed } = require('../src/blocking');
 
