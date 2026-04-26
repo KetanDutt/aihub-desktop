@@ -440,15 +440,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-
-
-
-  // Proxy Listeners
-  window.elements.toggleProxy.addEventListener('change', window.debouncedSaveSettings);
-  window.elements.proxyUrlInput.addEventListener('input', window.debouncedSaveSettings);
-
-
-
     if (elements.btnClearSession) {
       elements.btnClearSession.addEventListener('click', async () => {
           if (confirm('Are you sure you want to clear all session data? This will log you out of all AI services.')) {

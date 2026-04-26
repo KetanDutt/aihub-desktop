@@ -28,12 +28,21 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // App Lifecycle
 
+function validateServiceId(serviceId) {
+    return serviceId && /^[a-z0-9]+$/i.test(serviceId);
+}
+
 function handleDeepLinkUrl(urlStr) {
     if (!urlStr || !urlStr.startsWith('aihub://')) return;
     try {
         const urlObj = new URL(urlStr);
         const serviceId = urlObj.hostname; // e.g. aihub://chatgpt -> chatgpt
-        if (!serviceId) return;
+
+        // Security: Validate serviceId to be alphanumeric only
+        if (!validateServiceId(serviceId)) {
+            log.warn('Rejected invalid deep link serviceId:', serviceId);
+            return;
+        }
 
         const mainWindow = windowManager.getMainWindow();
         if (mainWindow) {
@@ -108,3 +117,7 @@ if (!gotTheLock) {
     }
   });
 }
+
+module.exports = {
+    validateServiceId
+};

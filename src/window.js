@@ -8,6 +8,7 @@ const { HEADER_HEIGHT, TABS_HEIGHT, STATUS_BAR_HEIGHT } = require('./constants')
 let mainWindow = null;
 let tray = null;
 let views = {}; // Maps tab ID to WebContentsView instance
+let activeTabId = null;
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -174,25 +175,23 @@ function createTab(serviceId, url, userAgent) {
 }
 
 function switchTab(serviceId) {
-    if (!mainWindow) return;
+    if (!mainWindow || activeTabId === serviceId) return;
 
-    // Remove all child views from window
-    const currentViews = mainWindow.contentView.children;
-    for (const view of currentViews) {
-         mainWindow.contentView.removeChildView(view);
+    // Suspend currently active tab if it exists
+    if (activeTabId && views[activeTabId]) {
+        const activeView = views[activeTabId];
+        activeView.webContents.setBackgroundThrottling(true);
+        mainWindow.contentView.removeChildView(activeView);
     }
 
-    // Wake up target tab and hide others
-    for (const [id, view] of Object.entries(views)) {
-        if (id === serviceId) {
-            // Wake up
-            view.webContents.setBackgroundThrottling(false);
-            // Add back to display
-            mainWindow.contentView.addChildView(view);
-        } else {
-            // Suspend other tabs
-            view.webContents.setBackgroundThrottling(true);
-        }
+    // Wake up target tab
+    if (views[serviceId]) {
+        const targetView = views[serviceId];
+        targetView.webContents.setBackgroundThrottling(false);
+        mainWindow.contentView.addChildView(targetView);
+        activeTabId = serviceId;
+    } else {
+        activeTabId = null;
     }
 
     configStore.updateConfigItem('activeTabId', serviceId);
@@ -203,9 +202,14 @@ function closeTab(serviceId) {
     if (!mainWindow || !views[serviceId]) return;
 
     const view = views[serviceId];
+    // Remove from UI if it's currently showing or in the view hierarchy
     mainWindow.contentView.removeChildView(view);
     view.webContents.close();
     delete views[serviceId];
+
+    if (activeTabId === serviceId) {
+        activeTabId = null;
+    }
 
     let openTabs = configStore.getConfig().openTabs || [];
     openTabs = openTabs.filter(t => t.id !== serviceId);
