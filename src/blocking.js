@@ -32,23 +32,25 @@ function isDomainAllowed(hostname, serviceDomains, blockingEnabled, commonAuthDo
 
 let blockingState = {
   enabled: true,
-  activeServiceId: null,
-  allowedDomains: [],
   commonAuthDomains: []
 };
 
+const tabDomainMap = new Map(); // webContentsId -> Set of allowed domains
+
+function updateTabDomains(webContentsId, serviceId, rules) {
+  const allowed = rules?.service_domains?.[serviceId] || [];
+  tabDomainMap.set(webContentsId, new Set(allowed));
+}
+
+function removeTabDomains(webContentsId) {
+  tabDomainMap.delete(webContentsId);
+}
+
 function updateBlockingState(config, rules, serviceId) {
   blockingState.enabled = config.blockingEnabled;
-  blockingState.activeServiceId = serviceId;
 
   if (rules && rules.common_auth_domains) {
     blockingState.commonAuthDomains = rules.common_auth_domains;
-  }
-
-  if (serviceId && rules && rules.service_domains && rules.service_domains[serviceId]) {
-    blockingState.allowedDomains = rules.service_domains[serviceId];
-  } else {
-    blockingState.allowedDomains = [];
   }
 }
 
@@ -73,10 +75,19 @@ function setupWebRequestBlocking() {
         const url = new URL(details.url);
         const hostname = url.hostname;
 
-        if (isDomainAllowed(hostname, blockingState.allowedDomains, blockingState.enabled, blockingState.commonAuthDomains)) {
+        // Find allowed domains for this specific webContents
+        let allowedDomains = [];
+        if (details.webContentsId !== undefined) {
+          const allowedSet = tabDomainMap.get(details.webContentsId);
+          if (allowedSet) {
+              allowedDomains = [...allowedSet];
+          }
+        }
+
+        if (isDomainAllowed(hostname, allowedDomains, blockingState.enabled, blockingState.commonAuthDomains)) {
           callback({}); // Allow
         } else {
-          log.info(`Blocked: ${hostname} (Service: ${blockingState.activeServiceId || 'none'})`);
+          log.info(`Blocked: ${hostname} for webContents ${details.webContentsId}`);
           callback({ cancel: true }); // Block
         }
       } catch (e) {
@@ -90,5 +101,7 @@ function setupWebRequestBlocking() {
 module.exports = {
   updateBlockingState,
   isDomainAllowed,
-  setupWebRequestBlocking
+  setupWebRequestBlocking,
+  updateTabDomains,
+  removeTabDomains
 };

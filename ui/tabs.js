@@ -2,23 +2,18 @@ window.App = window.App || {};
 
 const svgClose = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
 
-window.createTab = async (serviceId, url, title) => {
+window.createTab = async (serviceId, url, title, savedTabId = null) => {
   if (window.activeTabs.length >= window.config.maxActiveServices) {
     window.showStatus(`Memory limit reached (${window.config.maxActiveServices} services). Close a tab first.`, 'warning');
     return;
   }
 
-  // Check if tab already exists
-  const existingTab = window.activeTabs.find(t => t.id === serviceId);
-  if (existingTab) {
-    window.switchToTab(serviceId);
-    return;
-  }
+  const tabId = savedTabId || `${serviceId}-${Date.now()}`;
 
   // Create tab element
   const tab = document.createElement('div');
   tab.className = 'tab-item active';
-  tab.dataset.id = serviceId;
+  tab.dataset.id = tabId;
   tab.setAttribute('draggable', 'true');
   tab.innerHTML = `
   <img class="tab-favicon" src="https://${new URL(url).hostname}/favicon.ico" onerror="this.style.display='none'">
@@ -29,7 +24,7 @@ window.createTab = async (serviceId, url, title) => {
 
   // Simple Drag and Drop
   tab.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', serviceId);
+      e.dataTransfer.setData('text/plain', tabId);
       e.currentTarget.classList.add('dragging');
   });
   tab.addEventListener('dragend', (e) => {
@@ -58,20 +53,20 @@ window.createTab = async (serviceId, url, title) => {
   // Add event listeners
   tab.addEventListener('click', (e) => {
     if (!e.target.closest('.btn-close-tab')) {
-      window.switchToTab(serviceId);
+      window.switchToTab(tabId);
     }
   });
 
   tab.querySelector('.btn-close-tab').addEventListener('click', (e) => {
     e.stopPropagation();
-    window.closeTab(serviceId);
+    window.closeTab(tabId);
   });
 
   tab.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       // A minimal context menu simulation
       if (confirm(`Close all OTHER tabs?`)) {
-          const tabsToClose = window.activeTabs.filter(t => t.id !== serviceId).map(t => t.id);
+          const tabsToClose = window.activeTabs.filter(t => t.id !== tabId).map(t => t.id);
           tabsToClose.forEach(id => window.closeTab(id));
       }
   });
@@ -81,7 +76,7 @@ window.createTab = async (serviceId, url, title) => {
 
   // Instead of <webview>, invoke main process WebContentsView
   try {
-      const result = await window.electronAPI.createTab(serviceId, url, '');
+      const result = await window.electronAPI.createTab(tabId, serviceId, url, '');
       if (result && result.success === false) {
            window.showStatus(`Cannot create tab: ${result.error}`, 'error');
            tab.remove();
@@ -89,8 +84,8 @@ window.createTab = async (serviceId, url, title) => {
       }
 
       // Update state
-      window.activeTabs.push({ id: serviceId, url, title });
-      window.switchToTab(serviceId);
+      window.activeTabs.push({ id: tabId, serviceId, url, title });
+      window.switchToTab(tabId);
 
       // Hide welcome screen
       window.elements.welcomeScreen.style.display = 'none';
@@ -123,8 +118,17 @@ window.switchToTab = (id) => {
   // Ask main process to show specific WebContentsView
   try { window.electronAPI.switchTab(id); } catch(err) { console.error(err); }
 
+  // Update nav buttons
+  const tabData = window.activeTabs.find(t => t.id === id);
+  if (tabData) {
+      if (window.elements.btnNavBack) window.elements.btnNavBack.disabled = !tabData.canGoBack;
+      if (window.elements.btnNavForward) window.elements.btnNavForward.disabled = !tabData.canGoForward;
+  }
+
   // Update active service for blocking
-  try { window.electronAPI.setActiveService(id); } catch(err) { console.error(err); }
+  if (tabData) {
+      try { window.electronAPI.setActiveService(tabData.serviceId); } catch(err) { console.error(err); }
+  }
 };
 
 window.closeTab = (id) => {
@@ -150,3 +154,33 @@ window.closeTab = (id) => {
     window.currentTabId = null;
   }
 };
+
+if (window.electronAPI.onTabLoading) {
+    window.electronAPI.onTabLoading(({ tabId, isLoading }) => {
+        const tab = document.querySelector(`.tab-item[data-id="${tabId}"]`);
+        if (tab) {
+            const spinner = tab.querySelector('.tab-loading');
+            if (spinner) {
+                if (isLoading) {
+                    spinner.classList.remove('hidden');
+                } else {
+                    spinner.classList.add('hidden');
+                }
+            }
+        }
+    });
+}
+
+if (window.electronAPI.onTabNavState) {
+    window.electronAPI.onTabNavState(({ tabId, canGoBack, canGoForward }) => {
+        if (window.currentTabId === tabId) {
+            if (window.elements.btnNavBack) window.elements.btnNavBack.disabled = !canGoBack;
+            if (window.elements.btnNavForward) window.elements.btnNavForward.disabled = !canGoForward;
+        }
+        const tabData = window.activeTabs.find(t => t.id === tabId);
+        if (tabData) {
+            tabData.canGoBack = canGoBack;
+            tabData.canGoForward = canGoForward;
+        }
+    });
+}

@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   let allServices = []; // All available services
   let activeTabs = [];
-  let currentTabId = null;
+  window.currentTabId = null;
 
   // --- Utility Functions ---
 
@@ -55,7 +55,6 @@ document.addEventListener('DOMContentLoaded', () => {
   window.config = config;
   window.allServices = allServices;
   window.activeTabs = activeTabs;
-  window.currentTabId = currentTabId;
 
   // --- Core Logic ---
 
@@ -178,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
       card.appendChild(body);
 
       card.addEventListener('click', () => {
-        createTab(id, url, name);
+        window.createTab(id, url, name);
         elements.sidebar.classList.add('hidden');
         renderEnabledServices(); // re-render to update the active indicator
       });
@@ -278,126 +277,6 @@ document.addEventListener('DOMContentLoaded', () => {
           width: Math.round(containerBounds.width),
           height: Math.round(containerBounds.height)
       });
-  };
-
-  const createTab = async (serviceId, url, title) => {
-    if (activeTabs.length >= config.maxActiveServices) {
-      showStatus(`Memory limit reached (${config.maxActiveServices} services). Close a tab first.`, 'warning');
-      return;
-    }
-
-    // Check if tab already exists
-    const existingTab = activeTabs.find(t => t.id === serviceId);
-    if (existingTab) {
-      switchToTab(serviceId);
-      return;
-    }
-
-    // Create tab element
-    const tab = document.createElement('div');
-    tab.className = 'tab-item active';
-    tab.dataset.id = serviceId;
-
-    const tabTitle = document.createElement('span');
-    tabTitle.className = 'tab-title';
-    tabTitle.textContent = title;
-
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'btn-close-tab';
-    closeBtn.textContent = '✕';
-
-    tab.appendChild(tabTitle);
-    tab.appendChild(closeBtn);
-
-    // Add event listeners
-    tab.addEventListener('click', (e) => {
-      if (!e.target.classList.contains('btn-close-tab')) {
-        switchToTab(serviceId);
-      }
-    });
-
-    tab.querySelector('.btn-close-tab').addEventListener('click', (e) => {
-      e.stopPropagation();
-      closeTab(serviceId);
-    });
-
-    tab.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        // A minimal context menu simulation
-        if (confirm(`Close all OTHER tabs?`)) {
-            const tabsToClose = activeTabs.filter(t => t.id !== serviceId).map(t => t.id);
-            tabsToClose.forEach(id => closeTab(id));
-        }
-    });
-
-    // Add to DOM
-    elements.tabsList.appendChild(tab);
-
-    // Instead of <webview>, invoke main process WebContentsView
-    try {
-        const result = await window.electronAPI.createTab(serviceId, url, '');
-        if (result && result.success === false) {
-             showStatus(`Cannot create tab: ${result.error}`, 'error');
-             tab.remove();
-             return;
-        }
-
-        // Update state
-        activeTabs.push({ id: serviceId, url, title });
-        switchToTab(serviceId);
-
-        // Ensure bounds are correct after a new tab is initialized
-        updateViewBounds();
-
-        // Hide welcome screen
-        elements.welcomeScreen.style.display = 'none';
-
-        // Set active service for blocking
-        window.electronAPI.setActiveService(serviceId);
-    } catch(err) {
-        showStatus(`Error creating tab: ${err}`, 'error');
-        tab.remove();
-    }
-  };
-
-  const switchToTab = (id) => {
-    // Update tabs UI
-    document.querySelectorAll('.tab-item').forEach(tab => {
-      tab.classList.toggle('active', tab.dataset.id === id);
-    });
-
-    currentTabId = id;
-
-    // Ask main process to show specific WebContentsView
-    window.electronAPI.switchTab(id);
-    updateViewBounds();
-
-    // Update active service for blocking
-    window.electronAPI.setActiveService(id);
-  };
-
-  const closeTab = (id) => {
-    // Remove from DOM
-    const tab = document.querySelector(`.tab-item[data-id="${id}"]`);
-    if (tab) tab.remove();
-
-    // Remove from state
-    const index = activeTabs.findIndex(t => t.id === id);
-    if (index !== -1) {
-      activeTabs.splice(index, 1);
-    }
-
-    // Ask main process to destroy WebContentsView
-    window.electronAPI.closeTab(id);
-
-    // Switch to another tab or show welcome
-    if (activeTabs.length > 0) {
-      const newIndex = Math.min(index, activeTabs.length - 1);
-      switchToTab(activeTabs[newIndex].id);
-    } else {
-      elements.welcomeScreen.style.display = 'flex';
-      currentTabId = null;
-    }
   };
 
   // Keep views in sync when window resizes
@@ -512,7 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Close current tab
     if (e.ctrlKey && e.key.toLowerCase() === 'w') {
       e.preventDefault();
-      if (currentTabId) window.closeTab(currentTabId);
+      if (window.currentTabId) window.closeTab(window.currentTabId);
       return;
     }
 
@@ -532,13 +411,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   elements.btnNavBack.addEventListener('click', () => {
-    if (currentTabId) try { window.electronAPI.navGoBack(currentTabId); } catch(e){}
+    if (window.currentTabId) try { window.electronAPI.navGoBack(window.currentTabId); } catch(e){}
   });
   elements.btnNavForward.addEventListener('click', () => {
-    if (currentTabId) try { window.electronAPI.navGoForward(currentTabId); } catch(e){}
+    if (window.currentTabId) try { window.electronAPI.navGoForward(window.currentTabId); } catch(e){}
   });
   elements.btnNavReload.addEventListener('click', () => {
-    if (currentTabId) try { window.electronAPI.navReload(currentTabId); } catch(e){}
+    if (window.currentTabId) try { window.electronAPI.navReload(window.currentTabId); } catch(e){}
   });
 
   // --- Initialization ---
@@ -556,10 +435,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let validTabs = [];
         for (const savedTab of config.openTabs) {
           // Find matching service metadata to get the title
-          const serviceMeta = allServices.find(s => window.generateId(s[0]) === savedTab.id);
+          const serviceId = savedTab.serviceId || savedTab.id; // Fallback for old configs
+          const serviceMeta = allServices.find(s => window.generateId(s[0]) === serviceId);
           if (serviceMeta) {
               const title = serviceMeta[0];
-              await window.createTab(savedTab.id, savedTab.url, title);
+              await window.createTab(serviceId, savedTab.url, title, savedTab.id);
               validTabs.push(savedTab);
           } else {
               console.warn(`Skipping invalid saved tab: ${savedTab.id}`);

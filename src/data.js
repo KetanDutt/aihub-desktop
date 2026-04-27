@@ -121,9 +121,9 @@ async function loadRules() {
   return null;
 }
 
-function getCommonAuthDomains() {
+async function getCommonAuthDomains() {
   if (!rulesCache) {
-    loadRules();
+    await loadRules();
   }
   return commonAuthDomains;
 }
