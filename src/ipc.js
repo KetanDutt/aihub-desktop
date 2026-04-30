@@ -44,23 +44,27 @@ function setupIpcHandlers() {
 
   // -- Tab Management --
 
-  ipcMain.handle('create-tab', (event, { serviceId, url, userAgent }) => {
-    log.info(`Creating tab for ${serviceId} at ${url}`);
-    return windowManager.createTab(serviceId, url, userAgent);
+  ipcMain.handle('create-tab', (event, { tabId, serviceId, url, userAgent }) => {
+    log.info(`Creating tab ${tabId} for ${serviceId} at ${url}`);
+    return windowManager.createTab(tabId, serviceId, url, userAgent);
   });
 
-  ipcMain.on('switch-tab', (event, serviceId) => {
-    log.info(`Switching to tab ${serviceId}`);
-    windowManager.switchTab(serviceId);
+  ipcMain.on('switch-tab', (event, tabId) => {
+    log.info(`Switching to tab ${tabId}`);
+    windowManager.switchTab(tabId);
   });
 
-    ipcMain.on('nav-go-back', (event, serviceId) => windowManager.navGoBack(serviceId));
-  ipcMain.on('nav-go-forward', (event, serviceId) => windowManager.navGoForward(serviceId));
-  ipcMain.on('nav-reload', (event, serviceId) => windowManager.navReload(serviceId));
+  ipcMain.on('set-view-bounds', () => {
+    windowManager.applyViewBounds();
+  });
 
-  ipcMain.on('close-tab', (event, serviceId) => {
-    log.info(`Closing tab ${serviceId}`);
-    windowManager.closeTab(serviceId);
+  ipcMain.on('nav-go-back', (event, tabId) => windowManager.navGoBack(tabId));
+  ipcMain.on('nav-go-forward', (event, tabId) => windowManager.navGoForward(tabId));
+  ipcMain.on('nav-reload', (event, tabId) => windowManager.navReload(tabId));
+
+  ipcMain.on('close-tab', (event, tabId) => {
+    log.info(`Closing tab ${tabId}`);
+    windowManager.closeTab(tabId);
   });
 }
 

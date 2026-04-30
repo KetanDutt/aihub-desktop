@@ -103,11 +103,11 @@ function setupGlobalShortcuts() {
 
 // -- WebContentsView Tab Management --
 
-function createTab(serviceId, url, userAgent) {
+function createTab(tabId, serviceId, url, userAgent) {
     if (!mainWindow) return;
 
-    if (views[serviceId]) {
-        switchTab(serviceId);
+    if (views[tabId]) {
+        switchTab(tabId);
         return;
     }
 
@@ -129,7 +129,6 @@ function createTab(serviceId, url, userAgent) {
     }
 
 
-    const config = configStore.getConfig();
     let finalUrl = url;
     if (config.useProxy && config.proxyUrl) {
         // Construct standard web proxy URL structure. Some proxy sites use query params, some use POST.
@@ -158,24 +157,55 @@ function createTab(serviceId, url, userAgent) {
         menu.popup();
     });
 
+    // Notify tab loading state
+    view.webContents.on('did-start-loading', () => {
+        if (mainWindow) {
+            mainWindow.webContents.send('tab-loading', { tabId, isLoading: true });
+        }
+    });
+
+    view.webContents.on('did-stop-loading', () => {
+        if (mainWindow) {
+            mainWindow.webContents.send('tab-loading', { tabId, isLoading: false });
+        }
+    });
+
+    const sendNavState = () => {
+        if (mainWindow && !view.webContents.isDestroyed()) {
+            mainWindow.webContents.send('tab-nav-state', {
+                tabId,
+                canGoBack: view.webContents.canGoBack(),
+                canGoForward: view.webContents.canGoForward()
+            });
+        }
+    };
+
+    view.webContents.on('did-navigate', sendNavState);
+    view.webContents.on('did-navigate-in-page', sendNavState);
+
     mainWindow.contentView.addChildView(view);
-    views[serviceId] = view;
+    views[tabId] = view;
+
+    // Register allowed domains for this specific webContents
+    const { updateTabDomains } = require('./blocking');
+    const dataStore = require('./data');
+    updateTabDomains(view.webContents.id, serviceId, dataStore.getRulesCache());
 
     applyViewBounds();
-    switchTab(serviceId);
+    switchTab(tabId);
 
     // Update config state
     let openTabs = configStore.getConfig().openTabs || [];
-    if (!openTabs.find(t => t.id === serviceId)) {
-        openTabs.push({ id: serviceId, url });
+    if (!openTabs.find(t => t.id === tabId)) {
+        openTabs.push({ id: tabId, serviceId, url });
         configStore.updateConfigItem('openTabs', openTabs);
     }
 
     return { success: true };
 }
 
-function switchTab(serviceId) {
-    if (!mainWindow || activeTabId === serviceId) return;
+function switchTab(tabId) {
+    if (!mainWindow || activeTabId === tabId) return;
 
     // Suspend currently active tab if it exists
     if (activeTabId && views[activeTabId]) {
@@ -185,34 +215,46 @@ function switchTab(serviceId) {
     }
 
     // Wake up target tab
-    if (views[serviceId]) {
-        const targetView = views[serviceId];
+    if (views[tabId]) {
+        const targetView = views[tabId];
         targetView.webContents.setBackgroundThrottling(false);
         mainWindow.contentView.addChildView(targetView);
-        activeTabId = serviceId;
+        activeTabId = tabId;
+
+        // Also update the active service id in config so settings UI/others know
+        // which service is active. We need to find the serviceId for this tabId.
+        const openTabs = configStore.getConfig().openTabs || [];
+        const tabData = openTabs.find(t => t.id === tabId);
+        if (tabData && tabData.serviceId) {
+             configStore.updateConfigItem('lastActiveService', tabData.serviceId);
+        }
     } else {
         activeTabId = null;
     }
 
-    configStore.updateConfigItem('activeTabId', serviceId);
-    configStore.updateConfigItem('lastActiveService', serviceId);
+    configStore.updateConfigItem('activeTabId', tabId);
 }
 
-function closeTab(serviceId) {
-    if (!mainWindow || !views[serviceId]) return;
+function closeTab(tabId) {
+    if (!mainWindow || !views[tabId]) return;
 
-    const view = views[serviceId];
+    const view = views[tabId];
+
+    // Unregister domain blocking for this webContents
+    const { removeTabDomains } = require('./blocking');
+    removeTabDomains(view.webContents.id);
+
     // Remove from UI if it's currently showing or in the view hierarchy
     mainWindow.contentView.removeChildView(view);
     view.webContents.close();
-    delete views[serviceId];
+    delete views[tabId];
 
-    if (activeTabId === serviceId) {
+    if (activeTabId === tabId) {
         activeTabId = null;
     }
 
     let openTabs = configStore.getConfig().openTabs || [];
-    openTabs = openTabs.filter(t => t.id !== serviceId);
+    openTabs = openTabs.filter(t => t.id !== tabId);
     configStore.updateConfigItem('openTabs', openTabs);
 }
 
@@ -240,19 +282,19 @@ function applyViewBounds() {
 
 
 
-function navGoBack(serviceId) {
-    if (views[serviceId] && views[serviceId].webContents.canGoBack()) {
-        views[serviceId].webContents.goBack();
+function navGoBack(tabId) {
+    if (views[tabId] && views[tabId].webContents.canGoBack()) {
+        views[tabId].webContents.goBack();
     }
 }
-function navGoForward(serviceId) {
-    if (views[serviceId] && views[serviceId].webContents.canGoForward()) {
-        views[serviceId].webContents.goForward();
+function navGoForward(tabId) {
+    if (views[tabId] && views[tabId].webContents.canGoForward()) {
+        views[tabId].webContents.goForward();
     }
 }
-function navReload(serviceId) {
-    if (views[serviceId]) {
-        views[serviceId].webContents.reload();
+function navReload(tabId) {
+    if (views[tabId]) {
+        views[tabId].webContents.reload();
     }
 }
 
@@ -267,4 +309,5 @@ module.exports = {
   navGoBack,
   navGoForward,
   navReload,
-  };
+  applyViewBounds
+};
