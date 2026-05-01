@@ -5,7 +5,8 @@
   "scripts": {
     "start": "electron .",
     "test": "jest",
-    "build": "electron-builder"
+    "build": "electron-builder",
+    "dev": "nodemon --exec electron ."
   },
   "build": {
     "appId": "com.silentcoderhere.aihubdesktop",
@@ -37,7 +38,9 @@
   },
   "devDependencies": {
     "electron-builder": "^26.8.1",
+    "electron-reload": "^2.0.0-alpha.1",
     "eslint": "^8.57.1",
-    "jest": "^30.3.0"
+    "jest": "^30.3.0",
+    "nodemon": "^3.1.14"
   }
 }

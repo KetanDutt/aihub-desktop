@@ -1,5 +1,9 @@
 const { app, session, dialog } = require('electron');
 
+require('electron-reload')(__dirname, {
+  electron: require(`${__dirname}/node_modules/electron`)
+});
+
 // Configure logging
 const log = require('electron-log');
 if (app.isPackaged) {
