@@ -89,6 +89,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await window.electronAPI.getServices();
       if (data && data.ai_services) {
         window.allServices = allServices = data.ai_services;
+
+        // Cache services by ID for O(1) lookup
+        window.servicesMap = new Map();
+        for (const s of allServices) {
+          window.servicesMap.set(window.generateId(s[0]), s);
+        }
+
         window.renderEnabledServices();
         window.renderAllServicesInSettings();
       } else {
@@ -435,7 +442,7 @@ document.addEventListener('DOMContentLoaded', () => {
         for (const savedTab of config.openTabs) {
           // Find matching service metadata to get the title
           const serviceId = savedTab.serviceId || savedTab.id; // Fallback for old configs
-          const serviceMeta = allServices.find(s => window.generateId(s[0]) === serviceId);
+          const serviceMeta = window.servicesMap ? window.servicesMap.get(serviceId) : allServices.find(s => window.generateId(s[0]) === serviceId);
           if (serviceMeta) {
               const title = serviceMeta[0];
               await window.createTab(serviceId, savedTab.url, title, savedTab.id);
@@ -460,7 +467,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Deep link handling
   if (window.electronAPI.onDeepLinkOpen) {
       window.electronAPI.onDeepLinkOpen((serviceId) => {
-          const service = allServices.find(s => window.generateId(s[0]) === serviceId);
+          const service = window.servicesMap ? window.servicesMap.get(serviceId) : allServices.find(s => window.generateId(s[0]) === serviceId);
           if (service) {
               const [name, url] = service;
               window.createTab(serviceId, url, name);
