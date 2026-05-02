@@ -67,6 +67,7 @@ jest.mock('../src/updater', () => ({
 }));
 
 const { validateServiceId } = require('../main');
+const configStore = require('../src/config');
 
 describe('Security Validation', () => {
     test('validateServiceId should allow valid alphanumeric service IDs', () => {
@@ -88,5 +89,34 @@ describe('Security Validation', () => {
         expect(validateServiceId('')).toBeFalsy();
         expect(validateServiceId(null)).toBeFalsy();
         expect(validateServiceId(undefined)).toBeFalsy();
+    });
+
+    test('saveConfig should reject invalid proxy URLs when proxy is enabled', () => {
+        const invalidConfigs = [
+            { useProxy: true, proxyUrl: 'javascript:alert(1)' },
+            { useProxy: true, proxyUrl: 'file:///etc/passwd' },
+            { useProxy: true, proxyUrl: 'not-a-url' },
+            { useProxy: true, proxyUrl: 'ftp://proxy.com' }
+        ];
+
+        invalidConfigs.forEach(config => {
+            expect(() => configStore.saveConfig(config)).toThrow('Invalid proxy URL or protocol');
+        });
+    });
+
+    test('saveConfig should allow valid proxy URLs when proxy is enabled', () => {
+        const validConfigs = [
+            { useProxy: true, proxyUrl: 'http://proxy.com' },
+            { useProxy: true, proxyUrl: 'https://proxy.com/path?query=1' }
+        ];
+
+        validConfigs.forEach(config => {
+            expect(() => configStore.saveConfig(config)).not.toThrow();
+        });
+    });
+
+    test('saveConfig should ignore invalid proxy URLs if proxy is disabled', () => {
+        const config = { useProxy: false, proxyUrl: 'javascript:alert(1)' };
+        expect(() => configStore.saveConfig(config)).not.toThrow();
     });
 });

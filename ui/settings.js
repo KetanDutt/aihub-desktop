@@ -14,12 +14,30 @@ window.debouncedSaveSettings = () => {
 
 window.saveSettings = async () => {
   if (!window.elements) return;
+
+  const useProxy = window.elements.toggleProxy ? window.elements.toggleProxy.checked : false;
+  const proxyUrl = window.elements.proxyUrlInput ? window.elements.proxyUrlInput.value : '';
+
+  // Validate proxy URL if enabled
+  if (useProxy && proxyUrl) {
+    try {
+      const url = new URL(proxyUrl);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        window.showStatus('Invalid Proxy Protocol', 'error');
+        return;
+      }
+    } catch (e) {
+      window.showStatus('Invalid Proxy URL', 'error');
+      return;
+    }
+  }
+
   const newConfig = {
     blockingEnabled: window.elements.toggleBlocking.checked,
     maxActiveServices: parseInt(window.elements.maxServicesInput.value) || 3,
     darkMode: window.elements.toggleDarkMode.checked,
-    useProxy: window.elements.toggleProxy ? window.elements.toggleProxy.checked : false,
-    proxyUrl: window.elements.proxyUrlInput ? window.elements.proxyUrlInput.value : ''
+    useProxy: useProxy,
+    proxyUrl: proxyUrl
   };
 
   try {

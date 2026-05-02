@@ -68,7 +68,24 @@ function getConfig() {
   return store.store;
 }
 
+function validateProxyUrl(urlStr) {
+  if (!urlStr) return true; // Empty is allowed (default used)
+  try {
+    const url = new URL(urlStr);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch (e) {
+    return false;
+  }
+}
+
 function saveConfig(newConfig) {
+  // Security: Validate proxy URL if provided
+  if (newConfig.useProxy && newConfig.proxyUrl) {
+    if (!validateProxyUrl(newConfig.proxyUrl)) {
+      throw new Error('Invalid proxy URL or protocol');
+    }
+  }
+
   // Merge with existing config
   if (newConfig.enabledServices) {
     newConfig.enabledServices = [...new Set(newConfig.enabledServices)]; // Remove duplicates
