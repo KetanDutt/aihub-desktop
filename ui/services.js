@@ -21,6 +21,8 @@ window.renderEnabledServices = () => {
     return;
   }
 
+  const activeTabIds = new Set(window.activeTabs.map(t => t.id));
+
   enabledServices.forEach(service => {
     const [name, url, type, privacy, color] = service;
     const id = window.generateId(name);
@@ -29,7 +31,7 @@ window.renderEnabledServices = () => {
     const card = document.createElement('div');
     card.className = 'service-card';
 
-    const isActive = window.activeTabs.find(t => t.id === id);
+    const isActive = activeTabIds.has(id);
     const activeIndicator = isActive ? '🟢 ' : '';
 
     card.innerHTML = `

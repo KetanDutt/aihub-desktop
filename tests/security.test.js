@@ -24,6 +24,8 @@ jest.mock('electron', () => ({
     }
 }), { virtual: true });
 
+jest.mock('electron-reload', () => jest.fn(), { virtual: true });
+
 jest.mock('electron-log', () => ({
     error: jest.fn(),
     info: jest.fn(),
