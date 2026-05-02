@@ -18,7 +18,7 @@ function isDomainAllowed(hostname, serviceDomains, blockingEnabled, commonAuthDo
   }
 
   // Check service whitelist
-  if (serviceDomains && serviceDomains.length > 0) {
+  if (serviceDomains && (serviceDomains.length > 0 || serviceDomains.size > 0)) {
     for (const domain of serviceDomains) {
       if (matchesDomain(hostname, domain)) {
         return true;
@@ -76,12 +76,9 @@ function setupWebRequestBlocking() {
         const hostname = url.hostname;
 
         // Find allowed domains for this specific webContents
-        let allowedDomains = [];
+        let allowedDomains = null;
         if (details.webContentsId !== undefined) {
-          const allowedSet = tabDomainMap.get(details.webContentsId);
-          if (allowedSet) {
-              allowedDomains = [...allowedSet];
-          }
+          allowedDomains = tabDomainMap.get(details.webContentsId);
         }
 
         if (isDomainAllowed(hostname, allowedDomains, blockingState.enabled, blockingState.commonAuthDomains)) {
