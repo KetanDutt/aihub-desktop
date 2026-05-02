@@ -1,7 +1,4 @@
 
-function matchesDomain(hostname, domain) {
-  return hostname === domain || hostname.endsWith('.' + domain);
-}
 const { session } = require('electron');
 const configStore = require('./config');
 const dataStore = require('./data');
@@ -10,20 +7,20 @@ const log = require('electron-log');
 function isDomainAllowed(hostname, serviceDomains, blockingEnabled, commonAuthDomains) {
   if (!blockingEnabled) return true;
 
-  // Always allow common auth domains
-  for (const domain of commonAuthDomains) {
-    if (matchesDomain(hostname, domain)) {
+  let currentDomain = hostname;
+  while (currentDomain) {
+    if (commonAuthDomains && commonAuthDomains.has(currentDomain)) {
       return true;
     }
-  }
-
-  // Check service whitelist
-  if (serviceDomains && serviceDomains.length > 0) {
-    for (const domain of serviceDomains) {
-      if (matchesDomain(hostname, domain)) {
-        return true;
-      }
+    if (serviceDomains && serviceDomains.has(currentDomain)) {
+      return true;
     }
+
+    const dotIndex = currentDomain.indexOf('.');
+    if (dotIndex === -1) {
+      break;
+    }
+    currentDomain = currentDomain.substring(dotIndex + 1);
   }
 
   return false;
@@ -32,7 +29,7 @@ function isDomainAllowed(hostname, serviceDomains, blockingEnabled, commonAuthDo
 
 let blockingState = {
   enabled: true,
-  commonAuthDomains: []
+  commonAuthDomains: new Set()
 };
 
 const tabDomainMap = new Map(); // webContentsId -> Set of allowed domains
@@ -50,7 +47,7 @@ function updateBlockingState(config, rules, serviceId) {
   blockingState.enabled = config.blockingEnabled;
 
   if (rules && rules.common_auth_domains) {
-    blockingState.commonAuthDomains = rules.common_auth_domains;
+    blockingState.commonAuthDomains = new Set(rules.common_auth_domains);
   }
 }
 
@@ -76,11 +73,11 @@ function setupWebRequestBlocking() {
         const hostname = url.hostname;
 
         // Find allowed domains for this specific webContents
-        let allowedDomains = [];
+        let allowedDomains = new Set();
         if (details.webContentsId !== undefined) {
           const allowedSet = tabDomainMap.get(details.webContentsId);
           if (allowedSet) {
-              allowedDomains = [...allowedSet];
+              allowedDomains = allowedSet;
           }
         }
 
