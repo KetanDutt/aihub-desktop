@@ -40,34 +40,34 @@ const { isDomainAllowed } = require('../src/blocking');
 describe('Domain Blocking Logic', () => {
 
   it('should block domains without dot prefix incorrectly matching', () => {
-    const serviceDomains = ['openai.com'];
+    const serviceDomains = new Set(['openai.com']);
     expect(isDomainAllowed('notopenai.com', serviceDomains, true, new Set())).toBe(false);
   });
 
   it('should allow exact subdomains matching', () => {
-    const serviceDomains = ['openai.com'];
+    const serviceDomains = new Set(['openai.com']);
     expect(isDomainAllowed('api.openai.com', serviceDomains, true, new Set())).toBe(true);
   });
 
   it('should allow domains when blocking is disabled', () => {
-    expect(isDomainAllowed('evil.com', [], false, new Set())).toBe(true);
+    expect(isDomainAllowed('evil.com', new Set(), false, new Set())).toBe(true);
   });
 
   it('should allow common auth domains', () => {
     const commonAuthDomains = new Set(['google.com', 'accounts.google.com']);
-    expect(isDomainAllowed('google.com', [], true, commonAuthDomains)).toBe(true);
-    expect(isDomainAllowed('accounts.google.com', [], true, commonAuthDomains)).toBe(true);
-    expect(isDomainAllowed('some.other.accounts.google.com', [], true, commonAuthDomains)).toBe(true);
+    expect(isDomainAllowed('google.com', new Set(), true, commonAuthDomains)).toBe(true);
+    expect(isDomainAllowed('accounts.google.com', new Set(), true, commonAuthDomains)).toBe(true);
+    expect(isDomainAllowed('some.other.accounts.google.com', new Set(), true, commonAuthDomains)).toBe(true);
   });
 
   it('should allow whitelisted service domains', () => {
-    const serviceDomains = ['openai.com'];
+    const serviceDomains = new Set(['openai.com']);
     expect(isDomainAllowed('openai.com', serviceDomains, true, new Set())).toBe(true);
     expect(isDomainAllowed('chat.openai.com', serviceDomains, true, new Set())).toBe(true);
   });
 
   it('should block non-whitelisted domains', () => {
-    const serviceDomains = ['openai.com'];
+    const serviceDomains = new Set(['openai.com']);
     expect(isDomainAllowed('evil.com', serviceDomains, true, new Set())).toBe(false);
     expect(isDomainAllowed('notopenai.com', serviceDomains, true, new Set())).toBe(false);
   });
