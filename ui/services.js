@@ -34,15 +34,30 @@ window.renderEnabledServices = () => {
     const isActive = activeTabIds.has(id);
     const activeIndicator = isActive ? '🟢 ' : '';
 
-    card.innerHTML = `
-    <div class="service-header" style="background-color: ${bgColor}">
-    <h3 class="service-name">${activeIndicator}${name}</h3>
-    </div>
-    <div class="service-body">
-    <p class="service-type">${type || 'AI Service'}</p>
-    <p class="service-description">${privacy || ''}</p>
-    </div>
-    `;
+    const header = document.createElement('div');
+    header.className = 'service-header';
+    header.style.backgroundColor = bgColor;
+
+    const nameEl = document.createElement('h3');
+    nameEl.className = 'service-name';
+    nameEl.textContent = `${activeIndicator}${name}`;
+    header.appendChild(nameEl);
+
+    const body = document.createElement('div');
+    body.className = 'service-body';
+
+    const typeEl = document.createElement('p');
+    typeEl.className = 'service-type';
+    typeEl.textContent = type || 'AI Service';
+    body.appendChild(typeEl);
+
+    const descEl = document.createElement('p');
+    descEl.className = 'service-description';
+    descEl.textContent = privacy || '';
+    body.appendChild(descEl);
+
+    card.appendChild(header);
+    card.appendChild(body);
 
     card.addEventListener('click', () => {
       window.createTab(id, url, name);
@@ -58,7 +73,7 @@ window.renderEnabledServices = () => {
   if (quickStartGrid) {
       quickStartGrid.innerHTML = '';
       enabledServices.forEach(service => {
-          const [name, url, type, privacy, color] = service;
+          const [name, url, , , color] = service;
           const id = window.generateId(name);
           const item = document.createElement('div');
           item.className = 'quick-start-item';
@@ -83,7 +98,7 @@ window.renderAllServicesInSettings = () => {
   }
 
   window.allServices.forEach(service => {
-    const [name, url, type, privacy, color] = service;
+    const [name, , type, , color] = service;
     const id = window.generateId(name);
     const bgColor = color ? `#${color}` : '#4285f4';
     const isEnabled = window.config.enabledServices.includes(id);
@@ -92,22 +107,48 @@ window.renderAllServicesInSettings = () => {
     item.className = 'service-item';
     item.dataset.id = id;
 
-    item.innerHTML = `
-    <div class="service-item-color" style="background-color: ${bgColor}"></div>
-    <div class="service-item-info">
-    <h4 class="service-item-name">${name}</h4>
-    <p class="service-item-type">${type || 'AI Service'}</p>
-    </div>
-    <div class="service-item-toggle">
-    <label class="toggle-switch">
-    <input type="checkbox" ${isEnabled ? 'checked' : ''} data-service-id="${id}">
-    <span class="toggle-slider"></span>
-    </label>
-    </div>
-    `;
+    const colorIndicator = document.createElement('div');
+    colorIndicator.className = 'service-item-color';
+    colorIndicator.style.backgroundColor = bgColor;
+
+    const info = document.createElement('div');
+    info.className = 'service-item-info';
+
+    const nameEl = document.createElement('h4');
+    nameEl.className = 'service-item-name';
+    nameEl.textContent = name;
+
+    const typeEl = document.createElement('p');
+    typeEl.className = 'service-item-type';
+    typeEl.textContent = type || 'AI Service';
+
+    info.appendChild(nameEl);
+    info.appendChild(typeEl);
+
+    const toggleContainer = document.createElement('div');
+    toggleContainer.className = 'service-item-toggle';
+
+    const label = document.createElement('label');
+    label.className = 'toggle-switch';
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = isEnabled;
+    input.dataset.serviceId = id;
+
+    const slider = document.createElement('span');
+    slider.className = 'toggle-slider';
+
+    label.appendChild(input);
+    label.appendChild(slider);
+    toggleContainer.appendChild(label);
+
+    item.appendChild(colorIndicator);
+    item.appendChild(info);
+    item.appendChild(toggleContainer);
 
     // Add toggle event
-    const toggle = item.querySelector('input[type="checkbox"]');
+    const toggle = input;
     toggle.addEventListener('change', async (e) => {
       const serviceId = e.target.dataset.serviceId;
       try {

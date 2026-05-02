@@ -13,7 +13,7 @@ for (let i = 0; i < 500; i++) {
 console.time('Baseline O(N*M)');
 for (const savedTab of openTabs) {
   const serviceId = savedTab.id;
-  const serviceMeta = allServices.find(s => generateId(s[0]) === serviceId);
+  allServices.find(s => generateId(s[0]) === serviceId);
 }
 console.timeEnd('Baseline O(N*M)');
 
@@ -24,7 +24,7 @@ for (const s of allServices) {
 }
 for (const savedTab of openTabs) {
   const serviceId = savedTab.id;
-  const serviceMeta = servicesMap.get(serviceId);
+  servicesMap.get(serviceId);
 }
 console.timeEnd('Optimized O(N)');
 function matchesDomain(hostname, domain) {

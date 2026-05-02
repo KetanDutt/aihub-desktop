@@ -65,7 +65,7 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
 } else {
-  app.on('second-instance', (event, commandLine, workingDirectory) => {
+  app.on('second-instance', (event, commandLine) => {
     // Someone tried to run a second instance, we should focus our window.
     const mainWindow = windowManager.getMainWindow();
     if (mainWindow) {
@@ -99,7 +99,7 @@ if (!gotTheLock) {
     await dataStore.loadRules();
 
     // Set up blocking
-    blockingManager.updateBlockingState(require('./src/config').getConfig(), require('./src/data').getRulesCache(), require('./src/config').getConfig().lastActiveService);
+    blockingManager.updateBlockingState(require('./src/config').getConfig(), require('./src/data').getRulesCache());
     blockingManager.setupWebRequestBlocking();
 
     // Create UI

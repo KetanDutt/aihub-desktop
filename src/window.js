@@ -144,7 +144,7 @@ function createTab(tabId, serviceId, url, userAgent) {
     view.webContents.loadURL(finalUrl);
 
 
-    view.webContents.on('context-menu', (event, params) => {
+    view.webContents.on('context-menu', () => {
         const { Menu } = require('electron');
         const menu = Menu.buildFromTemplate([
             { role: 'copy' },

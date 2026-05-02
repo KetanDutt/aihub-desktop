@@ -11,7 +11,7 @@ function setupAutoUpdater() {
         log.info('Checking for update...');
     });
 
-    autoUpdater.on('update-available', (info) => {
+    autoUpdater.on('update-available', () => {
         log.info('Update available.');
         dialog.showMessageBox({
             type: 'info',
@@ -20,7 +20,7 @@ function setupAutoUpdater() {
         });
     });
 
-    autoUpdater.on('update-not-available', (info) => {
+    autoUpdater.on('update-not-available', () => {
         log.info('Update not available.');
     });
 
@@ -28,7 +28,7 @@ function setupAutoUpdater() {
         log.error('Error in auto-updater. ' + err);
     });
 
-    autoUpdater.on('update-downloaded', (info) => {
+    autoUpdater.on('update-downloaded', () => {
         log.info('Update downloaded');
         const { Notification } = require('electron');
 

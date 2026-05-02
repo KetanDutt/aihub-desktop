@@ -1,7 +1,5 @@
 
 const { session } = require('electron');
-const configStore = require('./config');
-const dataStore = require('./data');
 const log = require('electron-log');
 
 function isDomainAllowed(hostname, serviceDomains, blockingEnabled, commonAuthDomains) {
@@ -43,7 +41,7 @@ function removeTabDomains(webContentsId) {
   tabDomainMap.delete(webContentsId);
 }
 
-function updateBlockingState(config, rules, serviceId) {
+function updateBlockingState(config, rules) {
   blockingState.enabled = config.blockingEnabled;
 
   if (rules && rules.common_auth_domains) {
