@@ -28,7 +28,7 @@ function setupIpcHandlers() {
   ipcMain.handle('save-config', (event, newConfig) => {
     const config = configStore.saveConfig(newConfig);
     const { updateBlockingState } = require('./blocking');
-    updateBlockingState(config, dataStore.getRulesCache(), config.lastActiveService);
+    updateBlockingState(config, dataStore.getRulesCache());
     return config;
   });
 
@@ -39,7 +39,7 @@ function setupIpcHandlers() {
   ipcMain.on('set-active-service', (event, serviceId) => {
     configStore.updateConfigItem('lastActiveService', serviceId);
     const { updateBlockingState } = require('./blocking');
-    updateBlockingState(configStore.getConfig(), dataStore.getRulesCache(), serviceId);
+    updateBlockingState(configStore.getConfig(), dataStore.getRulesCache());
   });
 
   // -- Tab Management --

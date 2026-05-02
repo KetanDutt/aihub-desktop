@@ -15,12 +15,41 @@ window.createTab = async (serviceId, url, title, savedTabId = null) => {
   tab.className = 'tab-item active';
   tab.dataset.id = tabId;
   tab.setAttribute('draggable', 'true');
-  tab.innerHTML = `
-  <img class="tab-favicon" src="https://${new URL(url).hostname}/favicon.ico" onerror="this.style.display='none'">
-  <span class="tab-title">${title}</span>
-  <span class="tab-loading spin hidden" style="display:inline-flex; align-items:center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg></span>
-  <button class="btn-close-tab">${svgClose}</button>
-  `;
+
+  let faviconHostname = '';
+  try {
+      faviconHostname = new URL(url).hostname;
+  } catch (e) {
+      console.error('Invalid URL for favicon:', url);
+  }
+
+  const img = document.createElement('img');
+  img.className = 'tab-favicon';
+  if (faviconHostname) {
+      img.src = `https://${faviconHostname}/favicon.ico`;
+      img.onerror = function() { this.style.display = 'none'; };
+  } else {
+      img.style.display = 'none';
+  }
+
+  const titleSpan = document.createElement('span');
+  titleSpan.className = 'tab-title';
+  titleSpan.textContent = title;
+
+  const loadingSpan = document.createElement('span');
+  loadingSpan.className = 'tab-loading spin hidden';
+  loadingSpan.style.display = 'inline-flex';
+  loadingSpan.style.alignItems = 'center';
+  loadingSpan.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'btn-close-tab';
+  closeBtn.innerHTML = svgClose;
+
+  tab.appendChild(img);
+  tab.appendChild(titleSpan);
+  tab.appendChild(loadingSpan);
+  tab.appendChild(closeBtn);
 
   // Simple Drag and Drop
   tab.addEventListener('dragstart', (e) => {
