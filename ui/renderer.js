@@ -61,7 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const loadConfig = async () => {
     try {
       window.config = config = await window.electronAPI.getConfig();
-      console.log('Config loaded:', config);
 
       elements.toggleBlocking.checked = config.blockingEnabled;
       elements.maxServicesInput.value = config.maxActiveServices;
