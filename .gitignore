@@ -23,6 +23,5 @@ npm-debug.log*
 .vscode/
 *.swp
 
-# Lockfile: the project ships without one; committing it is recommended for
-# reproducible builds (remove this line if you start committing it).
-package-lock.json
+# NOTE: package-lock.json IS committed on purpose — CI's setup-node uses
+# `cache: npm`, which requires a lockfile, and it gives reproducible builds.
