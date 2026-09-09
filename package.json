@@ -1,46 +1,165 @@
 {
   "name": "aihub-desktop",
-  "version": "1.0.0",
+  "productName": "AI Hub Desktop",
+  "version": "1.2.0",
+  "description": "One window for every AI assistant: tabbed WebContentsViews, per-service domain filtering and automatic tab hibernation.",
   "main": "main.js",
+  "author": "SilentCoderHere",
+  "license": "MIT",
+  "homepage": "https://github.com/SilentCoderHere/aihub-desktop",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SilentCoderHere/aihub-desktop.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SilentCoderHere/aihub-desktop/issues"
+  },
+  "keywords": [
+    "electron",
+    "ai",
+    "chatgpt",
+    "claude",
+    "gemini",
+    "desktop",
+    "tabs",
+    "privacy"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "electron .",
+    "dev": "nodemon",
+    "doctor": "node scripts/doctor.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "test": "jest",
+    "test:watch": "jest --watch",
+    "coverage": "jest --coverage",
+    "check": "npm run lint && npm run test",
+    "benchmark": "node benchmarks/run.js",
+    "clean": "node scripts/clean.js",
+    "icons": "node scripts/generate-icons.js",
+    "pack": "electron-builder --dir",
     "build": "electron-builder",
-    "dev": "nodemon --exec electron ."
-  },
-  "build": {
-    "appId": "com.silentcoderhere.aihubdesktop",
-    "productName": "AI Hub Desktop",
-    "directories": {
-      "output": "dist"
-    },
-    "win": {
-      "target": [
-        "nsis"
-      ]
-    },
-    "mac": {
-      "target": [
-        "dmg"
-      ]
-    },
-    "linux": {
-      "target": [
-        "AppImage"
-      ]
-    }
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "postinstall": "node scripts/postinstall.js"
   },
   "dependencies": {
-    "electron": "^41.1.1",
     "electron-log": "^5.4.3",
     "electron-store": "^11.0.2",
     "electron-updater": "^6.8.3"
   },
   "devDependencies": {
+    "electron": "^41.1.1",
     "electron-builder": "^26.8.1",
     "electron-reload": "^2.0.0-alpha.1",
     "eslint": "^8.57.1",
     "jest": "^30.3.0",
+    "jest-environment-jsdom": "^30.5.1",
     "nodemon": "^3.1.14"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "ui/utils.js"
+    ],
+    "clearMocks": true
+  },
+  "build": {
+    "appId": "com.silentcoderhere.aihubdesktop",
+    "productName": "AI Hub Desktop",
+    "copyright": "Copyright © SilentCoderHere",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*.js",
+      "ui/**/*",
+      "package.json",
+      "README.md",
+      "LICENSE"
+    ],
+    "extraResources": [
+      {
+        "from": "data",
+        "to": "bundled-data",
+        "filter": [
+          "*.json"
+        ]
+      }
+    ],
+    "asar": true,
+    "compression": "normal",
+    "protocols": [
+      {
+        "name": "AI Hub Desktop",
+        "schemes": [
+          "aihub"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AI Hub Desktop",
+      "deleteAppDataOnUninstall": false,
+      "uninstallDisplayName": "AI Hub Desktop"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.productivity",
+      "darkModeSupport": true
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "build/icon.png",
+      "category": "Utility",
+      "synopsis": "All your AI services in one window",
+      "maintainer": "SilentCoderHere"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "SilentCoderHere",
+        "repo": "aihub-desktop"
+      }
+    ]
   }
 }

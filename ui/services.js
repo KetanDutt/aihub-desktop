@@ -1,178 +1,258 @@
-window.App = window.App || {};
+/**
+ * Service catalogue rendering: the sidebar, the welcome screen quick start and
+ * the Services tab in Settings.
+ */
 
-window.renderEnabledServices = () => {
-  if (!window.elements || !window.elements.servicesList) return;
+window.AiHub = window.AiHub || {};
 
-  window.elements.servicesList.innerHTML = '';
+(function (app) {
+  const PLUS_SVG =
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" ' +
+    'stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
 
-  if (!window.config.enabledServices || window.config.enabledServices.length === 0) {
-    window.elements.servicesList.innerHTML = '<div class="info-message">No services enabled. Go to Settings to enable services.</div>';
-    return;
-  }
+  function avatarFor(service, size = 'sm') {
+    const wrap = document.createElement('span');
+    wrap.className = `service-avatar ${size}`;
+    if (service.color) wrap.style.backgroundColor = `#${service.color}`;
 
-  // Filter only enabled services
-  const enabledServices = window.allServices.filter(service => {
-    const serviceId = window.generateId(service[0]);
-    return window.config.enabledServices.includes(serviceId);
-  });
+    const img = document.createElement('img');
+    img.alt = '';
+    const cached = app.getFavicon(service.id);
+    if (cached) img.src = cached;
+    else img.classList.add('hidden');
 
-  if (enabledServices.length === 0) {
-    window.elements.servicesList.innerHTML = '<div class="info-message">No services enabled. Go to Settings to enable services.</div>';
-    return;
-  }
+    const initials = document.createElement('span');
+    initials.className = 'service-avatar-initials';
+    initials.textContent = window.AiHubUtils.initials(service.name);
+    if (cached) initials.classList.add('hidden');
 
-  const activeTabIds = new Set(window.activeTabs.map(t => t.id));
-
-  enabledServices.forEach(service => {
-    const [name, url, type, privacy, color] = service;
-    const id = window.generateId(name);
-    const bgColor = color ? `#${color}` : '#4285f4';
-
-    const card = document.createElement('div');
-    card.className = 'service-card';
-
-    const isActive = activeTabIds.has(id);
-    const activeIndicator = isActive ? '🟢 ' : '';
-
-    const header = document.createElement('div');
-    header.className = 'service-header';
-    header.style.backgroundColor = bgColor;
-
-    const nameEl = document.createElement('h3');
-    nameEl.className = 'service-name';
-    nameEl.textContent = `${activeIndicator}${name}`;
-    header.appendChild(nameEl);
-
-    const body = document.createElement('div');
-    body.className = 'service-body';
-
-    const typeEl = document.createElement('p');
-    typeEl.className = 'service-type';
-    typeEl.textContent = type || 'AI Service';
-    body.appendChild(typeEl);
-
-    const descEl = document.createElement('p');
-    descEl.className = 'service-description';
-    descEl.textContent = privacy || '';
-    body.appendChild(descEl);
-
-    card.appendChild(header);
-    card.appendChild(body);
-
-    card.addEventListener('click', () => {
-      window.createTab(id, url, name);
-      window.elements.sidebar.classList.add('hidden');
-      window.renderEnabledServices(); // re-render to update the active indicator
+    img.addEventListener('load', () => {
+      img.classList.remove('hidden');
+      initials.classList.add('hidden');
     });
 
-    window.elements.servicesList.appendChild(card);
-  });
-
-  // Populate quick start grid on welcome screen
-  const quickStartGrid = document.getElementById('quick-start-services');
-  if (quickStartGrid) {
-      quickStartGrid.innerHTML = '';
-      enabledServices.forEach(service => {
-          const [name, url, , , color] = service;
-          const id = window.generateId(name);
-          const item = document.createElement('div');
-          item.className = 'quick-start-item';
-          item.textContent = name;
-          item.style.borderLeft = `4px solid ${color ? '#' + color : '#4285f4'}`;
-          item.addEventListener('click', () => {
-              window.createTab(id, url, name);
-          });
-          quickStartGrid.appendChild(item);
-      });
-  }
-};
-
-window.renderAllServicesInSettings = () => {
-  if (!window.elements || !window.elements.allServicesList) return;
-
-  window.elements.allServicesList.innerHTML = '';
-
-  if (window.allServices.length === 0) {
-    window.elements.allServicesList.innerHTML = '<div class="info-message">No services loaded. Click Update button.</div>';
-    return;
+    wrap.append(img, initials);
+    return wrap;
   }
 
-  window.allServices.forEach(service => {
-    const [name, , type, , color] = service;
-    const id = window.generateId(name);
-    const bgColor = color ? `#${color}` : '#4285f4';
-    const isEnabled = window.config.enabledServices.includes(id);
+  function openService(service) {
+    app.createTab({ serviceId: service.id, url: service.url, title: service.name });
+    if (app.elements.sidebar) app.elements.sidebar.classList.add('hidden');
+    app.renderEnabledServices();
+  }
 
-    const item = document.createElement('div');
-    item.className = 'service-item';
-    item.dataset.id = id;
+  function emptyState(message, actionLabel) {
+    const wrap = document.createElement('div');
+    wrap.className = 'empty-state';
 
-    const colorIndicator = document.createElement('div');
-    colorIndicator.className = 'service-item-color';
-    colorIndicator.style.backgroundColor = bgColor;
+    const text = document.createElement('p');
+    text.textContent = message;
+    wrap.appendChild(text);
 
-    const info = document.createElement('div');
-    info.className = 'service-item-info';
+    if (actionLabel) {
+      const button = document.createElement('button');
+      button.className = 'btn btn-secondary btn-small';
+      button.textContent = actionLabel;
+      button.addEventListener('click', () => app.openSettings('services'));
+      wrap.appendChild(button);
+    }
 
-    const nameEl = document.createElement('h4');
-    nameEl.className = 'service-item-name';
-    nameEl.textContent = name;
+    return wrap;
+  }
 
-    const typeEl = document.createElement('p');
-    typeEl.className = 'service-item-type';
-    typeEl.textContent = type || 'AI Service';
+  // -- Sidebar ---------------------------------------------------------------
 
-    info.appendChild(nameEl);
-    info.appendChild(typeEl);
+  app.renderEnabledServices = function renderEnabledServices() {
+    const list = app.elements && app.elements.servicesList;
+    if (!list) return;
 
-    const toggleContainer = document.createElement('div');
-    toggleContainer.className = 'service-item-toggle';
+    const query = app.elements.serviceSearch ? app.elements.serviceSearch.value : '';
+    const services = app.filterServices(app.enabledServices(), query);
 
-    const label = document.createElement('label');
-    label.className = 'toggle-switch';
+    list.innerHTML = '';
 
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.checked = isEnabled;
-    input.dataset.serviceId = id;
+    if (app.state.services.length === 0) {
+      list.appendChild(emptyState('No services loaded yet. Update the catalogue to get started.', 'Open Settings'));
+      app.updateServicesCount(0, 0);
+      return;
+    }
 
-    const slider = document.createElement('span');
-    slider.className = 'toggle-slider';
+    if (app.enabledServices().length === 0) {
+      list.appendChild(emptyState('No services enabled yet. Turn a few on in Settings.', 'Manage services'));
+      app.updateServicesCount(0, 0);
+      return;
+    }
 
-    label.appendChild(input);
-    label.appendChild(slider);
-    toggleContainer.appendChild(label);
+    if (services.length === 0) {
+      list.appendChild(emptyState(`No service matches “${query}”.`));
+      app.updateServicesCount(0, app.enabledServices().length);
+      return;
+    }
 
-    item.appendChild(colorIndicator);
-    item.appendChild(info);
-    item.appendChild(toggleContainer);
+    const openIds = app.openServiceIds();
 
-    // Add toggle event
-    const toggle = input;
-    toggle.addEventListener('change', async (e) => {
-      const serviceId = e.target.dataset.serviceId;
-      try {
-        const result = await window.electronAPI.toggleService(serviceId);
+    for (const service of services) {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'service-card';
+      if (openIds.has(service.id)) card.classList.add('is-open');
 
-        // Only re-render if the set actually changed lengths or elements
-        const changed = result.length !== window.config.enabledServices.length ||
-                        !result.every(val => window.config.enabledServices.includes(val));
+      const header = document.createElement('div');
+      header.className = 'service-card-header';
 
-        window.config.enabledServices = result;
+      header.appendChild(avatarFor(service, 'md'));
 
-        if (changed) {
-            window.renderEnabledServices();
-        }
+      const heading = document.createElement('span');
+      heading.className = 'service-card-title';
+      heading.textContent = service.name;
+      header.appendChild(heading);
 
-        window.showStatus(`Service ${e.target.checked ? 'enabled' : 'disabled'}`, 'success');
-      } catch (error) {
-        console.error('Error toggling service:', error);
-        window.showStatus('Error updating service', 'error');
-        // Revert toggle
-        e.target.checked = !e.target.checked;
+      if (openIds.has(service.id)) {
+        const dot = document.createElement('span');
+        dot.className = 'service-open-dot';
+        dot.title = 'Already open';
+        header.appendChild(dot);
       }
-    });
 
-    window.elements.allServicesList.appendChild(item);
-  });
-};
+      const add = document.createElement('span');
+      add.className = 'service-card-add';
+      add.innerHTML = PLUS_SVG;
+      header.appendChild(add);
+
+      const body = document.createElement('div');
+      body.className = 'service-card-body';
+
+      const type = document.createElement('span');
+      type.className = 'service-card-type';
+      type.textContent = service.type || 'AI Service';
+      body.appendChild(type);
+
+      if (service.privacy) {
+        const privacy = document.createElement('p');
+        privacy.className = 'service-card-privacy';
+        privacy.textContent = service.privacy;
+        body.appendChild(privacy);
+      }
+
+      card.append(header, body);
+      card.addEventListener('click', () => openService(service));
+      list.appendChild(card);
+    }
+
+    app.updateServicesCount(services.length, app.enabledServices().length);
+    app.renderQuickStart();
+  };
+
+  app.updateServicesCount = function updateServicesCount(shown, total) {
+    const el = app.elements && app.elements.servicesCount;
+    if (el) el.textContent = `${shown} of ${total} enabled`;
+  };
+
+  // -- Welcome screen --------------------------------------------------------
+
+  app.renderQuickStart = function renderQuickStart() {
+    const grid = app.elements && app.elements.quickStartServices;
+    if (!grid) return;
+
+    grid.innerHTML = '';
+    const services = app.enabledServices().slice(0, 8);
+
+    if (services.length === 0) {
+      const hint = document.createElement('p');
+      hint.className = 'hint-text';
+      hint.textContent = 'Enable services in Settings to pin them here.';
+      grid.appendChild(hint);
+      return;
+    }
+
+    for (const service of services) {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'quick-start-item';
+      if (service.color) item.style.setProperty('--accent', `#${service.color}`);
+
+      item.appendChild(avatarFor(service, 'sm'));
+
+      const label = document.createElement('span');
+      label.textContent = service.name;
+      item.appendChild(label);
+
+      item.addEventListener('click', () => openService(service));
+      grid.appendChild(item);
+    }
+  };
+
+  // -- Settings: manage services --------------------------------------------
+
+  app.renderAllServices = function renderAllServices() {
+    const list = app.elements && app.elements.allServicesList;
+    if (!list) return;
+
+    const query = app.elements.allServicesSearch ? app.elements.allServicesSearch.value : '';
+    const services = app.filterServices(app.state.services, query);
+    const enabled = new Set(app.state.config.enabledServices || []);
+
+    list.innerHTML = '';
+
+    if (app.state.services.length === 0) {
+      list.appendChild(emptyState('The catalogue is empty. Use the update button to download it.'));
+      return;
+    }
+
+    if (services.length === 0) {
+      list.appendChild(emptyState(`No service matches “${query}”.`));
+      return;
+    }
+
+    for (const service of services) {
+      const row = document.createElement('div');
+      row.className = 'service-item';
+      row.dataset.id = service.id;
+
+      row.appendChild(avatarFor(service, 'sm'));
+
+      const info = document.createElement('div');
+      info.className = 'service-item-info';
+
+      const name = document.createElement('h4');
+      name.className = 'service-item-name';
+      name.textContent = service.name;
+
+      const type = document.createElement('p');
+      type.className = 'service-item-type';
+      type.textContent = service.type || 'AI Service';
+
+      info.append(name, type);
+      row.appendChild(info);
+
+      const toggle = document.createElement('label');
+      toggle.className = 'toggle-switch';
+
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = enabled.has(service.id);
+      input.setAttribute('aria-label', `Enable ${service.name}`);
+
+      const slider = document.createElement('span');
+      slider.className = 'toggle-slider';
+
+      toggle.append(input, slider);
+      row.appendChild(toggle);
+
+      input.addEventListener('change', async (event) => {
+        const target = event.target;
+        try {
+          const result = await window.electronAPI.toggleService(service.id);
+          app.state.config.enabledServices = result;
+          app.renderEnabledServices();
+          app.toast(`${service.name} ${target.checked ? 'enabled' : 'disabled'}`, 'success');
+        } catch (error) {
+          target.checked = !target.checked;
+          app.toast('Unable to update this service', 'error');
+        }
+      });
+
+      list.appendChild(row);
+    }
+  };
+})(window.AiHub);

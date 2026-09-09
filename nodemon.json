@@ -1,0 +1,7 @@
+{
+  "watch": ["main.js", "preload.js", "src", "ui"],
+  "ext": "js,html,css,json,png",
+  "ignore": ["node_modules", "dist", "tests"],
+  "env": { "AIHUB_NO_RELOAD": "1" },
+  "exec": "electron ."
+}

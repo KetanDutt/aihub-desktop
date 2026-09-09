@@ -2,23 +2,45 @@
   "env": {
     "browser": true,
     "commonjs": true,
-    "es2021": true,
+    "es2022": true,
     "node": true,
     "jest": true
   },
   "extends": "eslint:recommended",
   "parserOptions": {
-    "ecmaVersion": 12
+    "ecmaVersion": 2022
   },
+  "ignorePatterns": [
+    "node_modules/",
+    "dist/",
+    "coverage/"
+  ],
   "rules": {
-    "no-unused-vars": "warn",
-    "no-undef": "warn",
-    "no-regex-spaces": "off",
-    "no-empty": "off"
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "no-undef": "error",
+    "no-console": "off",
+    "no-empty": ["error", { "allowEmptyCatch": true }],
+    "eqeqeq": ["error", "smart"],
+    "no-var": "error",
+    "prefer-const": "error",
+    "no-param-reassign": ["warn", { "props": false }],
+    "no-throw-literal": "error"
   },
   "globals": {
     "showStatus": "readonly",
     "formatDate": "readonly",
     "generateId": "readonly"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["ui/**/*.js"],
+      "env": { "browser": true, "node": false, "jest": false },
+      "globals": {
+        "module": "readonly",
+        "require": "readonly",
+        "process": "readonly",
+        "globalThis": "readonly"
+      }
+    }
+  ]
 }

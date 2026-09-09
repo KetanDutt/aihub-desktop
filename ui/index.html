@@ -3,165 +3,385 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+  <meta name="theme-color" content="#202124">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'">
   <title>AI Hub Desktop</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="dark-mode">
+<body>
+  <!-- Ambient Liquid Glass backdrop: soft colour fields the materials refract. -->
+  <div class="app-bg" aria-hidden="true">
+    <span class="app-bg-field field-a"></span>
+    <span class="app-bg-field field-b"></span>
+    <span class="app-bg-field field-c"></span>
+    <span class="app-bg-grain"></span>
+  </div>
+
   <div class="app-container">
-    <!-- Header -->
+
+    <!-- ===================== Header ===================== -->
     <header class="app-header">
       <div class="header-title">
-        <h1>AI Hub Desktop</h1>
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <circle cx="4" cy="6" r="2"></circle>
+              <circle cx="20" cy="6" r="2"></circle>
+              <circle cx="12" cy="21" r="2"></circle>
+              <path d="M9.6 10.4 5.6 7.4M14.4 10.4l4-3M12 15v4"></path>
+            </svg>
+          </span>
+          <h1>AI Hub Desktop</h1>
+        </div>
+
         <div class="header-controls">
-          <button id="btn-update" class="btn btn-icon" title="Update Services List">
-            <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span>
+          <span id="tab-count" class="tab-count" title="Open tabs / limit">0/3</span>
+          <button id="btn-update" class="btn btn-icon" title="Update the service catalogue" aria-label="Update the service catalogue">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+              <path d="M3 3v5h5"></path>
+            </svg>
           </button>
-          <button id="btn-settings" class="btn btn-icon" title="Settings">
-            <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+          <button id="btn-shortcuts" class="btn btn-icon" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+              <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"></path>
+            </svg>
+          </button>
+          <button id="btn-settings" class="btn btn-icon" title="Settings" aria-label="Settings">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
           </button>
         </div>
       </div>
 
-
-      <!-- Navigation -->
-      <!-- <div class="nav-controls">
-       </div> -->
-      <!-- Tabs Container -->
+      <!-- ===================== Tab strip ===================== -->
       <div class="tabs-container">
-        <div id="tabs-list" class="tabs-list">
-          <!-- Tabs will be added here dynamically -->
+        <div id="tabs-list" class="tabs-list" role="tablist" aria-label="Open services"></div>
+
+        <button id="btn-add-tab" class="btn btn-tab-add" title="Add a service (Ctrl+T)" aria-label="Add a service">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+
+        <div class="nav-controls">
+          <button id="btn-nav-back" class="btn btn-icon" title="Back" aria-label="Back" disabled>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button id="btn-nav-forward" class="btn btn-icon" title="Forward" aria-label="Forward" disabled>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+          <button id="btn-nav-reload" class="btn btn-icon" title="Reload (Ctrl+R)" aria-label="Reload">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+              <path d="M3 3v5h5"></path>
+            </svg>
+          </button>
         </div>
-        <button id="btn-add-tab" class="btn btn-tab-add" title="Add Service"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
-        <button id="btn-nav-back" class="btn btn-icon" title="Go Back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
-        <button id="btn-nav-forward" class="btn btn-icon" title="Go Forward"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
-        <button id="btn-nav-reload" class="btn btn-icon" title="Reload"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
       </div>
     </header>
 
-    <!-- Sidebar (Service List) -->
-    <aside id="sidebar" class="sidebar hidden">
+    <div class="main-row">
+    <!-- ===================== Sidebar ===================== -->
+    <aside id="sidebar" class="sidebar hidden" aria-label="Service picker">
       <div class="sidebar-header">
-        <h3>Active Services</h3>
-        <button class="btn btn-close-sidebar" id="btn-close-sidebar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        <div>
+          <h3>Services</h3>
+          <p id="services-count" class="sidebar-subtitle">0 of 0 enabled</p>
+        </div>
+        <button class="btn btn-icon" id="btn-close-sidebar" aria-label="Close the service picker">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"
+               stroke-linecap="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
       </div>
-      <div id="services-list" class="services-list">
-        <!-- Services populated here -->
+
+      <div class="sidebar-search">
+        <input id="service-search" type="search" class="input-field" placeholder="Search services…"
+               autocomplete="off" spellcheck="false" aria-label="Search services">
       </div>
+
+      <div id="services-list" class="services-list"></div>
     </aside>
 
-    <!-- Main Content Area -->
+    <!-- ===================== Main ===================== -->
     <main class="main-content">
       <div id="welcome-screen" class="welcome-screen">
-        <h2>Welcome to AI Hub Desktop</h2>
-        <p>Click the <strong>+</strong> button to add a service.</p>
-        <p>Configure services in Settings.</p>
-        <div id="quick-start-guide" class="quick-start-guide">
-          <h3>Quick Start</h3>
-          <div id="quick-start-services" class="quick-start-services-grid"></div>
+        <div class="welcome-inner">
+          <h2>Welcome to AI Hub Desktop</h2>
+          <p class="lead">Every assistant in one window, each in its own sandboxed tab.</p>
+
+          <div id="quick-start-guide" class="quick-start-guide">
+            <h3>Quick start</h3>
+            <div id="quick-start-services" class="quick-start-services-grid"></div>
+          </div>
+
+          <div class="welcome-tips">
+            <div class="tip">
+              <h4>Domain filtering</h4>
+              <p>Each tab can only talk to the domains its service actually needs. Stray trackers are dropped before they leave your machine.</p>
+            </div>
+            <div class="tip">
+              <h4>Memory aware</h4>
+              <p>Idle tabs are hibernated automatically, and a tab limit keeps the footprint predictable.</p>
+            </div>
+            <div class="tip">
+              <h4>Keyboard first</h4>
+              <p>Press <kbd>?</kbd> for the shortcut list, or <kbd>Ctrl</kbd>+<kbd>T</kbd> to open this picker.</p>
+            </div>
+          </div>
         </div>
       </div>
-      <div id="webviews-container">
-        <!-- Webviews will be attached here -->
-      </div>
+
+      <!-- The WebContentsViews are positioned over this element. -->
+      <div id="webviews-container" class="webviews-container"></div>
     </main>
 
-    <!-- Settings Panel -->
-    <div id="settings-panel" class="settings-panel hidden">
+    <!-- ===================== Settings ===================== -->
+    <div id="settings-panel" class="settings-panel hidden" role="dialog" aria-label="Settings" aria-hidden="true">
       <div class="panel-content">
         <div class="panel-header">
           <h2>Settings</h2>
-          <button id="btn-close-settings" class="btn btn-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          <button id="btn-close-settings" class="btn btn-icon" aria-label="Close settings">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"
+                 stroke-linecap="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
 
-        <div class="settings-tabs">
-          <button class="settings-tab active" data-tab="general">General</button>
-          <button class="settings-tab" data-tab="services">Services</button>
+        <div class="settings-tabs" role="tablist">
+          <button class="settings-tab active" data-tab="general" role="tab" aria-selected="true">General</button>
+          <button class="settings-tab" data-tab="services" role="tab" aria-selected="false">Services</button>
+          <button class="settings-tab" data-tab="privacy" role="tab" aria-selected="false">Privacy</button>
+          <button class="settings-tab" data-tab="about" role="tab" aria-selected="false">About</button>
         </div>
 
         <div class="settings-content">
-          <!-- General Tab -->
-          <div id="tab-general" class="settings-tab-content active">
-            <div class="setting-group">
-              <label class="setting-label">
-                <input type="checkbox" id="toggle-blocking" checked>
-                <span>Enable Domain Blocking</span>
+
+          <!-- ---------- General ---------- -->
+          <div id="tab-general" class="settings-tab-content active" role="tabpanel">
+            <section class="setting-group">
+              <h3 class="setting-section-title">Protection</h3>
+              <label class="setting-label toggle-row">
+                <span>
+                  <span class="setting-name">Domain blocking</span>
+                  <small class="setting-hint">Block requests to domains outside each service's allow-list.</small>
+                </span>
+                <span class="toggle-switch"><input type="checkbox" id="toggle-blocking" checked><span class="toggle-slider"></span></span>
               </label>
-              <small class="setting-hint">Blocks connections to non-whitelisted domains.</small>
-            </div>
-
-            <div class="setting-group">
-              <label class="setting-label" for="max-services">Active Services Limit</label>
-              <input type="number" id="max-services" min="1" max="10" value="3" class="input-field">
-              <small class="setting-hint">Limits RAM usage by restricting concurrent services.</small>
-            </div>
-
-            <div class="setting-group">
-              <label class="setting-label">
-                <input type="checkbox" id="toggle-dark-mode" checked>
-                <span>Dark Mode</span>
+              <label class="setting-label toggle-row">
+                <span>
+                  <span class="setting-name">Strict mode</span>
+                  <small class="setting-hint">Also block requests that cannot be attributed to a known tab. May break pop-ups.</small>
+                </span>
+                <span class="toggle-switch"><input type="checkbox" id="toggle-strict-blocking"><span class="toggle-slider"></span></span>
               </label>
-            </div>
+            </section>
 
-            <div class="setting-group">
-              <label class="setting-label">
-                <input type="checkbox" id="toggle-proxy">
-                <span>Use Proxy</span>
-              </label>
-              <small class="setting-hint">Route traffic through a web proxy to bypass IP detection.</small>
-            </div>
-            <div class="setting-group">
-              <label class="setting-label" for="proxy-url">Proxy Gateway URL</label>
-              <input type="text" id="proxy-url" class="input-field" placeholder="e.g., https://eu.proxysite.com/includes/process.php?action=update">
-            </div>
-
-
-            <div class="setting-group">
-              <div class="info-box">
-                <p><strong>Last Updated:</strong> <span id="last-update">Never</span></p>
+            <section class="setting-group">
+              <h3 class="setting-section-title">Performance</h3>
+              <div class="setting-field">
+                <label class="setting-label" for="max-services">Concurrent tab limit</label>
+                <input type="number" id="max-services" min="1" max="20" value="3" class="input-field input-narrow">
+                <small class="setting-hint">Each tab is a full Chromium renderer, so this is your main memory lever.</small>
               </div>
-            </div>
+              <label class="setting-label toggle-row">
+                <span>
+                  <span class="setting-name">Hibernate idle tabs</span>
+                  <small class="setting-hint">Release the renderer process of tabs you have not used for a while.</small>
+                </span>
+                <span class="toggle-switch"><input type="checkbox" id="toggle-hibernate" checked><span class="toggle-slider"></span></span>
+              </label>
+              <div class="setting-field">
+                <label class="setting-label" for="hibernate-minutes">Hibernate after (minutes)</label>
+                <input type="number" id="hibernate-minutes" min="1" max="1440" value="15" class="input-field input-narrow">
+              </div>
+            </section>
 
+            <section class="setting-group">
+              <h3 class="setting-section-title">Appearance &amp; system</h3>
+              <label class="setting-label toggle-row">
+                <span><span class="setting-name">Dark mode</span></span>
+                <span class="toggle-switch"><input type="checkbox" id="toggle-dark-mode" checked><span class="toggle-slider"></span></span>
+              </label>
+              <label class="setting-label toggle-row">
+                <span>
+                  <span class="setting-name">Minimise to tray on close</span>
+                  <small class="setting-hint">Keep running in the background when the window is closed.</small>
+                </span>
+                <span class="toggle-switch"><input type="checkbox" id="toggle-minimize-tray" checked><span class="toggle-slider"></span></span>
+              </label>
+              <label class="setting-label toggle-row">
+                <span><span class="setting-name">Launch at login</span><small class="setting-hint">Windows and macOS only.</small></span>
+                <span class="toggle-switch"><input type="checkbox" id="toggle-launch-login"><span class="toggle-slider"></span></span>
+              </label>
+              <div class="setting-field">
+                <label class="setting-label" for="global-shortcut">Global show/hide shortcut</label>
+                <input type="text" id="global-shortcut" class="input-field" placeholder="CommandOrControl+Shift+A" spellcheck="false">
+                <small class="setting-hint">Electron accelerator syntax, e.g. <code>CommandOrControl+Shift+A</code>.</small>
+              </div>
+            </section>
 
-            <div class="setting-group" style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 16px;">
-              <button id="btn-clear-session" class="btn btn-secondary" style="color: var(--error-color); border-color: var(--error-color);">Clear Session Data</button>
-              <small class="setting-hint" style="margin-left: 0;">Removes all cookies, caches, and stored session data.</small>
-            </div>
-
-            <div class="setting-actions"></div>
+            <section class="setting-group">
+              <h3 class="setting-section-title">Network</h3>
+              <label class="setting-label toggle-row">
+                <span>
+                  <span class="setting-name">Route tabs through a web proxy</span>
+                  <small class="setting-hint">Advanced. Some services detect and block proxy traffic.</small>
+                </span>
+                <span class="toggle-switch"><input type="checkbox" id="toggle-proxy"><span class="toggle-slider"></span></span>
+              </label>
+              <div class="setting-field">
+                <label class="setting-label" for="proxy-url">Proxy gateway URL</label>
+                <input type="text" id="proxy-url" class="input-field" placeholder="https://proxy.example.com/process.php?action=update" spellcheck="false">
+              </div>
+            </section>
           </div>
 
-          <!-- Services Tab -->
-          <div id="tab-services" class="settings-tab-content">
+          <!-- ---------- Services ---------- -->
+          <div id="tab-services" class="settings-tab-content" role="tabpanel">
             <div class="services-manager">
-              <h3>Manage Services</h3>
-              <p class="hint-text">Enable or disable services to show in your active list.</p>
-              <div id="all-services-list" class="all-services-list">
-                <!-- All services will be listed here -->
+              <div class="services-manager-header">
+                <div>
+                  <h3>Manage services</h3>
+                  <p class="hint-text">Choose which services appear in the picker.</p>
+                </div>
+                <input id="all-services-search" type="search" class="input-field" placeholder="Search…"
+                       autocomplete="off" spellcheck="false" aria-label="Search all services">
               </div>
+              <div id="all-services-list" class="all-services-list"></div>
             </div>
+          </div>
+
+          <!-- ---------- Privacy ---------- -->
+          <div id="tab-privacy" class="settings-tab-content" role="tabpanel">
+            <section class="setting-group">
+              <h3 class="setting-section-title">Catalogue</h3>
+              <div class="info-box">
+                <p><strong>Last updated:</strong> <span id="last-update">Never</span></p>
+                <p id="data-source" class="mono">Catalogue: bundled · Rules: bundled</p>
+              </div>
+              <label class="setting-label toggle-row">
+                <span>
+                  <span class="setting-name">Refresh the catalogue automatically</span>
+                  <small class="setting-hint">Checks for new services and rules about once a week, in the background.</small>
+                </span>
+                <span class="toggle-switch"><input type="checkbox" id="toggle-auto-update" checked><span class="toggle-slider"></span></span>
+              </label>
+              <div class="button-row">
+                <button id="btn-update-privacy" class="btn btn-secondary btn-small" data-action="update">Update now</button>
+              </div>
+            </section>
+
+            <section class="setting-group">
+              <h3 class="setting-section-title">Blocking activity</h3>
+              <p id="blocking-stats" class="mono">0 request(s) blocked</p>
+              <small class="setting-hint">Counters reset when the app restarts. Full details are in the log file.</small>
+            </section>
+
+            <section class="setting-group danger-zone">
+              <h3 class="setting-section-title">Session data</h3>
+              <button id="btn-clear-session" class="btn btn-danger btn-small">Clear session data</button>
+              <small class="setting-hint">Removes cookies, caches and stored credentials for every service.</small>
+            </section>
+
+            <section class="setting-group">
+              <h3 class="setting-section-title">Memory</h3>
+              <button id="btn-hibernate" class="btn btn-secondary btn-small">Hibernate idle tabs now</button>
+              <small class="setting-hint">Frees the renderer processes of background tabs immediately.</small>
+            </section>
+          </div>
+
+          <!-- ---------- About ---------- -->
+          <div id="tab-about" class="settings-tab-content" role="tabpanel">
+            <section class="setting-group">
+              <div class="about-hero">
+                <h3 id="about-version">AI Hub Desktop</h3>
+                <p class="hint-text">One window for every AI assistant, with a domain filter in front of each one.</p>
+              </div>
+              <div id="about-details" class="about-details"></div>
+            </section>
+
+            <section class="setting-group">
+              <h3 class="setting-section-title">Updates</h3>
+              <p id="update-status" class="hint-text">Update status unavailable.</p>
+              <div class="button-row">
+                <button id="btn-check-updates" class="btn btn-secondary btn-small">Check for updates</button>
+              </div>
+            </section>
+
+            <section class="setting-group">
+              <h3 class="setting-section-title">Diagnostics</h3>
+              <button id="btn-open-log" class="btn btn-secondary btn-small">Copy log file path</button>
+              <small class="setting-hint">Attach the log when reporting a problem.</small>
+            </section>
           </div>
         </div>
       </div>
     </div>
+    </div><!-- /.main-row -->
 
-    <!-- Status Bar -->
+    <!-- ===================== Shortcut reference ===================== -->
+    <div id="shortcuts-modal" class="modal-backdrop hidden" role="dialog" aria-label="Keyboard shortcuts" aria-modal="true">
+      <div class="modal">
+        <h3>Keyboard shortcuts</h3>
+        <p class="modal-message">Shortcuts apply while the app chrome has focus.</p>
+        <div class="shortcut-list"></div>
+        <div class="modal-actions">
+          <button id="btn-close-shortcuts" class="btn btn-primary">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== Status bar ===================== -->
     <footer class="status-bar">
       <div id="status-message" class="status-message">
-        <span class="loading-indicator hidden spin" id="loading-indicator" style="display:inline-flex; align-items:center; margin-right:4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg></span>
+        <span id="loading-indicator" class="loading-indicator hidden spin" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line>
+            <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+            <line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line>
+            <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+          </svg>
+        </span>
         <span id="status-text">Ready</span>
       </div>
       <div class="blocking-status">
-        <span id="blocking-indicator" class="indicator active"></span>
-        <span id="blocking-text">Blocking Active</span>
+        <span id="blocking-indicator" class="indicator active" aria-hidden="true"></span>
+        <span id="blocking-text">Blocking active</span>
       </div>
     </footer>
   </div>
 
+  <!-- Overlay anchors -->
+  <div id="overlay-root"></div>
+  <div id="toast-root" aria-live="polite"></div>
+
   <script src="utils.js"></script>
+  <script src="state.js"></script>
+  <script src="motion.js"></script>
+  <script src="overlays.js"></script>
   <script src="services.js"></script>
   <script src="tabs.js"></script>
   <script src="settings.js"></script>
+  <script src="shortcuts.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

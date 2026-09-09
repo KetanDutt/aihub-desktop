@@ -1,2 +1,27 @@
-/node_modules
-package-lock.json
+# Dependencies
+node_modules/
+
+# Build output (electron-builder)
+dist/
+out/
+release/
+
+# Test / coverage
+coverage/
+
+# Runtime data (fallback store when not running inside Electron)
+.aihub/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Editor / OS cruft
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# NOTE: package-lock.json IS committed on purpose — CI's setup-node uses
+# `cache: npm`, which requires a lockfile, and it gives reproducible builds.
