@@ -2,11 +2,17 @@
 jest.mock('electron', () => ({
     app: {
         isPackaged: false,
+        getName: jest.fn().mockReturnValue('aihub-desktop'),
+        getVersion: jest.fn().mockReturnValue('1.1.0'),
         requestSingleInstanceLock: jest.fn().mockReturnValue(true),
         on: jest.fn(),
         quit: jest.fn(),
-        whenReady: jest.fn().mockReturnValue({ then: jest.fn() }),
-        setAsDefaultProtocolClient: jest.fn()
+        whenReady: jest.fn().mockReturnValue({
+            then: jest.fn().mockReturnValue({ catch: jest.fn() }),
+            catch: jest.fn()
+        }),
+        setAsDefaultProtocolClient: jest.fn(),
+        setLoginItemSettings: jest.fn()
     },
     session: {
         defaultSession: {

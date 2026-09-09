@@ -1,317 +1,243 @@
-// renderer.js - Frontend Logic
+/**
+ * Renderer bootstrap: load config + catalogue, restore the session, wire the
+ * shell UI to the main process.
+ */
 
-document.addEventListener('DOMContentLoaded', () => {
-  // --- DOM Elements ---
-  const elements = {
-    tabsList: document.getElementById('tabs-list'),
-                          btnNavBack: document.getElementById('btn-nav-back'),
-                          btnNavForward: document.getElementById('btn-nav-forward'),
-                          btnNavReload: document.getElementById('btn-nav-reload'),
-                          addTabBtn: document.getElementById('btn-add-tab'),
-                          sidebar: document.getElementById('sidebar'),
-                          closeSidebarBtn: document.getElementById('btn-close-sidebar'),
-                          servicesList: document.getElementById('services-list'),
-                          webviewsContainer: document.getElementById('webviews-container'),
-                          welcomeScreen: document.getElementById('welcome-screen'),
-                          settingsPanel: document.getElementById('settings-panel'),
-                          btnSettings: document.getElementById('btn-settings'),
-                          btnUpdate: document.getElementById('btn-update'),
-                          toggleBlocking: document.getElementById('toggle-blocking'),
-                          maxServicesInput: document.getElementById('max-services'),
-                          toggleDarkMode: document.getElementById('toggle-dark-mode'),
-                          toggleProxy: document.getElementById('toggle-proxy'),
-                          proxyUrlInput: document.getElementById('proxy-url'),
-                          btnClearSession: document.getElementById('btn-clear-session'),
+window.AiHub = window.AiHub || {};
 
+(function (app) {
+  const utils = window.AiHubUtils;
+  const pendingDeepLinks = [];
 
-                          lastUpdate: document.getElementById('last-update'),
+  // -- Sidebar ---------------------------------------------------------------
 
-                          btnCloseSettings: document.getElementById('btn-close-settings'),
-                          statusMessage: document.getElementById('status-message'),
-                          blockingIndicator: document.getElementById('blocking-indicator'),
-                          blockingText: document.getElementById('blocking-text'),
-                          allServicesList: document.getElementById('all-services-list'),
-                          settingsTabs: document.querySelectorAll('.settings-tab'),
-                          settingsTabContents: document.querySelectorAll('.settings-tab-content')
+  app.openSidebar = function openSidebar() {
+    if (!app.elements.sidebar) return;
+    app.elements.sidebar.classList.remove('hidden');
+    app.renderEnabledServices();
+    if (app.elements.serviceSearch) app.elements.serviceSearch.focus();
   };
 
-  // --- State ---
-  let config = {
-    enabledServices: [],
-    blockingEnabled: true,
-    maxActiveServices: 3,
-    darkMode: true
+  app.closeSidebar = function closeSidebar() {
+    if (app.elements.sidebar) app.elements.sidebar.classList.add('hidden');
   };
-  let allServices = []; // All available services
-  let activeTabs = [];
-  window.currentTabId = null;
 
-  // --- Utility Functions ---
+  app.toggleSidebar = function toggleSidebar() {
+    if (!app.elements.sidebar) return;
+    if (app.elements.sidebar.classList.contains('hidden')) app.openSidebar();
+    else app.closeSidebar();
+  };
 
+  // -- Data loading ----------------------------------------------------------
 
-
-
-  window.elements = elements;
-  window.config = config;
-  window.allServices = allServices;
-  window.activeTabs = activeTabs;
-
-  // --- Core Logic ---
-
-  const loadConfig = async () => {
+  app.loadConfig = async function loadConfig() {
     try {
-      window.config = config = await window.electronAPI.getConfig();
-
-      elements.toggleBlocking.checked = config.blockingEnabled;
-      elements.maxServicesInput.value = config.maxActiveServices;
-      elements.toggleDarkMode.checked = config.darkMode;
-      elements.lastUpdate.textContent = window.formatDate(config.lastUpdate);
-
-      window.updateBlockingUI(config.blockingEnabled);
-      window.applyDarkMode(config.darkMode);
-      window.elements.toggleProxy.checked = window.config.useProxy || false;
-      window.elements.proxyUrlInput.value = window.config.proxyUrl || 'https://eu.proxysite.com/includes/process.php?action=update';
-
-
-      // Render enabled services in sidebar
-      window.renderEnabledServices();
-
-      // Render all services in settings
-      window.renderAllServicesInSettings();
+      const config = await window.electronAPI.getConfig();
+      app.state.config = config;
+      app.state.limit = config.maxActiveServices || 3;
+      app.state.blocking.enabled = config.blockingEnabled !== false;
+      app.loadSettingsIntoUI();
     } catch (error) {
-      console.error('Error loading config:', error);
-      window.showStatus('Error loading configuration', 'error');
+      console.error('Unable to load configuration:', error);
+      utils.showStatus('Unable to load configuration', 'error');
     }
   };
 
-  const loadServices = async () => {
+  app.loadServices = async function loadServices() {
     try {
       const data = await window.electronAPI.getServices();
-      if (data && data.ai_services) {
-        window.allServices = allServices = data.ai_services;
+      const services = (data && data.ai_services) || [];
 
-        // Cache services by ID for O(1) lookup
-        window.servicesMap = new Map();
-        for (const s of allServices) {
-          window.servicesMap.set(window.generateId(s[0]), s);
-        }
+      app.state.services = services;
+      app.state.servicesById = new Map(services.map((service) => [service.id, service]));
 
-        window.renderEnabledServices();
-        window.renderAllServicesInSettings();
-      } else {
-        elements.servicesList.innerHTML = '<div class="error-message">No services found. Click Update.</div>';
+      if (services.length === 0) {
+        app.toast('Service catalogue is empty. Open Settings and run an update.', 'warning');
       }
+
+      app.renderEnabledServices();
+      app.renderAllServices();
+      return services;
     } catch (error) {
-      console.error('Error loading services:', error);
-      elements.servicesList.innerHTML = '<div class="error-message">Error loading services.</div>';
+      console.error('Unable to load services:', error);
+      app.toast('Unable to load the service catalogue', 'error');
+      return [];
     }
   };
 
-  // --- Render Functions (Moved to ui/services.js) ---
+  // -- Session restore -------------------------------------------------------
 
-  // --- Tab Management ---
+  async function restoreSession() {
+    const { openTabs, activeTabId } = app.state.config;
+    if (!Array.isArray(openTabs) || openTabs.length === 0) {
+      app.showWelcome();
+      return;
+    }
 
-  const updateViewBounds = () => {
-      const containerBounds = elements.webviewsContainer.getBoundingClientRect();
-      window.electronAPI.setViewBounds({
-          x: Math.round(containerBounds.x),
-          y: Math.round(containerBounds.y),
-          width: Math.round(containerBounds.width),
-          height: Math.round(containerBounds.height)
+    const restored = [];
+    for (const saved of openTabs) {
+      const serviceId = saved.serviceId || saved.id;
+      const service = app.serviceById(serviceId);
+      if (!service) {
+        app.toast(`Skipped ${saved.id || serviceId}: no longer in the catalogue`, 'warning');
+        continue;
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      const tab = await app.createTab({
+        serviceId,
+        url: saved.url || service.url,
+        title: saved.title || service.name,
+        tabId: saved.id
       });
-  };
+      if (tab) restored.push(tab);
+    }
 
-  // Keep views in sync when window resizes
-  window.addEventListener('resize', updateViewBounds);
+    if (restored.length === 0) {
+      app.showWelcome();
+      return;
+    }
 
-// --- Tab Management (Moved to ui/tabs.js) ---
-
-// --- Settings Management (Moved to ui/settings.js) ---
-
-// --- Event Listeners ---
-
-  // Open sidebar
-  elements.addTabBtn.addEventListener('click', () => {
-    elements.sidebar.classList.remove('hidden');
-  });
-
-  // Close sidebar
-  elements.closeSidebarBtn.addEventListener('click', () => {
-    elements.sidebar.classList.add('hidden');
-  });
-
-  // Open settings
-  elements.btnSettings.addEventListener('click', () => {
-    elements.settingsPanel.classList.remove('hidden');
-    window.renderAllServicesInSettings();
-  });
-
-  // Close settings
-  elements.btnCloseSettings.addEventListener('click', () => {
-    elements.settingsPanel.classList.add('hidden');
-  });
-
-  // Auto-save settings
-
-  elements.toggleBlocking.addEventListener('change', window.debouncedSaveSettings);
-  elements.maxServicesInput.addEventListener('input', window.debouncedSaveSettings);
-  elements.toggleDarkMode.addEventListener('change', window.debouncedSaveSettings);
-  elements.toggleProxy.addEventListener('change', window.debouncedSaveSettings);
-  elements.proxyUrlInput.addEventListener('input', window.debouncedSaveSettings);
-
-
-
-    if (elements.btnClearSession) {
-      elements.btnClearSession.addEventListener('click', async () => {
-          if (confirm('Are you sure you want to clear all session data? This will log you out of all AI services.')) {
-              try {
-                  const success = await window.electronAPI.clearSessionData();
-                  if (success) {
-                      window.showStatus('Session data cleared successfully', 'success');
-                      // Reload current tab to reflect cleared state
-                      if (window.currentTabId) {
-                          window.electronAPI.navReload(window.currentTabId);
-                      }
-                  } else {
-                      window.showStatus('Failed to clear session data', 'error');
-                  }
-              } catch (err) {
-                  console.error(err);
-                  window.showStatus('Error clearing session data', 'error');
-              }
-          }
-      });
+    const active = restored.find((tab) => tab.id === activeTabId) || restored[0];
+    app.switchToTab(active.id);
+    app.hideWelcome();
   }
-  // Update services
-  elements.btnUpdate.addEventListener('click', async () => {
-    elements.btnUpdate.disabled = true;
-    const icon = elements.btnUpdate.querySelector('span');
-    if (icon) icon.classList.add('spin');
-    window.showStatus('Updating services...', 'loading');
 
-    try {
-      const result = await window.electronAPI.updateRemoteData();
-      if (result.success) {
-        await loadServices();
-        elements.lastUpdate.textContent = window.formatDate(config.lastUpdate);
-        window.showStatus('Update successful', 'success');
-      } else {
-        window.showStatus('Update failed: ' + result.error, 'error');
-      }
-    } catch (error) {
-      window.showStatus('Update failed', 'error');
-    } finally {
-      elements.btnUpdate.disabled = false;
-      if (icon) icon.classList.remove('spin');
-    }
-  });
+  // -- View bounds -----------------------------------------------------------
 
-  // Settings tabs
-  elements.settingsTabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      // Update tab buttons
-      elements.settingsTabs.forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
+  function initViewBounds() {
+    const container = app.elements.webviewsContainer;
+    if (!container) return;
 
-      // Update tab content
-      const tabName = tab.dataset.tab;
-      elements.settingsTabContents.forEach(content => {
-        content.classList.toggle('active', content.id === `tab-${tabName}`);
+    const report = utils.rafThrottle(() => {
+      const rect = container.getBoundingClientRect();
+      window.electronAPI.setViewBounds({
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height)
       });
     });
-  });
 
-    // Keyboard shortcuts
-  document.addEventListener('keydown', (e) => {
-    // Tab switching
-    if (e.ctrlKey && e.key === 'Tab') {
-      e.preventDefault();
-      window.switchToNextTab(e.shiftKey ? -1 : 1);
-      return;
+    window.addEventListener('resize', report);
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(report).observe(container);
     }
-
-    // Close current tab
-    if (e.ctrlKey && e.key.toLowerCase() === 'w') {
-      e.preventDefault();
-      if (window.currentTabId) window.closeTab(window.currentTabId);
-      return;
-    }
-
-    // Open sidebar
-    if (e.ctrlKey && e.key.toLowerCase() === 't') {
-      e.preventDefault();
-      elements.sidebar.classList.remove('hidden');
-      return;
-    }
-
-    // Close sidebar with Escape
-    if (e.key === 'Escape') {
-      elements.sidebar.classList.add('hidden');
-      elements.settingsPanel.classList.add('hidden');
-    }
-  });
-
-
-  elements.btnNavBack.addEventListener('click', () => {
-    if (window.currentTabId) try { window.electronAPI.navGoBack(window.currentTabId); } catch(e){}
-  });
-  elements.btnNavForward.addEventListener('click', () => {
-    if (window.currentTabId) try { window.electronAPI.navGoForward(window.currentTabId); } catch(e){}
-  });
-  elements.btnNavReload.addEventListener('click', () => {
-    if (window.currentTabId) try { window.electronAPI.navReload(window.currentTabId); } catch(e){}
-  });
-
-  // --- Initialization ---
-  const init = async () => {
-    await loadConfig();
-    await loadServices();
-
-    // Show welcome message if no enabled services
-    if (!config.enabledServices || config.enabledServices.length === 0) {
-      const heading = elements.welcomeScreen.querySelector('h2');
-      if (heading) heading.textContent = 'Welcome to AI Hub Desktop (No services enabled)';
-    } else {
-      // Restore Session Tabs
-      if (config.openTabs && config.openTabs.length > 0) {
-        let validTabs = [];
-        for (const savedTab of config.openTabs) {
-          // Find matching service metadata to get the title
-          const serviceId = savedTab.serviceId || savedTab.id; // Fallback for old configs
-          const serviceMeta = window.servicesMap ? window.servicesMap.get(serviceId) : allServices.find(s => window.generateId(s[0]) === serviceId);
-          if (serviceMeta) {
-              const title = serviceMeta[0];
-              await window.createTab(serviceId, savedTab.url, title, savedTab.id);
-              validTabs.push(savedTab);
-          } else {
-              console.warn(`Skipping invalid saved tab: ${savedTab.id}`);
-              window.showStatus(`Skipped deprecated service: ${savedTab.id}`, 'warning');
-          }
-        }
-
-        // Restore active tab
-        if (config.activeTabId && validTabs.find(t => t.id === config.activeTabId)) {
-          window.switchToTab(config.activeTabId);
-        } else if (validTabs.length > 0) {
-          // Switch to the first valid tab if the last active was closed
-          window.switchToTab(validTabs[0].id);
-        }
-      }
-    }
-  };
-
-    // Deep link handling
-  if (window.electronAPI.onDeepLinkOpen) {
-      window.electronAPI.onDeepLinkOpen((serviceId) => {
-          const service = window.servicesMap ? window.servicesMap.get(serviceId) : allServices.find(s => window.generateId(s[0]) === serviceId);
-          if (service) {
-              const [name, url] = service;
-              window.createTab(serviceId, url, name);
-          } else {
-              window.showStatus(`Service ${serviceId} not found`, 'warning');
-          }
-      });
+    document.fonts && document.fonts.ready && document.fonts.ready.then(report);
+    // Give the layout a frame to settle before the first report.
+    requestAnimationFrame(report);
+    setTimeout(report, 250);
   }
 
-  init();
-});
+  // -- Deep links ------------------------------------------------------------
+
+  function openServiceFromDeepLink(serviceId) {
+    const service = app.serviceById(serviceId);
+    if (!service) {
+      app.toast(`Unknown service: ${serviceId}`, 'warning');
+      return;
+    }
+    app.createTab({ serviceId: service.id, url: service.url, title: service.name });
+  }
+
+  function initDeepLinks() {
+    if (!window.electronAPI.onDeepLinkOpen) return;
+    window.electronAPI.onDeepLinkOpen((serviceId) => {
+      if (!app.state.ready) {
+        pendingDeepLinks.push(serviceId);
+        return;
+      }
+      openServiceFromDeepLink(serviceId);
+    });
+  }
+
+  // -- Misc listeners --------------------------------------------------------
+
+  function initGlobalListeners() {
+    if (window.electronAPI.onBlockingState) {
+      window.electronAPI.onBlockingState((snapshot) => {
+        app.state.blocking = { ...app.state.blocking, ...snapshot };
+        utils.updateBlockingUI(app.state.blocking);
+      });
+    }
+
+    if (window.electronAPI.onUpdateState) {
+      window.electronAPI.onUpdateState((status) => app.renderUpdateStatus(status));
+    }
+
+    const addTabBtn = app.elements.btnAddTab;
+    if (addTabBtn) {
+      addTabBtn.addEventListener('click', () => app.openSidebar());
+      addTabBtn.addEventListener('auxclick', (event) => {
+        if (event.button === 1) {
+          event.preventDefault();
+          app.openSidebar();
+        }
+      });
+    }
+
+    const closeSidebarBtn = app.elements.btnCloseSidebar;
+    if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', () => app.closeSidebar());
+
+    const settingsBtn = app.elements.btnSettings;
+    if (settingsBtn) settingsBtn.addEventListener('click', () => app.openSettings());
+
+    const back = app.elements.btnNavBack;
+    const forward = app.elements.btnNavForward;
+    const reload = app.elements.btnNavReload;
+    if (back) back.addEventListener('click', () => app.state.currentTabId && window.electronAPI.navGoBack(app.state.currentTabId));
+    if (forward) forward.addEventListener('click', () => app.state.currentTabId && window.electronAPI.navGoForward(app.state.currentTabId));
+    if (reload) reload.addEventListener('click', () => app.state.currentTabId && window.electronAPI.navReload(app.state.currentTabId));
+
+    // A click anywhere dismisses an open context menu.
+    document.addEventListener('click', () => app.closeContextMenu());
+  }
+
+  function updateWelcomeCopy() {
+    const heading = document.querySelector('#welcome-screen h2');
+    if (!heading) return;
+    const enabled = app.state.config.enabledServices || [];
+    heading.textContent =
+      enabled.length === 0 ? 'Welcome to AI Hub Desktop' : 'Which assistant are we opening today?';
+  }
+
+  // -- Boot ------------------------------------------------------------------
+
+  async function init() {
+    app.cacheElements();
+    initGlobalListeners();
+    app.initTabListeners();
+    app.initSettings();
+    app.initShortcuts();
+    initDeepLinks();
+    initViewBounds();
+
+    await app.loadConfig();
+    await app.loadServices();
+    updateWelcomeCopy();
+
+    await restoreSession();
+
+    app.state.ready = true;
+    while (pendingDeepLinks.length > 0) {
+      openServiceFromDeepLink(pendingDeepLinks.shift());
+    }
+
+    app.updateTabCount();
+    app.refreshPrivacyInfo();
+    utils.showStatus('Ready', 'info');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      init().catch((error) => {
+        console.error('Startup failed:', error);
+        utils.showStatus('Startup failed, see the log file', 'error');
+      });
+    });
+  } else {
+    init().catch((error) => {
+      console.error('Startup failed:', error);
+    });
+  }
+})(window.AiHub);

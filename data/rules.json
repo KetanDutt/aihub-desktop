@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-09T00:00:00.000Z",
+  "comment": "Offline fallback allow-list bundled with the app. Entries are registrable domains; every subdomain matches automatically (openai.com also allows cdn.openai.com). The remote rule set (Settings > Update) overrides this at runtime.",
+  "service_domains": {
+    "chatgpt": [
+      "openai.com",
+      "chatgpt.com",
+      "oaistatic.com",
+      "oaiusercontent.com",
+      "oailabs.com",
+      "intercom.io",
+      "intercomcdn.com",
+      "launchdarkly.com",
+      "statsigapi.net",
+      "sentry.io",
+      "arkoselabs.com",
+      "stripe.com",
+      "cloudflare.com",
+      "cloudflareinsights.com"
+    ],
+    "claude": [
+      "anthropic.com",
+      "claude.ai",
+      "claudeusercontent.com",
+      "claude.site",
+      "intercom.io",
+      "intercomcdn.com",
+      "statsigapi.net",
+      "sentry.io",
+      "arkoselabs.com",
+      "stripe.com",
+      "cloudflare.com",
+      "cloudflareinsights.com"
+    ],
+    "gemini": [
+      "google.com",
+      "googleapis.com",
+      "gstatic.com",
+      "googleusercontent.com",
+      "googlevideo.com",
+      "youtube.com",
+      "ytimg.com",
+      "recaptcha.net"
+    ],
+    "microsoftcopilot": [
+      "microsoft.com",
+      "microsoftonline.com",
+      "windows.net",
+      "bing.com",
+      "msauth.net",
+      "msftauth.net",
+      "live.com",
+      "office.com",
+      "skype.com",
+      "azureedge.net"
+    ],
+    "perplexity": [
+      "perplexity.ai",
+      "perplexity.com",
+      "launchdarkly.com",
+      "sentry.io",
+      "stripe.com",
+      "cloudflare.com"
+    ],
+    "deepseek": [
+      "deepseek.com",
+      "cloudflare.com"
+    ],
+    "grok": [
+      "grok.com",
+      "x.ai",
+      "x.com",
+      "twimg.com",
+      "twitter.com"
+    ],
+    "mistrallechat": [
+      "mistral.ai",
+      "sentry.io",
+      "cloudflare.com"
+    ],
+    "huggingchat": [
+      "huggingface.co",
+      "hf.co",
+      "hf.space",
+      "cloudflare.com"
+    ],
+    "coherechat": [
+      "cohere.com",
+      "cohere.ai",
+      "cloudflare.com"
+    ],
+    "youcom": [
+      "you.com",
+      "cloudflare.com"
+    ],
+    "poe": [
+      "poe.com",
+      "quora.com",
+      "cloudflare.com"
+    ],
+    "metaai": [
+      "meta.ai",
+      "meta.com",
+      "facebook.com",
+      "facebook.net",
+      "fbcdn.net",
+      "instagram.com",
+      "whatsapp.net"
+    ],
+    "pi": [
+      "pi.ai",
+      "inflection.ai",
+      "cloudflare.com"
+    ],
+    "qwenchat": [
+      "qwen.ai",
+      "aliyuncs.com",
+      "alibabacloud.com"
+    ],
+    "kimi": [
+      "moonshot.cn",
+      "kimi.com"
+    ]
+  },
+  "common_auth_domains": [
+    "google.com",
+    "gstatic.com",
+    "googleapis.com",
+    "microsoftonline.com",
+    "live.com",
+    "okta.com",
+    "auth0.com",
+    "apple.com",
+    "github.com",
+    "githubusercontent.com",
+    "recaptcha.net"
+  ],
+  "always_allowed_domains": [
+    "recaptcha.net",
+    "hcaptcha.com",
+    "arkoselabs.com",
+    "stripe.com"
+  ]
+}

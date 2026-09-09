@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-09T00:00:00.000Z",
+  "comment": "Offline fallback list bundled with the app. The remote list (Settings > Update) overrides this at runtime. Format is backwards compatible with the array-of-arrays layout used by aihub-config-data.",
+  "ai_services": [
+    ["ChatGPT", "https://chatgpt.com/", "Conversational AI", "Conversations may be reviewed to improve the model unless you opt out in your OpenAI account.", "10a37f"],
+    ["Claude", "https://claude.ai/", "Conversational AI", "Anthropic does not train on consumer conversations by default; workspace data is governed by your plan.", "d97757"],
+    ["Gemini", "https://gemini.google.com/", "Conversational AI", "Google Apps Activity may store your prompts; review your Google activity controls.", "4285f4"],
+    ["Microsoft Copilot", "https://copilot.microsoft.com/", "Conversational AI", "Prompts are processed by Microsoft and may be retained per your account settings.", "0078d4"],
+    ["Perplexity", "https://www.perplexity.ai/", "Answer engine", "Searches are logged; you can disable search history in your Perplexity settings.", "20808d"],
+    ["DeepSeek", "https://chat.deepseek.com/", "Conversational AI", "Prompts are stored on DeepSeek servers.", "4d6bfe"],
+    ["Grok", "https://grok.com/", "Conversational AI", "Conversations may be used for model training unless you opt out in xAI settings.", "1d9bf0"],
+    ["Mistral Le Chat", "https://chat.mistral.ai/", "Conversational AI", "Free tier data may be used to improve models; enterprise plans differ.", "fa500f"],
+    ["HuggingChat", "https://huggingface.co/chat/", "Open models", "You pick the model; telemetry settings are exposed in the chat UI.", "ffd21e"],
+    ["Cohere Chat", "https://chat.cohere.com/", "Enterprise AI", "Trial workspace conversations are retained by Cohere.", "39594d"],
+    ["You.com", "https://you.com/chat", "Answer engine", "Search and chat history stored unless private mode is enabled.", "5436ff"],
+    ["Poe", "https://poe.com/", "AI aggregator", "Aggregates many providers; each provider's data policy applies.", "5f5ae0"],
+    ["Meta AI", "https://www.meta.ai/", "Conversational AI", "Conversations can be reviewed by Meta and are tied to your Meta account.", "0866ff"],
+    ["Pi", "https://pi.ai/talk", "Companion AI", "Inflection AI retains conversations to personalise the assistant.", "f2c14e"],
+    ["Qwen Chat", "https://chat.qwen.ai/", "Open models", "Alibaba Cloud operates this service; review their privacy notice.", "615ced"],
+    ["Kimi", "https://kimi.moonshot.cn/", "Conversational AI", "Moonshot AI operates this service; data is processed in mainland China.", "1f1f1f"]
+  ]
+}

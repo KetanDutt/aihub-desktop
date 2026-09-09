@@ -1,2 +1,28 @@
-/node_modules
+# Dependencies
+node_modules/
+
+# Build output (electron-builder)
+dist/
+out/
+release/
+
+# Test / coverage
+coverage/
+
+# Runtime data (fallback store when not running inside Electron)
+.aihub/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Editor / OS cruft
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Lockfile: the project ships without one; committing it is recommended for
+# reproducible builds (remove this line if you start committing it).
 package-lock.json
