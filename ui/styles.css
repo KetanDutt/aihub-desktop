@@ -491,7 +491,7 @@ code {
   transition: color var(--t-fast) var(--ease-out), background-color var(--t-fast) var(--ease-out);
 }
 
-.tab-item:hover { color: var(--text-1); background: var(--glass-2); }
+.tab-item:hover:not(.active) { color: var(--text-1); background: var(--glass-2); }
 .tab-item.active { color: var(--text-1); }
 .tab-item.dragging { opacity: 0.45; }
 
@@ -933,6 +933,7 @@ input[type='search']::-webkit-search-cancel-button { -webkit-appearance: none; }
 
 /* Services manager */
 .services-manager-header { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.services-manager-header h3 { font-size: var(--fs-title); }
 .services-manager-header .input-field { width: 170px; }
 
 .all-services-list { display: flex; flex-direction: column; gap: var(--sp-1); }
