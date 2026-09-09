@@ -56,7 +56,13 @@ window.AiHub = window.AiHub || {};
   // -- Rendering -------------------------------------------------------------
 
   function tabNode(id) {
-    return document.querySelector(`.tab-item[data-id="${CSS.escape(id)}"]`);
+    // CSS.escape guards the attribute selector; ids are already constrained to
+    // [A-Za-z0-9_-] by the main process, so the fallback is always safe.
+    const selector =
+      typeof CSS !== 'undefined' && CSS.escape
+        ? CSS.escape(id)
+        : id.replace(/[^A-Za-z0-9_-]/g, '');
+    return document.querySelector(`.tab-item[data-id="${selector}"]`);
   }
 
   function buildTabElement(tab) {
@@ -254,6 +260,8 @@ window.AiHub = window.AiHub || {};
     const active = app.getActiveTab();
     if (app.elements.btnNavBack) app.elements.btnNavBack.disabled = !active || !active.canGoBack;
     if (app.elements.btnNavForward) app.elements.btnNavForward.disabled = !active || !active.canGoForward;
+
+    if (app.positionTabIndicator) app.positionTabIndicator();
   }
 
   /** Apply a `tab-state` payload from the main process. */

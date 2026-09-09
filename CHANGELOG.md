@@ -23,6 +23,14 @@ All notable changes to this project are documented here. The format follows
 ### Added
 - `ui/motion.js` (gliding indicators + scroll-aware surfaces) and the
   `.app-bg` ambient backdrop layer.
+- `docs/design.md` describing the Liquid Glass token/material system.
+- `tests/renderer-boot.test.js`: a jsdom integration test that executes the
+  real shell scripts end-to-end (boot, tab open/close, indicators, dialogs).
+
+### Fixed
+- The tab glide indicator now repositions on every active-tab paint (the
+  `paintActiveTab` hook was missing, so it could stay hidden).
+- `tabNode` guards `CSS.escape` with a safe fallback.
 
 ## [1.1.0] - 2026-09-09
 

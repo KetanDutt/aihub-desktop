@@ -58,6 +58,7 @@
     "electron-reload": "^2.0.0-alpha.1",
     "eslint": "^8.57.1",
     "jest": "^30.3.0",
+    "jest-environment-jsdom": "^30.5.1",
     "nodemon": "^3.1.14"
   },
   "jest": {
@@ -74,7 +75,7 @@
   "build": {
     "appId": "com.silentcoderhere.aihubdesktop",
     "productName": "AI Hub Desktop",
-    "copyright": "Copyright \u00a9 SilentCoderHere",
+    "copyright": "Copyright © SilentCoderHere",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "dist",
