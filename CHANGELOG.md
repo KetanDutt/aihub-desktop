@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-09-09
+
+### Changed (visual redesign - no behaviour changes)
+- Rebuilt the shell as a **Liquid Glass** design system: token-driven glass
+  materials (primary/secondary/tinted/float), an ambient layered backdrop, soft
+  ambient shadows, hairline edge highlights and a clear spatial z-hierarchy.
+- New typography scale and spacing rhythm using the SF/system font stack;
+  refined dark *and* light materials (light mode is a first-class theme).
+- Tab strip and Settings tabs now use a **gliding glass indicator** that tracks
+  the active item with spring easing; sidebar/settings headers gain density on
+  scroll.
+- Buttons, cards, inputs, toggles, dialogs, context menus and toasts share the
+  same material language with quick, purposeful micro-interactions.
+- All motion is transform/opacity based and disabled under
+  `prefers-reduced-motion`. No functionality, IPC, or backend logic changed.
+
+### Added
+- `ui/motion.js` (gliding indicators + scroll-aware surfaces) and the
+  `.app-bg` ambient backdrop layer.
+
 ## [1.1.0] - 2026-09-09
 
 ### Fixed

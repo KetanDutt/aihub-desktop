@@ -433,6 +433,7 @@ window.AiHub = window.AiHub || {};
     } catch (e) {
       /* non fatal */
     }
+    if (app.positionTabIndicator) app.positionTabIndicator();
   };
 
   app.updateTabCount = function updateTabCount() {

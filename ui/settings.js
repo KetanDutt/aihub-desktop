@@ -33,6 +33,7 @@ window.AiHub = window.AiHub || {};
     app.elements.settingsTabContents.forEach((content) => {
       content.classList.toggle('active', content.id === `tab-${name}`);
     });
+    if (app.positionSettingsIndicator) app.positionSettingsIndicator();
   };
 
   // -- Load / save -----------------------------------------------------------

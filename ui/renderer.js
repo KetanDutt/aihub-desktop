@@ -205,6 +205,7 @@ window.AiHub = window.AiHub || {};
 
   async function init() {
     app.cacheElements();
+    if (app.initMotion) app.initMotion();
     initGlobalListeners();
     app.initTabListeners();
     app.initSettings();
