@@ -35,7 +35,7 @@ const {
   APP_NAME,
   IPC
 } = require('./constants');
-const { clampNumber, truncate } = require('./utils');
+const { clampNumber, clampFloat, truncate, safeHostname } = require('./utils');
 
 let mainWindow = null;
 let tray = null;
@@ -75,7 +75,7 @@ function createMainWindow() {
     minWidth: LAYOUT.MIN_WIDTH,
     minHeight: LAYOUT.MIN_HEIGHT,
     title: APP_NAME,
-    backgroundColor: config.darkMode === false ? '#ffffff' : '#202124',
+    backgroundColor: config.darkMode === false ? '#e8ecf3' : '#080a0e',
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
@@ -354,7 +354,8 @@ function notifyTabState(tab) {
     canGoForward: tab.canGoForward,
     hibernated: tab.hibernated,
     active: tabs.activeTabId === tab.id,
-    zoomFactor: tab.zoomFactor
+    zoomFactor: tab.zoomFactor,
+    muted: Boolean(tab.muted)
   });
 }
 
@@ -395,6 +396,18 @@ function proxyUrlFor(url) {
   return proxied;
 }
 
+/**
+ * While a web proxy is enabled, inject the proxy host into the tab allow-list
+ * so proxied traffic is not self-blocked by the domain filter.
+ * @param {Set<string>} allowList
+ */
+function injectProxyHost(allowList) {
+  const config = configStore.getConfig();
+  if (!config.useProxy || !config.proxyUrl || !allowList) return;
+  const host = safeHostname(config.proxyUrl);
+  if (host) allowList.add(host);
+}
+
 /** Create the `WebContentsView` backing a tab record. */
 function createViewForTab(tab) {
   if (!mainWindow) return null;
@@ -415,6 +428,16 @@ function createViewForTab(tab) {
 
   // Register the allow-list *before* navigating so no request escapes it.
   const allowList = blocking.updateTabDomains(webContentsId, tab.serviceId, dataStore.getRulesCache());
+  injectProxyHost(allowList);
+
+  // Prefer public interfaces for WebRTC so local IPs are not leaked.
+  try {
+    if (typeof view.webContents.session.setWebRTCIPHandlingPolicy === 'function') {
+      view.webContents.session.setWebRTCIPHandlingPolicy('disable_non_proxied_udp');
+    }
+  } catch (e) {
+    log.debug('WebRTC IP policy unavailable:', e.message);
+  }
 
   security.attachTabGuards(view.webContents, {
     isAllowed: (hostname) => blocking.isDomainAllowed(hostname, allowList, true),
@@ -473,9 +496,34 @@ function createViewForTab(tab) {
 
   contents.on('context-menu', () => buildTabContextMenu(tab, contents));
 
+  contents.on('found-in-page', (event, result) => {
+    send(IPC.TAB_FIND_RESULT, {
+      tabId: tab.id,
+      activeMatchOrdinal: result && result.activeMatchOrdinal,
+      matches: result && result.matches,
+      finalUpdate: result && result.finalUpdate
+    });
+  });
+
   ensureChildView(view);
   view.setBounds(calculateViewBounds());
   views.set(tab.id, view);
+
+  // Restore per-tab zoom / mute before navigation so the first paint is correct.
+  if (tab.zoomFactor && tab.zoomFactor !== 1) {
+    try {
+      contents.setZoomFactor(tab.zoomFactor);
+    } catch (e) {
+      /* ignore */
+    }
+  }
+  if (tab.muted) {
+    try {
+      contents.setAudioMuted(true);
+    } catch (e) {
+      /* ignore */
+    }
+  }
 
   contents.loadURL(proxyUrlFor(tab.url)).catch((error) => {
     log.error(`Unable to load ${tab.url}:`, error.message);
@@ -522,6 +570,16 @@ function buildTabContextMenu(tab, contents) {
     {
       label: 'Reset zoom',
       click: () => setZoom(tab.id, 1)
+    },
+    { type: 'separator' },
+    {
+      label: tab.muted ? 'Unmute tab' : 'Mute tab',
+      click: () => setMuted(tab.id, !tab.muted)
+    },
+    {
+      label: 'Find in page…',
+      accelerator: 'CommandOrControl+F',
+      click: () => send(IPC.TAB_STATE, { ...(stateFor(tab.id) || {}), requestFind: true })
     }
   ];
 
@@ -545,7 +603,8 @@ function stateFor(tabId) {
     canGoForward: tab.canGoForward,
     hibernated: tab.hibernated,
     active: tabs.activeTabId === tab.id,
-    zoomFactor: tab.zoomFactor
+    zoomFactor: tab.zoomFactor,
+    muted: Boolean(tab.muted)
   };
 }
 
@@ -561,7 +620,15 @@ function openInNewTab(serviceId, url) {
  * Create a tab and its backing view.
  * @returns {{success: boolean, error?: string}}
  */
-function createTab({ tabId, serviceId, url, userAgent = '', title = '' }) {
+function createTab({
+  tabId,
+  serviceId,
+  url,
+  userAgent = '',
+  title = '',
+  zoomFactor = 1,
+  muted = false
+} = {}) {
   if (!mainWindow) return { success: false, error: 'no_window' };
 
   const added = tabs.add({
@@ -576,6 +643,13 @@ function createTab({ tabId, serviceId, url, userAgent = '', title = '' }) {
     log.warn(`Refused to create tab ${tabId}: ${added.error}`);
     return { success: false, error: added.error, limit: tabs.getLimit() };
   }
+
+  // Restore persisted zoom / mute before the view is created so the first
+  // paint and audio state match the previous session.
+  if (zoomFactor && zoomFactor !== 1) {
+    tabs.update(tabId, { zoomFactor: clampFloat(zoomFactor, 0.3, 5, 1) });
+  }
+  if (muted) tabs.update(tabId, { muted: true });
 
   const view = createViewForTab(added.tab);
   if (!view) {
@@ -681,41 +755,87 @@ function reorderTabs(ids) {
 
 // -- Navigation --------------------------------------------------------------
 
-function withContents(tabId, fn) {
+/**
+ * Run `fn` against a live tab webContents.
+ * Returns the function result, or `fallback` when the view is missing/destroyed.
+ */
+function withContents(tabId, fn, fallback = false) {
   const view = views.get(tabId);
-  if (!view || view.webContents.isDestroyed()) return false;
+  if (!view || view.webContents.isDestroyed()) return fallback;
   try {
-    return fn(view.webContents) !== false;
+    return fn(view.webContents);
   } catch (e) {
     log.debug('Navigation action failed:', e.message);
-    return false;
+    return fallback;
   }
 }
 
 function navGoBack(tabId) {
-  return withContents(tabId, (contents) => contents.canGoBack() && contents.goBack());
+  return Boolean(withContents(tabId, (contents) => contents.canGoBack() && (contents.goBack(), true)));
 }
 
 function navGoForward(tabId) {
-  return withContents(tabId, (contents) => contents.canGoForward() && contents.goForward());
+  return Boolean(withContents(tabId, (contents) => contents.canGoForward() && (contents.goForward(), true)));
 }
 
 function navReload(tabId) {
   const tab = tabs.get(tabId);
   if (tab && tab.hibernated) return activateTab(tabId);
-  return withContents(tabId, (contents) => contents.reload());
+  return Boolean(withContents(tabId, (contents) => (contents.reload(), true)));
 }
 
 function setZoom(tabId, factor) {
-  const clamped = clampNumber(factor, 0.3, 5, 1);
+  const clamped = clampFloat(factor, 0.3, 5, 1);
   tabs.update(tabId, { zoomFactor: clamped });
   withContents(tabId, (contents) => contents.setZoomFactor(clamped));
   notifyTabState(tabs.get(tabId));
+  schedulePersist();
   return clamped;
 }
 
+function setMuted(tabId, muted) {
+  const value = Boolean(muted);
+  tabs.update(tabId, { muted: value });
+  withContents(tabId, (contents) => contents.setAudioMuted(value));
+  notifyTabState(tabs.get(tabId));
+  schedulePersist();
+  return value;
+}
+
+/**
+ * Find text in the active tab's page.
+ * @returns {{requestId?: number, matches?: number}|{matches: 0}}
+ */
+function findInPage(tabId, text, options = {}) {
+  if (!text) {
+    stopFindInPage(tabId);
+    return { matches: 0 };
+  }
+  return withContents(
+    tabId,
+    (contents) => {
+      const requestId = contents.findInPage(text, {
+        forward: options.forward !== false,
+        findNext: Boolean(options.findNext),
+        matchCase: Boolean(options.matchCase)
+      });
+      return { requestId };
+    },
+    { matches: 0 }
+  );
+}
+
+function stopFindInPage(tabId) {
+  return Boolean(
+    withContents(tabId, (contents) => {
+      contents.stopFindInPage('clearSelection');
+      return true;
+    })
+  );
+}
+
 function openDevTools(tabId) {
-  return withContents(tabId, (contents) => contents.openDevTools({ mode: 'detach' }));
+  return Boolean(withContents(tabId, (contents) => (contents.openDevTools({ mode: 'detach' }), true)));
 }
 
 // -- Hibernation -------------------------------------------------------------
@@ -791,7 +911,9 @@ function restoreTabs(records) {
       tabId: record.id,
       serviceId,
       url: record.url,
-      title: record.title || serviceId
+      title: record.title || serviceId,
+      zoomFactor: record.zoomFactor || 1,
+      muted: Boolean(record.muted)
     });
     if (result.success) restored += 1;
   }
@@ -845,6 +967,9 @@ module.exports = {
   navGoForward,
   navReload,
   setZoom,
+  setMuted,
+  findInPage,
+  stopFindInPage,
   openDevTools,
   setViewBounds,
   applyViewBounds,

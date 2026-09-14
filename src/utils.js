@@ -20,11 +20,31 @@ function slugify(name) {
   return name.toLowerCase().trim().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
 }
 
-/** Clamp a number into [min, max], returning `fallback` when not finite. */
+/**
+ * Clamp a number into [min, max], returning `fallback` when not finite.
+ * Rounds to the nearest integer — use {@link clampFloat} for fractional values
+ * (zoom factors, opacity, …).
+ */
 function clampNumber(value, min, max, fallback) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(max, Math.max(min, Math.round(n)));
+}
+
+/**
+ * Clamp a floating-point number into [min, max] without rounding.
+ * @param {number} value
+ * @param {number} min
+ * @param {number} max
+ * @param {number} fallback
+ * @param {number} [precision=3] decimal places to keep
+ */
+function clampFloat(value, min, max, fallback, precision = 3) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  const clamped = Math.min(max, Math.max(min, n));
+  const factor = 10 ** precision;
+  return Math.round(clamped * factor) / factor;
 }
 
 /** Coerce anything to a boolean. */
@@ -120,6 +140,7 @@ function delay(ms) {
 module.exports = {
   slugify,
   clampNumber,
+  clampFloat,
   toBoolean,
   isNonEmptyString,
   isSafeHttpUrl,

@@ -4,7 +4,12 @@ Thanks for helping make AI Hub Desktop better.
 
 ## Getting set up
 
+**Windows:** double-click `RUN.bat` at the repo root — it installs Node.js and
+dependencies if needed, then launches the app.
+
 ```bash
+npm run one-click  # any OS: check/install deps, then launch
+# or manually:
 npm install
 npm run doctor   # verify your environment
 npm start

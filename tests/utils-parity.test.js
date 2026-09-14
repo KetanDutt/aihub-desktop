@@ -52,6 +52,15 @@ describe('clamp / boolean coercion', () => {
     expect(mainUtils.clampNumber('nope', 1, 5, 3)).toBe(3);
   });
 
+  it('clampFloat keeps fractional zoom steps', () => {
+    expect(mainUtils.clampFloat(1.1, 0.3, 5, 1)).toBe(1.1);
+    expect(mainUtils.clampFloat(0.95, 0.3, 5, 1)).toBe(0.95);
+    expect(mainUtils.clampFloat(9, 0.3, 5, 1)).toBe(5);
+    expect(mainUtils.clampFloat('nope', 0.3, 5, 1)).toBe(1);
+    // Integer clamp would have rounded 1.1 -> 1; this is the zoom bug fix.
+    expect(mainUtils.clampNumber(1.1, 0.3, 5, 1)).toBe(1);
+  });
+
   it('coerces booleans', () => {
     expect(mainUtils.toBoolean('true')).toBe(true);
     expect(mainUtils.toBoolean('false', true)).toBe(false);

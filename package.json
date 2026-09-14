@@ -1,7 +1,7 @@
 {
   "name": "aihub-desktop",
   "productName": "AI Hub Desktop",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "One window for every AI assistant: tabbed WebContentsViews, per-service domain filtering and automatic tab hibernation.",
   "main": "main.js",
   "author": "SilentCoderHere",
@@ -30,6 +30,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "nodemon",
+    "one-click": "node scripts/one-click-run.js",
     "doctor": "node scripts/doctor.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

@@ -4,6 +4,57 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-09-14
+
+### Changed (visual — Liquid Glass v2)
+- Full shell redesign against a refined **Liquid Glass** token system: quieter
+  ambient backdrop, stronger type hierarchy, softer ambient shadows, clearer
+  material tiers (primary / secondary / tinted / float / hover).
+- Header, tab strip, drawers, cards, forms, toggles, dialogs, menus, toasts and
+  empty states share one spatial language; welcome tips and toasts gain icon
+  treatments; confirm dialogs ease out on dismiss.
+- Layout metrics tightened (`54 / 44 / 30`) and window chrome colours match the
+  dark/light tokens. Scroll-aware header density and gliding indicators retained.
+- Docs: `docs/design.md` rewritten as the design-system source of truth.
+
+### Fixed
+- **Zoom steps were rounded away**: `clampNumber` always rounds to integers, so
+  Ctrl+= / Ctrl+- collapsed every step to `1`. Zoom now uses `clampFloat` and
+  keeps fractional factors (1.1, 0.9, …).
+- **Tab-state ghost entries**: main-process `tab-state` payloads use `tabId`
+  while the renderer stores `id`. `upsertTab` now normalises both shapes so
+  updates merge into the existing tab instead of creating duplicates.
+- **Proxy self-blocking**: when *Use Proxy* is on, the proxy hostname is now
+  injected into each tab's domain allow-list (documented behaviour that was
+  missing from the code path).
+- **Layout fallback drift**: main-process header/tabs/status fallbacks now match
+  the CSS tokens (`56 / 46 / 32`), so the first frames before the renderer
+  reports bounds no longer clip the webview.
+- **Context-menu keydown leak**: the Escape handler is removed when the menu
+  closes, instead of stacking anonymous listeners.
+- **Favicon selector injection**: service ids are CSS-escaped before being used
+  in attribute selectors.
+
+### Added
+- **Find in page** (`Ctrl+F` / `⌘F`): floating find bar with next/previous
+  match, live counter, and Esc to clear. Also available from the tab context
+  menu.
+- **Per-tab mute** (`Ctrl+M` / `⌘M`): mute state is persisted with the session
+  and restored on relaunch; muted tabs show a subdued favicon/title.
+- **Persist zoom**: per-tab `zoomFactor` survives restarts via `openTabs`.
+- **WebRTC IP handling policy**: sessions use `disable_non_proxied_udp` to avoid
+  leaking local IPs to peers.
+- **One-click run for Windows + webapp**: root `RUN.bat` / `RUN.ps1` check and
+  install Node.js 20+, npm dependencies and the Electron runtime, run the
+  environment doctor, then launch. Cross-platform companion:
+  `npm run one-click` (`scripts/one-click-run.js`).
+- Block-log throttling on the request filter hot path (identical hosts within
+  1.5s are counted but not re-logged).
+
+### Changed
+- Keyboard shortcut reference, docs and roadmap updated for find/mute/zoom.
+- `withContents` returns real function results (needed by find-in-page).
+
 ## [1.2.0] - 2026-09-09
 
 ### Changed (visual redesign - no behaviour changes)
@@ -78,11 +129,3 @@ All notable changes to this project are documented here. The format follows
   all IPC input is validated (tab ids, service ids, URLs, accelerators).
 - Data downloads are size/redirect/time-limited, validated before write and
   stored atomically; the loader normalises both tuple and object payloads.
-- `electron` moved to devDependencies (electron-builder convention).
-- Renderer refactored into focused modules with a shared `window.AiHub` state.
-
-### Removed
-- Unused/scratch files: `benchmark.js` (root), `summerize.py`, `config.json`,
-  and the stale `benchmarks/blocking_benchmark.js`.
-
-## [1.0.0] - initial release

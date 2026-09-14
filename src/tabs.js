@@ -59,7 +59,9 @@ class TabManager {
       id: tab.id,
       serviceId: tab.serviceId,
       url: tab.url,
-      title: tab.title
+      title: tab.title,
+      zoomFactor: tab.zoomFactor || 1,
+      muted: Boolean(tab.muted)
     }));
   }
 
@@ -101,6 +103,7 @@ class TabManager {
       canGoForward: false,
       hibernated: false,
       zoomFactor: 1,
+      muted: false,
       createdAt: now,
       lastActiveAt: now
     };
@@ -138,7 +141,11 @@ class TabManager {
     if (patch.loading !== undefined) tab.loading = Boolean(patch.loading);
     if (patch.canGoBack !== undefined) tab.canGoBack = Boolean(patch.canGoBack);
     if (patch.canGoForward !== undefined) tab.canGoForward = Boolean(patch.canGoForward);
-    if (patch.zoomFactor !== undefined) tab.zoomFactor = Number(patch.zoomFactor) || 1;
+    if (patch.zoomFactor !== undefined) {
+      const z = Number(patch.zoomFactor);
+      tab.zoomFactor = Number.isFinite(z) && z > 0 ? z : 1;
+    }
+    if (patch.muted !== undefined) tab.muted = Boolean(patch.muted);
     if (patch.serviceId !== undefined) tab.serviceId = String(patch.serviceId);
 
     this.emit('update', { tab });

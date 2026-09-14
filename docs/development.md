@@ -8,6 +8,8 @@
 ## Quick start
 
 ```bash
+# Windows: double-click RUN.bat at the repo root (installs Node if needed)
+npm run one-click  # check/install deps, then launch (any OS)
 npm install        # or run scripts/windows/Setup.bat on Windows
 npm start          # launch
 npm run dev        # auto-restart on changes (nodemon)
@@ -18,6 +20,7 @@ npm run doctor     # diagnose this environment
 
 | Command | Purpose |
 |---------|---------|
+| `npm run one-click` | Check Node, install deps + Electron if needed, then launch. |
 | `npm start` | Run the app (hot reload of the renderer). |
 | `npm run dev` | Restart the whole app on any source change. |
 | `npm test` | Jest suite (unit + integration smoke). |
@@ -30,6 +33,8 @@ npm run doctor     # diagnose this environment
 | `npm run icons` | Regenerate `build/*.{png,ico}` from source. |
 | `npm run clean` | Remove `dist/`, `coverage/` (`--deps` also node_modules). |
 | `npm run build[:win|:mac|:linux]` | Package with electron-builder. |
+
+Windows: double-click `RUN.bat` at the repo root for the all-in-one path.
 
 ## Testing
 
@@ -52,7 +57,9 @@ src/               main-process modules (see docs/architecture.md)
 ui/                shell renderer (plain JS, no bundler)
 data/              bundled offline catalogue + rules
 build/             generated icons + vector source
-scripts/           doctor/clean/icons + one-click Windows scripts
+scripts/           doctor/clean/icons/one-click-run + Windows helpers
+RUN.bat / RUN.ps1  root one-click launcher (Windows)
+ui/findbar.js      find-in-page UI (Ctrl+F)
 tests/             Jest suites
 benchmarks/        performance micro-benchmarks
 docs/              this documentation

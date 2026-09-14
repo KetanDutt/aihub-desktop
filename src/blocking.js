@@ -231,11 +231,21 @@ function setupWebRequestBlocking(targetSession) {
     return false;
   }
 
+  // Throttle block-log spam: identical hostnames within a short window are
+  // counted but not re-logged, keeping the hot path cheap under heavy pages.
+  let lastBlockHost = '';
+  let lastBlockAt = 0;
+
   ses.webRequest.onBeforeRequest({ urls: ['*://*/*'] }, (details, callback) => {
     try {
       const decision = evaluateRequest(details);
       if (!decision.allow) {
-        log.info(`Blocked ${decision.hostname} (webContents ${details.webContentsId})`);
+        const now = Date.now();
+        if (decision.hostname !== lastBlockHost || now - lastBlockAt > 1500) {
+          log.info(`Blocked ${decision.hostname} (webContents ${details.webContentsId})`);
+          lastBlockHost = decision.hostname || '';
+          lastBlockAt = now;
+        }
         callback({ cancel: true });
         return;
       }

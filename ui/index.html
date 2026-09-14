@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#202124">
+  <meta name="theme-color" content="#080a0e">
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'">
   <title>AI Hub Desktop</title>
@@ -133,15 +133,30 @@
 
           <div class="welcome-tips">
             <div class="tip">
-              <h4>Domain filtering</h4>
+              <h4>
+                <span class="tip-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </span>
+                Domain filtering
+              </h4>
               <p>Each tab can only talk to the domains its service actually needs. Stray trackers are dropped before they leave your machine.</p>
             </div>
             <div class="tip">
-              <h4>Memory aware</h4>
+              <h4>
+                <span class="tip-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                </span>
+                Memory aware
+              </h4>
               <p>Idle tabs are hibernated automatically, and a tab limit keeps the footprint predictable.</p>
             </div>
             <div class="tip">
-              <h4>Keyboard first</h4>
+              <h4>
+                <span class="tip-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg>
+                </span>
+                Keyboard first
+              </h4>
               <p>Press <kbd>?</kbd> for the shortcut list, or <kbd>Ctrl</kbd>+<kbd>T</kbd> to open this picker.</p>
             </div>
           </div>
@@ -380,6 +395,7 @@
   <script src="overlays.js"></script>
   <script src="services.js"></script>
   <script src="tabs.js"></script>
+  <script src="findbar.js"></script>
   <script src="settings.js"></script>
   <script src="shortcuts.js"></script>
   <script src="renderer.js"></script>

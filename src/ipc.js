@@ -18,7 +18,7 @@ const favicon = require('./favicon');
 const updater = require('./updater');
 const paths = require('./paths');
 const { IPC, APP_NAME, LIMITS } = require('./constants');
-const { isSafeHttpUrl, slugify, clampNumber } = require('./utils');
+const { isSafeHttpUrl, slugify, clampFloat } = require('./utils');
 
 const TAB_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
@@ -177,7 +177,9 @@ function setupIpcHandlers() {
       serviceId,
       url: data.url,
       userAgent: typeof data.userAgent === 'string' ? data.userAgent : '',
-      title: typeof data.title === 'string' ? data.title : ''
+      title: typeof data.title === 'string' ? data.title : '',
+      zoomFactor: typeof data.zoomFactor === 'number' ? data.zoomFactor : 1,
+      muted: Boolean(data.muted)
     });
   });
 
@@ -207,7 +209,23 @@ function setupIpcHandlers() {
 
   ipcMain.handle(IPC.SET_ZOOM, (event, tabId, factor) => {
     if (!validTabId(tabId)) return null;
-    return windowManager.setZoom(tabId, clampNumber(factor, 0.3, 5, 1));
+    return windowManager.setZoom(tabId, clampFloat(factor, 0.3, 5, 1));
+  });
+
+  ipcMain.handle(IPC.SET_MUTED, (event, tabId, muted) => {
+    if (!validTabId(tabId)) return null;
+    return windowManager.setMuted(tabId, Boolean(muted));
+  });
+
+  ipcMain.handle(IPC.FIND_IN_PAGE, (event, tabId, text, options) => {
+    if (!validTabId(tabId)) return { matches: 0 };
+    const query = typeof text === 'string' ? text.slice(0, 500) : '';
+    return windowManager.findInPage(tabId, query, options && typeof options === 'object' ? options : {});
+  });
+
+  ipcMain.handle(IPC.STOP_FIND_IN_PAGE, (event, tabId) => {
+    if (!validTabId(tabId)) return false;
+    return windowManager.stopFindInPage(tabId);
   });
 
   ipcMain.handle(IPC.OPEN_TAB_DEVTOOLS, (event, tabId) => {

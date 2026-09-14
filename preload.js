@@ -51,6 +51,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   navGoForward: (tabId) => ipcRenderer.send('nav-go-forward', tabId),
   navReload: (tabId) => ipcRenderer.send('nav-reload', tabId),
   setZoom: (tabId, factor) => ipcRenderer.invoke('set-zoom', tabId, factor),
+  setMuted: (tabId, muted) => ipcRenderer.invoke('set-muted', tabId, muted),
+  findInPage: (tabId, text, options) => ipcRenderer.invoke('find-in-page', tabId, text, options),
+  stopFindInPage: (tabId) => ipcRenderer.invoke('stop-find-in-page', tabId),
   openDevTools: (tabId) => ipcRenderer.invoke('open-tab-devtools', tabId),
 
   // -- Session / privacy -----------------------------------------------------
@@ -76,6 +79,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onTabClosed: (callback) => subscribe('tab-closed', callback),
   onTabsEmptied: (callback) => subscribe('tabs-emptied', callback),
   onTabBlocked: (callback) => subscribe('tab-blocked', callback),
+  onTabFindResult: (callback) => subscribe('tab-find-result', callback),
   onBlockingState: (callback) => subscribe('blocking-state', callback),
   onUpdateState: (callback) => subscribe('update-state', callback)
 });

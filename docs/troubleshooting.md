@@ -12,6 +12,9 @@ Everything lands in an `electron-log` file.
 Also run `npm run doctor` - it verifies Node, dependencies, the Electron binary,
 the bundled data and the packaging icons in one go.
 
+**Windows first-run:** double-click `RUN.bat` at the repository root. It installs
+Node.js (if needed), dependencies and Electron, then launches the app.
+
 ## Common problems
 
 **Blank tab / site keeps failing to load.**
@@ -37,11 +40,15 @@ or the proxy can also interfere; try with *Use Proxy* off.
 
 **Windows scripts say Node is missing after installing.**
 The installer updated `PATH` for new terminals only. Close and reopen the
-console window, or run the script again.
+console window, or double-click `RUN.bat` again.
 
 **Electron failed to install (`ELECTRON_SKIP_BINARY_DOWNLOAD`).**
-Run `npm rebuild electron` (the Windows scripts do this automatically).
+Run `npm rebuild electron` (the Windows scripts and `npm run one-click` do
+this automatically).
 
+**`RUN.bat` / one-click fails with no package manager.**
+Install Node.js 20+ from https://nodejs.org, then re-run. On Windows the
+script tries winget, then Chocolatey, then Scoop.
 ## Reporting a bug
 
 Attach the log file, your OS/arch (Settings → About) and the steps to

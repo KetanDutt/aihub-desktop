@@ -97,7 +97,7 @@
     if (typeof document === 'undefined') return;
     document.body.classList.toggle('light-mode', enabled === false);
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', enabled === false ? '#ffffff' : '#202124');
+    if (meta) meta.setAttribute('content', enabled === false ? '#e8ecf3' : '#080a0e');
   }
 
   function debounce(fn, wait = 300) {

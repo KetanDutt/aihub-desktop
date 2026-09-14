@@ -106,6 +106,15 @@ function hardenSession(targetSession) {
     ses.setDevicePermissionHandler(() => false);
   }
 
+  // Prefer public interfaces for WebRTC so local IPs are not leaked to peers.
+  try {
+    if (typeof ses.setWebRTCIPHandlingPolicy === 'function') {
+      ses.setWebRTCIPHandlingPolicy('disable_non_proxied_udp');
+    }
+  } catch (e) {
+    log.debug('WebRTC IP policy unavailable:', e.message);
+  }
+
   return true;
 }
 

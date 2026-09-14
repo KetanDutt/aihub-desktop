@@ -45,6 +45,15 @@ window.AiHub = window.AiHub || {};
     const wrap = document.createElement('div');
     wrap.className = 'empty-state';
 
+    const icon = document.createElement('span');
+    icon.className = 'empty-state-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.innerHTML =
+      '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+      'stroke-linecap="round" stroke-linejoin="round">' +
+      '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>';
+    wrap.appendChild(icon);
+
     const text = document.createElement('p');
     text.textContent = message;
     wrap.appendChild(text);
