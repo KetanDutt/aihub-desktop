@@ -8,7 +8,14 @@
 window.AiHub = window.AiHub || {};
 
 (function (app) {
-  const TOAST_TIMEOUT_MS = 3200;
+  const TOAST_TIMEOUT_MS = 3400;
+
+  const TOAST_GLYPHS = {
+    info: 'i',
+    success: '✓',
+    warning: '!',
+    error: '×'
+  };
 
   function toastRoot() {
     return document.getElementById('toast-root') || document.body;
@@ -24,14 +31,24 @@ window.AiHub = window.AiHub || {};
     const el = document.createElement('div');
     el.className = `toast toast-${type}`;
     el.setAttribute('role', 'status');
-    el.textContent = message;
+
+    const icon = document.createElement('span');
+    icon.className = 'toast-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = TOAST_GLYPHS[type] || TOAST_GLYPHS.info;
+
+    const body = document.createElement('span');
+    body.className = 'toast-body';
+    body.textContent = message;
+
+    el.append(icon, body);
     root.appendChild(el);
 
     requestAnimationFrame(() => el.classList.add('visible'));
 
     const remove = () => {
       el.classList.remove('visible');
-      setTimeout(() => el.remove(), 200);
+      setTimeout(() => el.remove(), 220);
     };
 
     const timer = setTimeout(remove, TOAST_TIMEOUT_MS);
@@ -92,8 +109,11 @@ window.AiHub = window.AiHub || {};
 
       const finish = (result) => {
         document.removeEventListener('keydown', onKey, true);
-        backdrop.remove();
-        resolve(result);
+        backdrop.classList.remove('visible');
+        setTimeout(() => {
+          backdrop.remove();
+          resolve(result);
+        }, 180);
       };
 
       const onKey = (event) => {
@@ -179,18 +199,25 @@ window.AiHub = window.AiHub || {};
       app.closeContextMenu();
     };
 
+    const onKey = (event) => {
+      if (event.key === 'Escape') app.closeContextMenu();
+    };
+
     setTimeout(() => {
       document.addEventListener('mousedown', dismiss, { once: true });
-      document.addEventListener('keydown', function onKey(event) {
-        if (event.key === 'Escape') app.closeContextMenu();
-      });
+      document.addEventListener('keydown', onKey);
       window.addEventListener('blur', () => app.closeContextMenu(), { once: true });
+      app._contextMenuKeyHandler = onKey;
     }, 0);
 
     return menu;
   };
 
   app.closeContextMenu = function closeContextMenu() {
+    if (app._contextMenuKeyHandler) {
+      document.removeEventListener('keydown', app._contextMenuKeyHandler);
+      app._contextMenuKeyHandler = null;
+    }
     if (app._contextMenu) {
       app._contextMenu.remove();
       app._contextMenu = null;

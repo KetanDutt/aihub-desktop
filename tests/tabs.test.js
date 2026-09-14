@@ -98,8 +98,19 @@ describe('TabManager', () => {
     manager.add({ id: 'b', serviceId: 'sb', url: 'https://b.com', title: 'B' });
     manager.reorder(['b', 'a']);
     expect(manager.toJSON()).toEqual([
-      { id: 'b', serviceId: 'sb', url: 'https://b.com', title: 'B' },
-      { id: 'a', serviceId: 'sa', url: 'https://a.com', title: 'A' }
+      { id: 'b', serviceId: 'sb', url: 'https://b.com', title: 'B', zoomFactor: 1, muted: false },
+      { id: 'a', serviceId: 'sa', url: 'https://a.com', title: 'A', zoomFactor: 1, muted: false }
     ]);
   });
+
+  it('persists zoom and mute in toJSON', () => {
+    const manager = new TabManager();
+    manager.add({ id: 'a', serviceId: 's', url: 'https://a.com', title: 'A' });
+    manager.update('a', { zoomFactor: 1.25, muted: true });
+    const json = manager.toJSON();
+    expect(json).toEqual([
+      { id: 'a', serviceId: 's', url: 'https://a.com', title: 'A', zoomFactor: 1.25, muted: true }
+    ]);
+  });
+
 });

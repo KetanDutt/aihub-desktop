@@ -55,6 +55,18 @@ Everything Chromium can ask for is denied unless explicitly allowed. `media`
 for the session only; geolocation, MIDI, USB/serial/Bluetooth, display-capture,
 etc. are denied outright.
 
+## WebRTC / local IP leakage
+
+Sessions install `setWebRTCIPHandlingPolicy('disable_non_proxied_udp')` so peer
+connections prefer public interfaces and do not advertise LAN addresses. This
+is especially relevant when a proxy is in use.
+
+## Proxy
+
+When *Use Proxy* is enabled, the proxy hostname is injected into every tab's
+domain allow-list so proxied traffic is not self-blocked. Proxy URLs with
+schemes like `javascript:` or `file:` are rejected at config save time.
+
 ## Window escape
 
 `window.open` / `target="_blank"` never spawn a bare Electron window. Same-
@@ -65,8 +77,7 @@ are handed to the OS browser after a confirmation dialog.
 
 All IPC input is validated in the main process: tab ids match a strict pattern,
 service ids must exist in the catalogue, URLs must be `http(s)`, and config
-writes are whitelisted/clamped (`sanitizeConfig`). Proxy URLs with schemes like
-`javascript:` or `file:` are rejected.
+writes are whitelisted/clamped (`sanitizeConfig`).
 
 ## Supply chain / data
 

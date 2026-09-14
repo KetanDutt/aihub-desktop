@@ -20,6 +20,8 @@ window.AiHub = window.AiHub || {};
     { keys: [`${MOD}+1…9`], description: 'Jump to tab n' },
     { keys: [`${MOD}+W`], description: 'Close the active tab' },
     { keys: [`${MOD}+R`, 'F5'], description: 'Reload the active tab' },
+    { keys: [`${MOD}+F`], description: 'Find in page' },
+    { keys: [`${MOD}+M`], description: 'Mute / unmute the active tab' },
     { keys: [`${MOD}+=`, `${MOD}+-`, `${MOD}+0`], description: 'Zoom in, out, reset' },
     { keys: [`${MOD}+,`], description: 'Open settings' },
     { keys: ['Esc'], description: 'Close dialogs and panels' },
@@ -74,6 +76,10 @@ window.AiHub = window.AiHub || {};
 
       // Escape always closes the top-most overlay.
       if (key === 'Escape') {
+        if (app.isFindBarOpen && app.isFindBarOpen()) {
+          app.closeFindBar();
+          return;
+        }
         if (!app.elements.shortcutsModal || app.elements.shortcutsModal.classList.contains('hidden')) {
           app.closeSettings();
           if (app.elements.sidebar) app.elements.sidebar.classList.add('hidden');
@@ -129,6 +135,18 @@ window.AiHub = window.AiHub || {};
         return;
       }
 
+      if (lower === 'f') {
+        event.preventDefault();
+        if (app.openFindBar) app.openFindBar();
+        return;
+      }
+
+      if (lower === 'm') {
+        event.preventDefault();
+        app.toggleMuteActiveTab();
+        return;
+      }
+
       if (lower === ',') {
         event.preventDefault();
         app.openSettings();
@@ -175,6 +193,21 @@ window.AiHub = window.AiHub || {};
     try {
       const applied = await window.electronAPI.setZoom(tab.id, next);
       if (applied) tab.zoomFactor = applied;
+    } catch (e) {
+      /* non fatal */
+    }
+  };
+
+  app.toggleMuteActiveTab = async function toggleMuteActiveTab() {
+    const tab = app.getActiveTab();
+    if (!tab || !window.electronAPI.setMuted) return;
+    const next = !tab.muted;
+    try {
+      await window.electronAPI.setMuted(tab.id, next);
+      tab.muted = next;
+      const node = app.tabNode ? app.tabNode(tab.id) : null;
+      if (node) node.classList.toggle('is-muted', next);
+      app.toast(next ? 'Tab muted' : 'Tab unmuted', 'info');
     } catch (e) {
       /* non fatal */
     }

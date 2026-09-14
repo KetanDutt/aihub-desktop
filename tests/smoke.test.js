@@ -82,7 +82,17 @@ describe('module graph', () => {
     expect(typeof updater.setupAutoUpdater).toBe('function');
 
     const windowManager = require('../src/window');
-    for (const fn of ['createTab', 'switchTab', 'closeTab', 'reorderTabs', 'setViewBounds']) {
+    for (const fn of [
+      'createTab',
+      'switchTab',
+      'closeTab',
+      'reorderTabs',
+      'setViewBounds',
+      'setZoom',
+      'setMuted',
+      'findInPage',
+      'stopFindInPage'
+    ]) {
       expect(typeof windowManager[fn]).toBe('function');
     }
 
@@ -111,5 +121,9 @@ describe('module graph', () => {
     expect(all.length).toBe(new Set(all).size); // no duplicate registration
     expect(all).toContain('create-tab');
     expect(all).toContain('get-config');
+    expect(all).toContain('set-zoom');
+    expect(all).toContain('set-muted');
+    expect(all).toContain('find-in-page');
+    expect(all).toContain('stop-find-in-page');
   });
 });

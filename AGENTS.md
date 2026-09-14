@@ -32,7 +32,11 @@ Tests live in `tests/`. Main-process code is unit-tested under an Electron stub
 - `main.js` entry/lifecycle; `preload.js` contextBridge.
 - `src/` main process (see `docs/architecture.md`).
 - `ui/` shell renderer (plain JS, no bundler).
-- `scripts/` doctor/clean/icons + one-click Windows scripts.
+- `scripts/` doctor/clean/icons/one-click-run + Windows helpers; root `RUN.bat`
+  is the Windows all-in-one launcher.
+- Use `clampFloat` (not `clampNumber`) for fractional values such as zoom.
+- IPC channel names live only in `src/constants.js#IPC`; keep preload and
+  renderer in sync when adding channels.
 - `docs/` user + developer documentation; `CHANGELOG.md` for releases.
 
 ## Style

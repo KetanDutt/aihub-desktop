@@ -88,7 +88,9 @@ window.AiHub = window.AiHub || {};
         serviceId,
         url: saved.url || service.url,
         title: saved.title || service.name,
-        tabId: saved.id
+        tabId: saved.id,
+        zoomFactor: saved.zoomFactor || 1,
+        muted: Boolean(saved.muted)
       });
       if (tab) restored.push(tab);
     }
@@ -210,6 +212,7 @@ window.AiHub = window.AiHub || {};
     app.initTabListeners();
     app.initSettings();
     app.initShortcuts();
+    if (app.initFindBar) app.initFindBar();
     initDeepLinks();
     initViewBounds();
 

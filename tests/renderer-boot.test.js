@@ -22,6 +22,7 @@ const SCRIPTS = [
   'overlays.js',
   'services.js',
   'tabs.js',
+  'findbar.js',
   'settings.js',
   'shortcuts.js',
   'renderer.js'
@@ -102,6 +103,9 @@ function installElectronApiStub() {
     navGoForward: jest.fn(),
     navReload: jest.fn(),
     setZoom: jest.fn().mockResolvedValue(1),
+    setMuted: jest.fn().mockResolvedValue(true),
+    findInPage: jest.fn().mockResolvedValue({ requestId: 1 }),
+    stopFindInPage: jest.fn().mockResolvedValue(true),
     openDevTools: jest.fn().mockResolvedValue(false),
     clearSessionData: jest.fn().mockResolvedValue({ success: true }),
     openExternal: jest.fn().mockResolvedValue(true),
@@ -119,6 +123,7 @@ function installElectronApiStub() {
     onTabClosed: noopSubscribe,
     onTabsEmptied: noopSubscribe,
     onTabBlocked: noopSubscribe,
+    onTabFindResult: noopSubscribe,
     onBlockingState: noopSubscribe,
     onUpdateState: noopSubscribe
   };
@@ -197,5 +202,38 @@ describe('shell renderer', () => {
     expect(document.querySelectorAll('.modal-backdrop').length).toBeGreaterThan(0);
     document.querySelector('#overlay-root .modal-actions .btn-primary').click();
     await expect(pending).resolves.toBe(true);
+  });
+
+  it('normalises tab-state payloads (tabId -> id) and opens the find bar', async () => {
+    installElectronApiStub();
+    loadShell();
+    await flush();
+
+    const tab = await window.AiHub.createTab({ serviceId: 'chatgpt', url: SERVICE.url, title: 'ChatGPT' });
+    expect(tab).toBeTruthy();
+
+    // Main process sends `tabId`, not `id` — upsert must not create a ghost entry.
+    window.AiHub.applyTabState({
+      tabId: tab.id,
+      title: 'ChatGPT — updated',
+      url: SERVICE.url,
+      loading: false,
+      canGoBack: false,
+      canGoForward: false,
+      hibernated: false,
+      active: true,
+      zoomFactor: 1.25,
+      muted: false
+    });
+    expect(window.AiHub.state.tabs.length).toBe(1);
+    expect(window.AiHub.getTab(tab.id).title).toBe('ChatGPT — updated');
+    expect(window.AiHub.getTab(tab.id).zoomFactor).toBe(1.25);
+
+    window.AiHub.openFindBar();
+    expect(window.AiHub.isFindBarOpen()).toBe(true);
+    expect(document.getElementById('find-bar')).toBeTruthy();
+
+    window.AiHub.closeFindBar();
+    expect(window.AiHub.isFindBarOpen()).toBe(false);
   });
 });

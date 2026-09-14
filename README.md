@@ -14,6 +14,7 @@
   <a href="https://github.com/SilentCoderHere/aihub-desktop/actions/workflows/ci.yml"><img src="https://github.com/SilentCoderHere/aihub-desktop/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/SilentCoderHere/aihub-desktop" alt="License"></a>
   <a href="https://www.electronjs.org"><img src="https://img.shields.io/badge/Electron-41-47848F?logo=electron" alt="Electron"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-1.3.0-blue" alt="Version"></a>
 </p>
 
 ---
@@ -34,35 +35,54 @@ your machine.
   domains, an optional *Strict mode*, live blocked-request counters.
 - **Memory aware** - a concurrent-tab limit plus **automatic hibernation** of
   idle tabs tears down background renderers and rebuilds them on demand.
+- **Find in page** - `Ctrl+F` opens a floating find bar with match counter and
+  next/previous navigation.
+- **Per-tab mute & zoom** - mute noisy tabs (`Ctrl+M`); zoom steps and mute
+  state survive restarts.
 - **Offline-first** - a validated catalogue + rule set ships with the app; the
   remote list refreshes in the background and can never corrupt the cache.
 - **Privacy controls** - deny-by-default permissions with prompts, session
-  wipe, proxy support, "open in browser" instead of pop-up windows.
-- **Session restore** - tabs and the active tab survive restarts.
+  wipe, proxy support, WebRTC IP policy, "open in browser" instead of pop-up
+  windows.
+- **Session restore** - tabs, the active tab, zoom and mute survive restarts.
 - **System integration** - tray with open-tab menu, global show/hide shortcut,
   launch-at-login, `aihub://` deep links, auto-update.
-- **Polished shell** - dark/light themes, sidebar search, toasts, context
-  menus, keyboard shortcuts and a shortcut reference (`?`).
+- **Polished shell** - Liquid Glass dark/light themes, sidebar search, toasts,
+  context menus, keyboard shortcuts and a shortcut reference (`?`).
 
 ## Quick start
 
-```bash
-npm install
-npm start
-```
+### Windows — one click (recommended)
 
-### Windows (no terminal required)
+Double-click **`RUN.bat`** at the repository root.
 
-Double-click in `scripts/windows/`:
+It checks and installs Node.js 20+ (via winget / Chocolatey / Scoop), installs
+npm dependencies and the Electron runtime, runs a quick environment doctor, then
+launches the desktop app (the web UI shell runs inside Electron).
+
+No terminal knowledge required. On failure the window stays open so you can
+read the log.
 
 | Script | Action |
 |--------|--------|
-| `Setup.bat` | Install Node.js + dependencies, run the doctor |
-| `Run.bat` | Launch the app |
-| `Build.bat` | Lint, test and build the installer into `dist\` |
-| `Test.bat` | Run lint + tests |
+| **`RUN.bat`** (repo root) | **All-in-one**: deps + launch |
+| `scripts/windows/Setup.bat` | Install Node.js + dependencies only |
+| `scripts/windows/Run.bat` | Launch (installs deps if needed) |
+| `scripts/windows/Build.bat` | Lint, test and build the installer into `dist\` |
+| `scripts/windows/Test.bat` | Run lint + tests |
+| `scripts/windows/Dev.bat` | Live-reload development loop |
+| `scripts/windows/Clean.bat` | Remove `node_modules` and build artefacts |
 
 See [scripts/windows/README.md](scripts/windows/README.md).
+
+### macOS / Linux / any terminal
+
+```bash
+npm run one-click     # check/install deps, then launch
+# or manually:
+npm install
+npm start
+```
 
 ### Everything else
 
@@ -77,21 +97,41 @@ npm run build:win     # package (also :mac / :linux)
 
 ## Keyboard shortcuts
 
-Press `?` in the app for the full list. Highlights: `Ctrl+T` picker,
-`Ctrl+Tab` next tab, `Ctrl+W` close tab, `Ctrl+,` settings,
-`Ctrl+Shift+A` (global) show/hide. On macOS use `⌘`.
+Press `?` in the app for the full list. Highlights:
+
+| Keys | Action |
+|------|--------|
+| `Ctrl+T` | Open the service picker |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab |
+| `Ctrl+W` | Close the active tab |
+| `Ctrl+F` | Find in page |
+| `Ctrl+M` | Mute / unmute the active tab |
+| `Ctrl+=` / `-` / `0` | Zoom in / out / reset |
+| `Ctrl+,` | Settings |
+| `Ctrl+Shift+A` (global) | Show / hide the app |
+
+On macOS use `⌘` instead of `Ctrl`. Full reference:
+[docs/keyboard-shortcuts.md](docs/keyboard-shortcuts.md).
 
 ## Documentation
 
 | | |
 |---|---|
 | [Architecture](docs/architecture.md) | process model, IPC, tab lifecycle, hibernation |
+| [Design system](docs/design.md) | Liquid Glass tokens, materials, motion |
 | [Configuration](docs/configuration.md) | every setting and its effect |
 | [Security model](docs/security.md) | what the filter does and does not do |
 | [Development](docs/development.md) | setup, scripts, tests, conventions |
 | [Packaging](docs/packaging.md) | electron-builder, auto-update, one-click scripts |
 | [Troubleshooting](docs/troubleshooting.md) | reading the log, common problems |
+| [API surface](docs/api.md) | IPC channels and preload bridge |
 | [Roadmap](docs/roadmap.md) | suggested next improvements |
+
+## Requirements
+
+- **Node.js 20+** (22 recommended)
+- Windows 10+, macOS 11+, or a modern Linux desktop
+- ~200 MB free disk for Electron + dependencies
 
 ## Contributing
 

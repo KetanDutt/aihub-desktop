@@ -39,13 +39,18 @@ window.AiHub = window.AiHub || {};
   }
 
   function applyFavicon(serviceId, dataUrl) {
-    document.querySelectorAll(`.tab-item[data-service="${serviceId}"] .tab-favicon img`).forEach((img) => {
-      if (dataUrl) {
-        img.src = dataUrl;
-        img.classList.remove('hidden');
-        const fallback = img.parentElement.querySelector('.tab-initials');
-        if (fallback) fallback.classList.add('hidden');
-      }
+    if (!dataUrl || !serviceId) return;
+    // Escape the service id for attribute selectors (ids are slugified, but
+    // keep the path safe if a non-slug ever slips through).
+    const safe =
+      typeof CSS !== 'undefined' && CSS.escape
+        ? CSS.escape(serviceId)
+        : String(serviceId).replace(/[^A-Za-z0-9_-]/g, '');
+    document.querySelectorAll(`.tab-item[data-service="${safe}"] .tab-favicon img`).forEach((img) => {
+      img.src = dataUrl;
+      img.classList.remove('hidden');
+      const fallback = img.parentElement.querySelector('.tab-initials');
+      if (fallback) fallback.classList.add('hidden');
     });
   }
 
@@ -225,6 +230,29 @@ window.AiHub = window.AiHub || {};
       },
       { type: 'separator' },
       {
+        label: tab.muted ? 'Unmute tab' : 'Mute tab',
+        onClick: async () => {
+          const next = !tab.muted;
+          try {
+            await window.electronAPI.setMuted(id, next);
+            tab.muted = next;
+            const node = tabNode(id);
+            if (node) node.classList.toggle('is-muted', next);
+            app.toast(next ? 'Tab muted' : 'Tab unmuted', 'info');
+          } catch (e) {
+            app.toast('Unable to change mute state', 'error');
+          }
+        }
+      },
+      {
+        label: 'Find in page…',
+        onClick: () => {
+          app.switchToTab(id);
+          if (typeof app.openFindBar === 'function') app.openFindBar();
+        }
+      },
+      { type: 'separator' },
+      {
         label: 'Close other tabs',
         disabled: app.state.tabs.length < 2,
         onClick: () => window.electronAPI.closeOtherTabs(id)
@@ -286,6 +314,8 @@ window.AiHub = window.AiHub || {};
     const badge = el.querySelector('.tab-badge');
     if (badge) badge.classList.toggle('hidden', !payload.hibernated);
 
+    el.classList.toggle('is-muted', Boolean(payload.muted));
+
     if (payload.active) {
       app.state.currentTabId = payload.tabId;
       paintActiveTab();
@@ -294,11 +324,22 @@ window.AiHub = window.AiHub || {};
     if (payload.crashed) {
       app.toast('This tab crashed. Reload it to continue.', 'error');
     }
+
+    if (payload.requestFind && typeof app.openFindBar === 'function') {
+      app.openFindBar();
+    }
   }
 
   // -- Public actions --------------------------------------------------------
 
-  app.createTab = async function createTab({ serviceId, url, title, tabId = null }) {
+  app.createTab = async function createTab({
+    serviceId,
+    url,
+    title,
+    tabId = null,
+    zoomFactor = 1,
+    muted = false
+  }) {
     const id = tabId || `${serviceId}-${Date.now()}`;
 
     if (app.state.tabs.length >= app.state.limit) {
@@ -320,11 +361,13 @@ window.AiHub = window.AiHub || {};
       canGoBack: false,
       canGoForward: false,
       hibernated: false,
-      zoomFactor: 1
+      zoomFactor: zoomFactor || 1,
+      muted: Boolean(muted)
     };
 
     app.upsertTab(record);
     const el = buildTabElement(record);
+    if (record.muted) el.classList.add('is-muted');
     app.elements.tabsList.appendChild(el);
     loadFavicon(serviceId, url);
 
@@ -335,7 +378,9 @@ window.AiHub = window.AiHub || {};
         serviceId,
         url,
         title: record.title,
-        userAgent: ''
+        userAgent: '',
+        zoomFactor: record.zoomFactor,
+        muted: record.muted
       });
     } catch (error) {
       app.removeTab(id);

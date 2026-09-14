@@ -1,7 +1,7 @@
 /**
  * Motion layer: gliding active indicators and scroll-aware surfaces.
  *
- * Everything here is defensive - if an element is missing the helper simply
+ * Everything here is defensive — if an element is missing the helper simply
  * does nothing, so the shell keeps working even if the DOM changes. All
  * animations are transform/opacity based and are disabled entirely when the
  * user prefers reduced motion.
@@ -24,7 +24,8 @@ window.AiHub = window.AiHub || {};
     const el = document.createElement('div');
     el.className = className;
     el.setAttribute('aria-hidden', 'true');
-    container.appendChild(el);
+    // Place behind tab/settings buttons so content paints above the pill.
+    container.insertBefore(el, container.firstChild);
     return el;
   }
 
@@ -78,8 +79,8 @@ window.AiHub = window.AiHub || {};
   };
 
   app.updateIndicators = function updateIndicators() {
-    app.positionTabIndicator && app.positionTabIndicator();
-    app.positionSettingsIndicator && app.positionSettingsIndicator();
+    if (app.positionTabIndicator) app.positionTabIndicator();
+    if (app.positionSettingsIndicator) app.positionSettingsIndicator();
   };
 
   // -- Scroll-aware surface density -----------------------------------------
@@ -93,7 +94,7 @@ window.AiHub = window.AiHub || {};
         if (ticking) return;
         ticking = true;
         requestAnimationFrame(() => {
-          header.classList.toggle(className, scroller.scrollTop > 8);
+          header.classList.toggle(className, scroller.scrollTop > 6);
           ticking = false;
         });
       },
@@ -113,12 +114,21 @@ window.AiHub = window.AiHub || {};
       document.querySelector('.sidebar-header'),
       'is-scrolled'
     );
+
+    // Header density when the main content (welcome) scrolls.
+    const welcome = document.getElementById('welcome-screen');
+    const header = document.querySelector('.app-header');
+    if (welcome && header) {
+      bindScrollDensity(welcome, header, 'is-dense');
+    }
   }
 
   // -- Re-position on layout changes ----------------------------------------
 
   function initObservers() {
-    const raf = window.AiHubUtils ? window.AiHubUtils.rafThrottle(() => app.updateIndicators()) : null;
+    const raf = window.AiHubUtils
+      ? window.AiHubUtils.rafThrottle(() => app.updateIndicators())
+      : null;
     if (!raf) return;
 
     window.addEventListener('resize', raf);
@@ -126,6 +136,8 @@ window.AiHub = window.AiHub || {};
     if (typeof ResizeObserver !== 'undefined') {
       const ro = new ResizeObserver(raf);
       if (app.elements && app.elements.tabsList) ro.observe(app.elements.tabsList);
+      const settingsTabs = document.querySelector('.settings-tabs');
+      if (settingsTabs) ro.observe(settingsTabs);
     }
   }
 
@@ -133,6 +145,9 @@ window.AiHub = window.AiHub || {};
     initDensity();
     initObservers();
     // Position once layout has settled.
-    requestAnimationFrame(() => app.updateIndicators());
+    requestAnimationFrame(() => {
+      app.updateIndicators();
+      requestAnimationFrame(() => app.updateIndicators());
+    });
   };
 })(window.AiHub);

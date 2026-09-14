@@ -7,6 +7,7 @@ domain allow-list in front of every network request.
 | Document | Contents |
 |----------|----------|
 | [Architecture](architecture.md) | Process model, module map, IPC surface, tab lifecycle and hibernation. |
+| [API surface](api.md) | Every IPC channel, preload bridge and validation rule. |
 | [Design system](design.md) | Liquid Glass tokens, materials, motion and layering. |
 | [Configuration](configuration.md) | Every setting, its default and its effect; where state is stored. |
 | [Security model](security.md) | What the domain filter does and does not do, permission policy, hardening. |

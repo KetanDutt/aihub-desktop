@@ -11,9 +11,12 @@ const PROTOCOL = 'aihub';
 const GLOBAL_SHORTCUT_DEFAULT = 'CommandOrControl+Shift+A';
 
 // -- Layout fallbacks (px, CSS pixels) ---------------------------------------
-const HEADER_HEIGHT = 80;
-const TABS_HEIGHT = 40;
-const STATUS_BAR_HEIGHT = 28;
+// Keep in sync with the CSS custom properties in ui/styles.css
+// (--header-height, --tabs-height, --status-height). The renderer reports the
+// real #webviews-container bounds; these only cover the first frames.
+const HEADER_HEIGHT = 54;
+const TABS_HEIGHT = 44;
+const STATUS_BAR_HEIGHT = 30;
 
 const LAYOUT = {
   HEADER_HEIGHT,
@@ -94,6 +97,9 @@ const IPC = {
   NAV_GO_FORWARD: 'nav-go-forward',
   NAV_RELOAD: 'nav-reload',
   SET_ZOOM: 'set-zoom',
+  SET_MUTED: 'set-muted',
+  FIND_IN_PAGE: 'find-in-page',
+  STOP_FIND_IN_PAGE: 'stop-find-in-page',
   OPEN_TAB_DEVTOOLS: 'open-tab-devtools',
   CHECK_FOR_UPDATES: 'check-for-updates',
   GET_UPDATE_STATUS: 'get-update-status',
@@ -111,6 +117,7 @@ const IPC = {
   TAB_CLOSED: 'tab-closed',
   TABS_EMPTIED: 'tabs-emptied',
   TAB_BLOCKED: 'tab-blocked',
+  TAB_FIND_RESULT: 'tab-find-result',
   BLOCKING_STATE: 'blocking-state',
   UPDATE_STATE: 'update-state',
   APP_LOG: 'app-log'

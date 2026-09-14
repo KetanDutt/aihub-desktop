@@ -67,6 +67,18 @@ down (freeing the renderer process and its memory) while the tab record
 survives; switching back recreates the view on demand. The active tab is never
 hibernated.
 
+## Session fields that survive restarts
+
+`TabManager.toJSON()` persists, per tab:
+
+| Field | Purpose |
+|-------|---------|
+| `id` / `serviceId` / `url` / `title` | Identity and last location |
+| `zoomFactor` | Per-tab zoom (fractional) |
+| `muted` | Per-tab audio mute |
+
+Find-in-page state is ephemeral and is not restored.
+
 ## Blocking model
 
 Each tab gets an allow-list = *its service's domains* ∪ *common auth domains*

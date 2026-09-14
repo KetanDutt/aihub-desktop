@@ -120,12 +120,19 @@ window.AiHub = window.AiHub || {};
   };
 
   app.upsertTab = function upsertTab(tab) {
-    const index = app.state.tabs.findIndex((existing) => existing.id === tab.id);
+    // Main-process `tab-state` payloads use `tabId`; local records use `id`.
+    // Normalise so both shapes merge correctly without creating ghost entries.
+    const id = tab.id || tab.tabId;
+    if (!id) return null;
+    const normalised = { ...tab, id };
+    delete normalised.tabId;
+
+    const index = app.state.tabs.findIndex((existing) => existing.id === id);
     if (index === -1) {
-      app.state.tabs.push(tab);
-      return tab;
+      app.state.tabs.push(normalised);
+      return normalised;
     }
-    app.state.tabs[index] = { ...app.state.tabs[index], ...tab };
+    app.state.tabs[index] = { ...app.state.tabs[index], ...normalised };
     return app.state.tabs[index];
   };
 

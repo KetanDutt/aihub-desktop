@@ -4,10 +4,23 @@ Double-click any of these from File Explorer — no terminal knowledge required.
 Each `.bat` is a thin launcher around a `.ps1` that does the real work
 (toolchain detection, dependency installation, action, and a friendly report).
 
+## Fastest path
+
+From the **repository root**, double-click:
+
+| Script | What it does |
+|--------|----------------|
+| **`RUN.bat`** | **All-in-one**: checks/installs Node.js 20+, npm deps + Electron, runs the doctor, then launches the desktop app (web UI shell). |
+
+That is the only file most people need. The scripts below live in this folder
+for finer-grained control.
+
+## Scripts in this folder
+
 | Script      | What it does                                                                 |
 |-------------|------------------------------------------------------------------------------|
 | `Setup.bat` | Installs/verifies Node.js 20+ (via winget/choco/scoop), installs npm deps, downloads Electron, then runs the environment doctor. |
-| `Run.bat`   | Verifies dependencies, then launches the app (`npm start`).                  |
+| `Run.bat`   | Verifies dependencies, runs doctor, then launches the app (`npm start`).     |
 | `Dev.bat`   | Starts the live-reload development loop (`npm run dev` via nodemon).         |
 | `Test.bat`  | Installs what is needed, then runs ESLint + the Jest suite (`npm run check`).|
 | `Build.bat` | Verifies toolchain, runs lint + tests, then builds the NSIS installer into `dist\` (`npm run build:win`). |
@@ -32,9 +45,13 @@ Each `.bat` is a thin launcher around a `.ps1` that does the real work
 The same actions exist as npm scripts (see the root `README.md`):
 
 ```
+npm run one-click  # check deps + launch (any OS; Node must already be installed)
 npm start          # Run
 npm run dev        # Dev
 npm run check      # Test
 npm run build:win  # Build
 npm run doctor     # environment report
 ```
+
+On Windows, `RUN.bat` / `RUN.ps1` at the repo root can also install Node.js
+itself when winget, Chocolatey or Scoop is available.
