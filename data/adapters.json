@@ -421,6 +421,84 @@
         "kimi",
         "moonshot"
       ]
+    },
+    "duckai": {
+      "strategy": "dom",
+      "label": "",
+      "defaultModel": "gpt-4o-mini",
+      "models": [
+        "gpt-4o-mini",
+        "o3-mini",
+        "claude-3-haiku",
+        "llama-3.1-70b",
+        "mistral-small-3"
+      ],
+      "aliases": [
+        "duck",
+        "duckduckgo",
+        "duckassist"
+      ],
+      "dom": {
+        "url": "https://duck.ai/",
+        "answer": "[class*=\"markdown\"], [class*=\"prose\"], [data-testid*=\"message\"]",
+        "pending": "button[aria-label*=\"Stop\"], [class*=\"stop\"]",
+        "idlePolls": 4
+      }
+    },
+    "phind": {
+      "strategy": "dom",
+      "label": "",
+      "defaultModel": "phind-70b",
+      "models": [
+        "phind-70b",
+        "gpt-4o",
+        "claude-sonnet-4-5",
+        "gpt-5"
+      ],
+      "aliases": [
+        "phind"
+      ],
+      "dom": {
+        "url": "https://www.phind.com/",
+        "answer": "[class*=\"markdown\"], [class*=\"prose\"], [class*=\"answer\"]",
+        "idlePolls": 4
+      }
+    },
+    "blackboxai": {
+      "strategy": "dom",
+      "label": "",
+      "defaultModel": "blackbox",
+      "models": [
+        "blackbox",
+        "gpt-4o",
+        "claude-sonnet-4-5",
+        "deepseek-r1"
+      ],
+      "aliases": [
+        "blackbox"
+      ],
+      "dom": {
+        "url": "https://www.blackbox.ai/",
+        "answer": "[class*=\"markdown\"], [class*=\"prose\"], [class*=\"message-content\"]",
+        "idlePolls": 4
+      }
+    },
+    "deepaichat": {
+      "strategy": "dom",
+      "label": "",
+      "defaultModel": "deepai-chat",
+      "models": [
+        "deepai-chat",
+        "gpt-4o"
+      ],
+      "aliases": [
+        "deepai"
+      ],
+      "dom": {
+        "url": "https://deepai.org/chat",
+        "answer": "[class*=\"markdown\"], [class*=\"prose\"], [class*=\"chat-message\"]",
+        "idlePolls": 4
+      }
     }
   }
 }

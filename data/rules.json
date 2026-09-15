@@ -121,6 +121,19 @@
     "kimi": [
       "moonshot.cn",
       "kimi.com"
+    ],
+    "duckai": [
+      "duck.ai",
+      "duckduckgo.com"
+    ],
+    "phind": [
+      "phind.com"
+    ],
+    "blackboxai": [
+      "blackbox.ai"
+    ],
+    "deepaichat": [
+      "deepai.org"
     ]
   },
   "common_auth_domains": [

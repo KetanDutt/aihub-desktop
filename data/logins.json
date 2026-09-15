@@ -3,16 +3,31 @@
   "generatedAt": "2026-09-14T00:00:00.000Z",
   "comment": "Per-service login fingerprints. `session_cookies` are the cookie names that prove a live session (matched case-insensitively, and only after the cookie domains match). `loginUrl` is where a re-login is started from, `signedOutPaths` are paths that mean the service is showing a login wall. `loggedInSelector`/`signedOutSelector` are optional read-only DOM hints used when a service has no usable cookie. Ids are slugify(name) and must exist in services.json.",
   "default": {
-    "session_cookies": ["session", "auth_token", "token", "sid", "cf_clearance", "__Secure-"],
+    "session_cookies": [
+      "session",
+      "auth_token",
+      "token",
+      "sid",
+      "cf_clearance",
+      "__Secure-"
+    ],
     "cookie_domains": [],
-    "signed_out_paths": ["/signin", "/log-in", "/login", "/auth/login"]
+    "signed_out_paths": [
+      "/signin",
+      "/log-in",
+      "/login",
+      "/auth/login"
+    ]
   },
   "profiles": {
     "chatgpt": {
       "label": "ChatGPT",
       "loginUrl": "https://chatgpt.com/auth/login",
       "homeUrl": "https://chatgpt.com/",
-      "cookie_domains": ["chatgpt.com", "openai.com"],
+      "cookie_domains": [
+        "chatgpt.com",
+        "openai.com"
+      ],
       "session_cookies": [
         "__Secure-next-auth.session-token",
         "__Secure-next-auth.callback-url",
@@ -20,7 +35,10 @@
         "oai-harvest",
         "oai-client-info"
       ],
-      "signed_out_paths": ["/auth/login", "/signin"],
+      "signed_out_paths": [
+        "/auth/login",
+        "/signin"
+      ],
       "loggedInSelector": "#user-menu-button, [data-testid=\"user-menu-button\"]",
       "signedOutSelector": "[data-testid=\"login-button\"]"
     },
@@ -28,9 +46,18 @@
       "label": "Claude",
       "loginUrl": "https://claude.ai/login",
       "homeUrl": "https://claude.ai/new",
-      "cookie_domains": ["claude.ai", "anthropic.com"],
-      "session_cookies": ["__Secure-next-auth.session-token", "sessionKey", "ANTHROPIC"],
-      "signed_out_paths": ["/login"],
+      "cookie_domains": [
+        "claude.ai",
+        "anthropic.com"
+      ],
+      "session_cookies": [
+        "__Secure-next-auth.session-token",
+        "sessionKey",
+        "ANTHROPIC"
+      ],
+      "signed_out_paths": [
+        "/login"
+      ],
       "loggedInSelector": "[data-test=\"account-info\"]",
       "signedOutSelector": "[data-test=\"login\"]"
     },
@@ -38,9 +65,23 @@
       "label": "Gemini",
       "loginUrl": "https://accounts.google.com/ServiceLogin?hl=en&continue=https://gemini.google.com/app",
       "homeUrl": "https://gemini.google.com/app",
-      "cookie_domains": ["google.com"],
-      "session_cookies": ["__Secure-1PSID", "__Secure-1PSIDTS", "HSID", "SSID", "APISID", "SAPISID", "NID"],
-      "signed_out_paths": ["/ServiceLogin", "/AccountChooser", "/signin"],
+      "cookie_domains": [
+        "google.com"
+      ],
+      "session_cookies": [
+        "__Secure-1PSID",
+        "__Secure-1PSIDTS",
+        "HSID",
+        "SSID",
+        "APISID",
+        "SAPISID",
+        "NID"
+      ],
+      "signed_out_paths": [
+        "/ServiceLogin",
+        "/AccountChooser",
+        "/signin"
+      ],
       "loggedInSelector": "[data-test-id=\"user-info\"], .single-user-info",
       "signedOutSelector": null
     },
@@ -48,9 +89,27 @@
       "label": "Microsoft Copilot",
       "loginUrl": "https://copilot.microsoft.com/sign-in",
       "homeUrl": "https://copilot.microsoft.com/",
-      "cookie_domains": ["microsoft.com", "live.com", "bing.com", "microsoftonline.com"],
-      "session_cookies": ["MUID", "_RDGCookie", "rt", "ANON", "ISPSS", "FedAuth", "_U", "MR", "SRCHUSR"],
-      "signed_out_paths": ["/sign-in", "/oauth20_authorize.srf"],
+      "cookie_domains": [
+        "microsoft.com",
+        "live.com",
+        "bing.com",
+        "microsoftonline.com"
+      ],
+      "session_cookies": [
+        "MUID",
+        "_RDGCookie",
+        "rt",
+        "ANON",
+        "ISPSS",
+        "FedAuth",
+        "_U",
+        "MR",
+        "SRCHUSR"
+      ],
+      "signed_out_paths": [
+        "/sign-in",
+        "/oauth20_authorize.srf"
+      ],
       "loggedInSelector": "[data-testid=\"user-avatar\"], #id_n",
       "signedOutSelector": "[data-testid=\"sign-in-button\"]"
     },
@@ -58,9 +117,20 @@
       "label": "Perplexity",
       "loginUrl": "https://www.perplexity.ai/rest/auth/login",
       "homeUrl": "https://www.perplexity.ai/",
-      "cookie_domains": ["perplexity.ai"],
-      "session_cookies": ["__Secure-next-auth.session-token", "sso", "pre_ssm_id", "ids", "gateway_ver"],
-      "signed_out_paths": ["/login", "/rest/auth/login"],
+      "cookie_domains": [
+        "perplexity.ai"
+      ],
+      "session_cookies": [
+        "__Secure-next-auth.session-token",
+        "sso",
+        "pre_ssm_id",
+        "ids",
+        "gateway_ver"
+      ],
+      "signed_out_paths": [
+        "/login",
+        "/rest/auth/login"
+      ],
       "loggedInSelector": "[data-testid=\"user-menu\"], .user-menu",
       "signedOutSelector": "a[href*=\"login\"]"
     },
@@ -68,9 +138,19 @@
       "label": "DeepSeek",
       "loginUrl": "https://chat.deepseek.com/sign_in",
       "homeUrl": "https://chat.deepseek.com/",
-      "cookie_domains": ["deepseek.com"],
-      "session_cookies": ["sid", "session_id", "connect.sid", "_state"],
-      "signed_out_paths": ["/sign_in", "/signin"],
+      "cookie_domains": [
+        "deepseek.com"
+      ],
+      "session_cookies": [
+        "sid",
+        "session_id",
+        "connect.sid",
+        "_state"
+      ],
+      "signed_out_paths": [
+        "/sign_in",
+        "/signin"
+      ],
       "loggedInSelector": "[class*=\"avatar\"]",
       "signedOutSelector": null
     },
@@ -78,9 +158,20 @@
       "label": "Grok",
       "loginUrl": "https://grok.com/sign-in",
       "homeUrl": "https://grok.com/",
-      "cookie_domains": ["grok.com", "x.com"],
-      "session_cookies": ["auth_token", "ct0", "x-chat-session", "__csrf"],
-      "signed_out_paths": ["/sign-in", "/i/flow/login"],
+      "cookie_domains": [
+        "grok.com",
+        "x.com"
+      ],
+      "session_cookies": [
+        "auth_token",
+        "ct0",
+        "x-chat-session",
+        "__csrf"
+      ],
+      "signed_out_paths": [
+        "/sign-in",
+        "/i/flow/login"
+      ],
       "loggedInSelector": "[data-testid=\"user-menu\"]",
       "signedOutSelector": null
     },
@@ -88,9 +179,18 @@
       "label": "Mistral Le Chat",
       "loginUrl": "https://chat.mistral.ai/login",
       "homeUrl": "https://chat.mistral.ai/chat",
-      "cookie_domains": ["mistral.ai"],
-      "session_cookies": ["accounts-mistralai", "auth_mistral_ai", "__Secure-next-auth.session-token"],
-      "signed_out_paths": ["/login", "/auth/login"],
+      "cookie_domains": [
+        "mistral.ai"
+      ],
+      "session_cookies": [
+        "accounts-mistralai",
+        "auth_mistral_ai",
+        "__Secure-next-auth.session-token"
+      ],
+      "signed_out_paths": [
+        "/login",
+        "/auth/login"
+      ],
       "loggedInSelector": "[data-testid=\"user-menu\"]",
       "signedOutSelector": null
     },
@@ -98,9 +198,17 @@
       "label": "HuggingChat",
       "loginUrl": "https://huggingface.co/login",
       "homeUrl": "https://huggingface.co/chat/",
-      "cookie_domains": ["huggingface.co"],
-      "session_cookies": ["token", "hf_chat_user", "notify-js-disabled"],
-      "signed_out_paths": ["/login"],
+      "cookie_domains": [
+        "huggingface.co"
+      ],
+      "session_cookies": [
+        "token",
+        "hf_chat_user",
+        "notify-js-disabled"
+      ],
+      "signed_out_paths": [
+        "/login"
+      ],
       "loggedInSelector": "[data-testid=\"user-avatar\"]",
       "signedOutSelector": "a[href=\"/login\"]"
     },
@@ -108,9 +216,18 @@
       "label": "Cohere Chat",
       "loginUrl": "https://chat.cohere.com/login",
       "homeUrl": "https://chat.cohere.com/",
-      "cookie_domains": ["cohere.com", "cohere.ai"],
-      "session_cookies": ["CohereOAuth2", "session", "__Secure-session"],
-      "signed_out_paths": ["/login"],
+      "cookie_domains": [
+        "cohere.com",
+        "cohere.ai"
+      ],
+      "session_cookies": [
+        "CohereOAuth2",
+        "session",
+        "__Secure-session"
+      ],
+      "signed_out_paths": [
+        "/login"
+      ],
       "loggedInSelector": null,
       "signedOutSelector": null
     },
@@ -118,9 +235,17 @@
       "label": "You.com",
       "loginUrl": "https://you.com/login",
       "homeUrl": "https://you.com/chat",
-      "cookie_domains": ["you.com"],
-      "session_cookies": ["youdot-com_auth", "next-auth.session-token", "access_token"],
-      "signed_out_paths": ["/login"],
+      "cookie_domains": [
+        "you.com"
+      ],
+      "session_cookies": [
+        "youdot-com_auth",
+        "next-auth.session-token",
+        "access_token"
+      ],
+      "signed_out_paths": [
+        "/login"
+      ],
       "loggedInSelector": null,
       "signedOutSelector": null
     },
@@ -128,9 +253,18 @@
       "label": "Poe",
       "loginUrl": "https://poe.com/login",
       "homeUrl": "https://poe.com/",
-      "cookie_domains": ["poe.com", "quora.com"],
-      "session_cookies": ["poe_user_id_v1", "poe_digest_v1", "maceid"],
-      "signed_out_paths": ["/login"],
+      "cookie_domains": [
+        "poe.com",
+        "quora.com"
+      ],
+      "session_cookies": [
+        "poe_user_id_v1",
+        "poe_digest_v1",
+        "maceid"
+      ],
+      "signed_out_paths": [
+        "/login"
+      ],
       "loggedInSelector": "[data-testid=\"profile\"]",
       "signedOutSelector": null
     },
@@ -138,9 +272,22 @@
       "label": "Meta AI",
       "loginUrl": "https://www.meta.ai/",
       "homeUrl": "https://www.meta.ai/",
-      "cookie_domains": ["meta.ai", "facebook.com", "meta.com"],
-      "session_cookies": ["c_user", "xs", "datr", "sb", "fr"],
-      "signed_out_paths": ["/login", "/reg/"],
+      "cookie_domains": [
+        "meta.ai",
+        "facebook.com",
+        "meta.com"
+      ],
+      "session_cookies": [
+        "c_user",
+        "xs",
+        "datr",
+        "sb",
+        "fr"
+      ],
+      "signed_out_paths": [
+        "/login",
+        "/reg/"
+      ],
       "loggedInSelector": null,
       "signedOutSelector": null
     },
@@ -148,9 +295,17 @@
       "label": "Pi",
       "loginUrl": "https://pi.ai/login",
       "homeUrl": "https://pi.ai/talk",
-      "cookie_domains": ["pi.ai"],
-      "session_cookies": ["__Secure-next-auth.session-token", "session", "talk_session"],
-      "signed_out_paths": ["/login"],
+      "cookie_domains": [
+        "pi.ai"
+      ],
+      "session_cookies": [
+        "__Secure-next-auth.session-token",
+        "session",
+        "talk_session"
+      ],
+      "signed_out_paths": [
+        "/login"
+      ],
       "loggedInSelector": null,
       "signedOutSelector": null
     },
@@ -158,9 +313,19 @@
       "label": "Qwen Chat",
       "loginUrl": "https://chat.qwen.ai/auth/login",
       "homeUrl": "https://chat.qwen.ai/",
-      "cookie_domains": ["qwen.ai", "alibabacloud.com"],
-      "session_cookies": ["token", "acw_tc", "login_qwen_token"],
-      "signed_out_paths": ["/auth/login", "/login"],
+      "cookie_domains": [
+        "qwen.ai",
+        "alibabacloud.com"
+      ],
+      "session_cookies": [
+        "token",
+        "acw_tc",
+        "login_qwen_token"
+      ],
+      "signed_out_paths": [
+        "/auth/login",
+        "/login"
+      ],
       "loggedInSelector": null,
       "signedOutSelector": null
     },
@@ -168,11 +333,89 @@
       "label": "Kimi",
       "loginUrl": "https://kimi.moonshot.cn/",
       "homeUrl": "https://kimi.moonshot.cn/",
-      "cookie_domains": ["moonshot.cn", "kimi.com"],
-      "session_cookies": ["kimi-token", "access_token", "satoken"],
-      "signed_out_paths": ["/login"],
+      "cookie_domains": [
+        "moonshot.cn",
+        "kimi.com"
+      ],
+      "session_cookies": [
+        "kimi-token",
+        "access_token",
+        "satoken"
+      ],
+      "signed_out_paths": [
+        "/login"
+      ],
       "loggedInSelector": null,
       "signedOutSelector": null
+    },
+    "duckai": {
+      "label": "Duck.ai",
+      "loginUrl": "https://duck.ai/",
+      "homeUrl": "https://duck.ai/",
+      "cookie_domains": [
+        "duck.ai",
+        "duckduckgo.com"
+      ],
+      "session_cookies": [
+        "session"
+      ],
+      "signed_out_paths": [],
+      "loggedInSelector": null,
+      "signedOutSelector": null
+    },
+    "phind": {
+      "label": "Phind",
+      "loginUrl": "https://www.phind.com/login",
+      "homeUrl": "https://www.phind.com/",
+      "cookie_domains": [
+        "phind.com"
+      ],
+      "session_cookies": [
+        "session",
+        "auth_token",
+        "phind_session"
+      ],
+      "signed_out_paths": [
+        "/login"
+      ],
+      "loggedInSelector": "[data-testid=\"user-menu\"], .user-menu",
+      "signedOutSelector": "a[href*=\"login\"]"
+    },
+    "blackboxai": {
+      "label": "Blackbox AI",
+      "loginUrl": "https://www.blackbox.ai/login",
+      "homeUrl": "https://www.blackbox.ai/",
+      "cookie_domains": [
+        "blackbox.ai"
+      ],
+      "session_cookies": [
+        "session",
+        "token",
+        "auth_token"
+      ],
+      "signed_out_paths": [
+        "/login",
+        "/signin"
+      ],
+      "loggedInSelector": "[class*=\"user-avatar\"], [data-testid=\"user-menu\"]",
+      "signedOutSelector": "a[href*=\"login\"]"
+    },
+    "deepaichat": {
+      "label": "DeepAI Chat",
+      "loginUrl": "https://deepai.org/login",
+      "homeUrl": "https://deepai.org/chat",
+      "cookie_domains": [
+        "deepai.org"
+      ],
+      "session_cookies": [
+        "session",
+        "deepai_session"
+      ],
+      "signed_out_paths": [
+        "/login"
+      ],
+      "loggedInSelector": "[class*=\"user-menu\"], [class*=\"account\"]",
+      "signedOutSelector": "a[href*=\"login\"]"
     }
   }
 }

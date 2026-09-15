@@ -56,9 +56,9 @@ your machine.
   publishes every model each service exposes, splits answers into
   reasoning/code/links/text, and can run **headless** with no window at all.
 - **Free services, kept apart** - the catalogue knows which sites answer without
-  an account (Perplexity, Copilot, You.com, Pi…); they are marked *No sign-in*,
-  filterable on their own, and callable through the API before you log into
-  anything.
+  an account (Perplexity, Copilot, You.com, Pi, Duck.ai, Phind, Blackbox AI,
+  DeepAI Chat); they are marked *No sign-in*, grouped and filterable on their
+  own, and callable through the API before you log into anything.
 - **Filterable catalogue** - the Services tab filters by type, enabled state,
   sign-in state and *access* (no sign-in vs sign-in required), and sorts by name,
   type, recency, cached cookies or "free first".

@@ -74,7 +74,9 @@ describe('GET /v1/models payload', () => {
 
     expect(free.length).toBeGreaterThan(0);
     expect(gated.length).toBeGreaterThan(0);
-    expect(free.some((model) => model.aihub.service === 'perplexity')).toBe(true);
+    for (const id of ['perplexity', 'microsoftcopilot', 'youcom', 'pi', 'duckai', 'phind', 'blackboxai', 'deepaichat']) {
+      expect(free.some((model) => model.aihub.service === id)).toBe(true);
+    }
     expect(gated.some((model) => model.aihub.service === 'chatgpt')).toBe(true);
 
     // A free service is callable with no session at all; a gated one is not.
@@ -104,6 +106,7 @@ describe('GET /v1/models payload', () => {
 
   it('tells the engine which services may be called anonymously', () => {
     expect(engine.serviceRequiresLogin('perplexity')).toBe(false);
+    expect(engine.serviceRequiresLogin('duckai')).toBe(false);
     expect(engine.serviceRequiresLogin('chatgpt')).toBe(true);
     // Unknown ids fail safe: assume a sign-in is needed.
     expect(engine.serviceRequiresLogin('does-not-exist')).toBe(true);

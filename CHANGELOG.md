@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **More no-login services.** Duck.ai, Phind, Blackbox AI and DeepAI Chat join
+  the catalogue with domain rules, login fingerprints and DOM adapters, each
+  flagged `requiresLogin: false` — 20 services, 109 published models.
 - **Free services are separated from sign-in ones.** The catalogue now carries a
   `requiresLogin` flag (6th tuple slot, or `requiresLogin: false` on an object
   entry); services that answer without an account are badged *No sign-in* in the
@@ -32,6 +35,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Adapter overrides now merge `dom`/`api` field by field with the `default`
+  entry, so a partial override (only `answer`, say) keeps the inherited
+  `composer` instead of silently losing the driver.
 - **The local API is on by default** (`apiEnabled: true`) and a random
   `aihub-<hex>` key is generated the first time the config is read, so the
   endpoint works immediately instead of after a settings detour.

@@ -130,6 +130,38 @@
       "Moonshot AI operates this service; data is processed in mainland China.",
       "1f1f1f",
       true
+    ],
+    [
+      "Duck.ai",
+      "https://duck.ai/",
+      "Conversational AI",
+      "Chats are anonymous by design: DuckDuckGo does not keep an AI chat history tied to you.",
+      "de5833",
+      false
+    ],
+    [
+      "Phind",
+      "https://www.phind.com/",
+      "Developer AI",
+      "Prompts reach Phind and its model providers; the anonymous tier is rate limited.",
+      "2d7ff9",
+      false
+    ],
+    [
+      "Blackbox AI",
+      "https://www.blackbox.ai/",
+      "Developer AI",
+      "Prompts are processed by Blackbox and its upstream model providers; anonymous use is rate limited.",
+      "1f1f2e",
+      false
+    ],
+    [
+      "DeepAI Chat",
+      "https://deepai.org/chat",
+      "Open models",
+      "Prompts are processed by DeepAI; the anonymous tier is rate limited.",
+      "ff6f61",
+      false
     ]
   ]
 }

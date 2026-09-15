@@ -69,7 +69,8 @@ everything a client might branch on: `service`, `upstreamModel`, `strategy`,
 `requiresLogin`, `ready`, `login`, `expiresAt`, `aliases`, `models`.
 
 **Free services are listed too.** Every service marked `requiresLogin: false` in
-the catalogue (Perplexity, Microsoft Copilot, You.com, Pi, …) is published, is
+the catalogue (Perplexity, Microsoft Copilot, You.com, Pi, Duck.ai, Phind,
+Blackbox AI, DeepAI Chat …) is published, is
 `ready` from the first launch, and is callable with no session at all — the
 engine drives it anonymously instead of failing with `session_unavailable`.
 Services that want a sign-in are still listed; they simply report
