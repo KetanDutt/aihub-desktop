@@ -42,7 +42,7 @@ new code — import the constant.
 | `touch-session` | serviceId | `{ ok, status }` — keep-alive ping + re-snapshot |
 | `clear-service-data` | serviceId | `{ success, cleared }` — cookies, storage and snapshot for one service |
 | `clear-session-data` | `{ scope: 'cache'\|'all' }` | `{ success, scope }` — `cache` keeps logins, `all` signs out |
-| `get-api-status` | — | local API status incl. the key (only channel that returns it) |
+| `get-api-status` | — | local API status incl. the key (only channel that returns it). Adds `modelCount`, `readyModelCount`, `freeModelCount`, `freeServiceCount`, and per model: `owned_by`, `description`, `requiresLogin`, `ready`, `service`, `upstreamModel` |
 | `rotate-api-token` | — | `{ ok, key, keyMasked }` |
 | `api-ping` | — | self-test of `GET /health` over the socket |
 

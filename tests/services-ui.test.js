@@ -243,4 +243,18 @@ describe('services tab — free vs sign-in', () => {
     expect(badges).toEqual(['sign in', 'free']);
     expect(document.querySelectorAll('#api-model-list .api-model-description').length).toBe(2);
   });
+
+
+  it('marks free services in the Sessions tab too', async () => {
+    await window.AiHub.refreshSessions();
+    document.getElementById('tab-sessions');
+    window.AiHub.renderSessionList();
+    window.AiHub.renderSessionSummary();
+
+    const chips = [...document.querySelectorAll('#session-list .login-chip')].map((c) => c.textContent);
+    expect(chips).toContain('No sign-in needed');
+    expect(document.querySelectorAll('#session-list .free-chip').length).toBe(1);
+    expect(document.getElementById('session-summary').textContent).toContain('1 need no sign-in');
+  });
+
 });

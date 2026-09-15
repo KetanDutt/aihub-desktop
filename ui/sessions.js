@@ -80,8 +80,12 @@ window.AiHub = window.AiHub || {};
     const needsAttention = states.filter((record) => record.state === 'logged-out').length;
     const verifying = states.filter((record) => record.state === 'challenge').length;
     const meta = app.state.sessionMeta || {};
+    // Services that answer without an account are not "signed out" — they are
+    // simply free, and counting them as needing attention is misleading.
+    const freeServices = (app.state.services || []).filter((service) => !window.AiHubUtils.requiresLogin(service)).length;
 
     const bits = [`${signedIn} signed in`];
+    if (freeServices) bits.push(`${freeServices} need no sign-in`);
     if (needsAttention) bits.push(`${needsAttention} need a sign-in`);
     if (expiring) bits.push(`${expiring} expiring soon`);
     if (verifying) bits.push(`${verifying} verifying`);
@@ -117,6 +121,14 @@ window.AiHub = window.AiHub || {};
     el.textContent = bits.join(' · ');
   };
 
+  /** Same marker the Services tab uses: this one needs no account. */
+  function freeChip() {
+    const chip = document.createElement('span');
+    chip.className = 'free-chip';
+    chip.textContent = 'No sign-in';
+    return chip;
+  }
+
   function sessionRow(serviceId, service, stats, record) {
     const row = document.createElement('div');
     row.className = 'session-row';
@@ -131,10 +143,12 @@ window.AiHub = window.AiHub || {};
 
     const chip = document.createElement('span');
     const state = (record && record.state) || 'unknown';
+    const needsLogin = window.AiHubUtils.requiresLogin(service);
     chip.className = `login-chip login-${state}`;
-    chip.textContent = STATE_LABELS[state] || state;
+    chip.textContent = needsLogin ? STATE_LABELS[state] || state : 'No sign-in needed';
 
     head.append(name, chip);
+    if (!needsLogin) head.appendChild(freeChip());
     row.appendChild(head);
 
     const facts = document.createElement('div');
