@@ -89,3 +89,34 @@ the bundled copy always remains as a fallback.
 ## Reporting
 
 See `SECURITY.md` at the repository root.
+
+## Sessions, cookies and the local API
+
+**Cached logins.** `<userData>/data/sessions/` holds one small JSON file per
+service: its cookies, re-stamped so Chromium persists them. The file is written
+`0600`, encrypted with the OS keychain via `safeStorage` when one is available,
+never leaves the machine, and is not included in any sync or diagnostic export.
+Cookie *values* never cross the IPC bridge — the renderer gets counts.
+
+**No credentials.** The app has no password field, no autofill, no credential
+store and no keychain access beyond `safeStorage` for the cookie cache. Every
+sign-in happens in the service's own page, typed by you. Re-login-on-open only
+*navigates* to the provider's sign-in URL.
+
+**Hardening is not an anonymity tool.** `src/stealth.js` removes the tells that
+come from *this app* (the `Electron` UA token, automation flags, missing client
+hints, `window.chrome`, plugin list). It does not make you untrackable: your
+account, IP and behaviour are still yours to explain to the provider. Canvas
+noise is off by default precisely because it would also destabilise the login
+cache.
+
+**The local API is loopback-only.** Bound to `127.0.0.1`, key-guarded, no CORS,
+non-loopback `Host` refused (rebinding) and any browser `Origin` refused (CSRF).
+Bodies, message counts, message size, per-minute rate and concurrency are capped;
+a request dies with the client that made it. It replays *your* logged-in session,
+which means it is as trusted as you are — do not expose the port, do not put the
+key in a shell history you share, and rotate it from Settings if either happens.
+
+**Automating a service may breach its terms.** Everything here talks to a service
+the way its own web app does; whether you point it at something else is your
+judgement and your account risk.

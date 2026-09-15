@@ -26,6 +26,21 @@ settings, status bar) and one **`WebContentsView` per open service tab**.
           src/config.js  electron-store backed settings + sanitisation
           src/favicon.js favicon resolver (main-process fetch + cache)
           src/updater.js electron-updater wiring
+          src/loginstate.js login classification (pure: cookies + URL + DOM hints)
+          src/logins.js   login monitor: tab watchers, re-login on open, keep-alive
+          src/sessionstore.js cookie pin/snapshot/restore, per-service partitions
+          src/cookies.js  cookie primitives (pin, merge, summarise) — no Electron
+          src/fingerprint.js stable fingerprint profile + hardening script (pure)
+          src/stealth.js  anti-bot hardening: flags, headers, CDP injection, cadence
+          src/api/        local OpenAI-compatible endpoint
+            index.js      lifecycle, key, IPC surface, config sync
+            server.js     HTTP transport (no Electron; deps injected)
+            openai.js     wire format: validation, completions, SSE (pure)
+            engine.js     drives a logged-in session (API replay or hidden window)
+            adapters.js   adapter descriptor validation (pure)
+            template.js   `{placeholder}` rendering, path get/set (pure)
+            queue.js      concurrency + rate limits (pure)
+            http.js       outbound transport, cookie header assembly
           src/logger.js  electron-log configuration
           src/paths.js   bundled/user data directory resolution
           src/utils.js   pure helpers (slugify, clamp, URL checks)
@@ -87,6 +102,21 @@ Each tab gets an allow-list = *its service's domains* ∪ *common auth domains*
 internal protocols and the trusted shell pass, registered tabs are matched by a
 suffix walk over their list, and unknown senders fail open by default
 (`strictBlocking` flips them to fail-closed). See [security.md](security.md).
+
+## Session and login layer
+
+Tabs run in the persistent default session (or in `persist:aihub-<id>` when
+`isolateSessions` is on). `src/logins.js` watches each tab's URL and cookie jar,
+classifies the session with `src/loginstate.js`, and persists the verdict, which
+is what makes re-login-on-open safe to automate. `src/sessionstore.js` pins and
+caches cookies (see [sessions.md](sessions.md)); it writes `0600` files through
+`safeStorage` and never sends cookie values to the renderer.
+
+Anti-bot hardening is applied per session and per tab by `src/stealth.js`, from a
+seed-derived profile in `src/fingerprint.js` so it is stable across launches.
+
+The local API is a thin transport over that same session material — it does not
+own a second copy of your logins.
 
 ## Offline-first data
 

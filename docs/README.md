@@ -11,6 +11,8 @@ domain allow-list in front of every network request.
 | [Design system](design.md) | Liquid Glass tokens, materials, motion and layering. |
 | [Configuration](configuration.md) | Every setting, its default and its effect; where state is stored. |
 | [Security model](security.md) | What the domain filter does and does not do, permission policy, hardening. |
+| [Sessions & anti-bot](sessions.md) | Login detection, cookie caching, re-login on open, fingerprint hardening. |
+| [Local API](local-api.md) | The OpenAI-compatible endpoint on loopback: endpoints, keys, limits, adapters. |
 | [Keyboard shortcuts](keyboard-shortcuts.md) | The full reference shown by the `?` dialog. |
 | [Development](development.md) | Setup, scripts, tests, benchmarks, linting, icon regeneration. |
 | [Packaging](packaging.md) | electron-builder targets, auto-update, deep links, one-click Windows scripts. |

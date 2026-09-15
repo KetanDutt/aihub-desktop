@@ -44,7 +44,17 @@ your machine.
 - **Privacy controls** - deny-by-default permissions with prompts, session
   wipe, proxy support, WebRTC IP policy, "open in browser" instead of pop-up
   windows.
-- **Session restore** - tabs, the active tab, zoom and mute survive restarts.
+- **Stays signed in** - each service's login is detected from its own session
+  cookies, cached across restarts (pinned + encrypted snapshots) and refreshed by
+  a background keep-alive; an expired session reopens its sign-in page on launch.
+- **Not obviously a bot** - the `Electron` UA token, automation flags and missing
+  client hints are normalised from a stable fingerprint profile, challenges are
+  waited out instead of farmed, and typed input keeps a human cadence.
+- **Local OpenAI-compatible API** - `POST /v1/chat/completions` on loopback,
+  answered through your logged-in sessions (streaming included), bearer-keyed
+  and rate limited.
+- **Filterable catalogue** - the Services tab filters by type, enabled state and
+  sign-in state, and sorts by name, type, recency or cached cookies.
 - **System integration** - tray with open-tab menu, global show/hide shortcut,
   launch-at-login, `aihub://` deep links, auto-update.
 - **Polished shell** - Liquid Glass dark/light themes, sidebar search, toasts,
@@ -95,6 +105,33 @@ npm run benchmark     # performance micro-benchmarks
 npm run build:win     # package (also :mac / :linux)
 ```
 
+## Local OpenAI-compatible API
+
+Enable **Settings ▸ Local API** and the app serves the usual OpenAI shape on
+loopback, answering from the sessions you are already signed into — no provider
+key, streaming included:
+
+```bash
+curl http://127.0.0.1:8788/v1/chat/completions \
+  -H "Authorization: Bearer $AIHUB_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"aihub/chatgpt","stream":true,"messages":[{"role":"user","content":"Summarise my last chat"}]}'
+```
+
+Any SDK that takes a custom `base_url` works the same way. It is loopback-only,
+bearer-keyed, rate limited and off by default - see
+[docs/local-api.md](docs/local-api.md).
+
+## Staying signed in
+
+Each service's login is detected from its own session cookies and cached: session
+cookies are re-stamped so Chromium persists them, snapshots are stored encrypted
+where the OS keychain allows, and a background ping rolls a warm session forward.
+If a service that *was* signed in has expired, its sign-in page is reopened on
+launch instead of you finding out mid-task. Fingerprint hardening (UA, client
+hints, automation flags, challenge handling) rides along - see
+[docs/sessions.md](docs/sessions.md).
+
 ## Keyboard shortcuts
 
 Press `?` in the app for the full list. Highlights:
@@ -121,6 +158,8 @@ On macOS use `⌘` instead of `Ctrl`. Full reference:
 | [Design system](docs/design.md) | Liquid Glass tokens, materials, motion |
 | [Configuration](docs/configuration.md) | every setting and its effect |
 | [Security model](docs/security.md) | what the filter does and does not do |
+| [Sessions & anti-bot](docs/sessions.md) | login detection, cookie cache, re-login, hardening |
+| [Local API](docs/local-api.md) | the OpenAI-compatible endpoint: models, keys, limits |
 | [Development](docs/development.md) | setup, scripts, tests, conventions |
 | [Packaging](docs/packaging.md) | electron-builder, auto-update, one-click scripts |
 | [Troubleshooting](docs/troubleshooting.md) | reading the log, common problems |

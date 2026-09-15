@@ -36,6 +36,15 @@ new code — import the constant.
 | `get-update-status` | — | update status |
 | `quit-and-install` | — | boolean |
 | `get-blocking-stats` | — | blocking snapshot + counters |
+| `get-login-states` | — | `{ serviceId: { state, reason, expiresAt, hasSnapshot, … } }` |
+| `get-session-stats` | — | per-service cookie/cache stats + hardening status |
+| `relogin-service` | serviceId | `{ ok, url, reason }` — opens the service's sign-in page |
+| `touch-session` | serviceId | `{ ok, status }` — keep-alive ping + re-snapshot |
+| `clear-service-data` | serviceId | `{ success, cleared }` — cookies, storage and snapshot for one service |
+| `clear-session-data` | `{ scope: 'cache'\|'all' }` | `{ success, scope }` — `cache` keeps logins, `all` signs out |
+| `get-api-status` | — | local API status incl. the key (only channel that returns it) |
+| `rotate-api-token` | — | `{ ok, key, keyMasked }` |
+| `api-ping` | — | self-test of `GET /health` over the socket |
 
 ### Renderer → main (send / on)
 
@@ -62,6 +71,9 @@ new code — import the constant.
 | `tab-blocked` | `{ tabId, hostname, kind }` |
 | `tab-find-result` | `{ tabId, activeMatchOrdinal, matches, finalUpdate }` |
 | `blocking-state` | snapshot + counters |
+| `login-state` | `{ serviceId, previous, state, reason, confidence, expiresAt, changed }`, or `{ relogin: [serviceId] }` after the launch pass |
+| `session-state` | `{ logins, hardening }` after a session wipe/recheck |
+| `api-state` | local API status (start/stop/request finished) |
 | `update-state` | updater status |
 
 ## Preload bridge (`window.electronAPI`)
@@ -74,6 +86,11 @@ const stop = window.electronAPI.onTabState((payload) => { /* … */ });
 // later
 stop();
 ```
+
+## HTTP surface
+
+The app also *serves* an OpenAI-compatible API on loopback (off by default):
+see [local-api.md](local-api.md).
 
 ## Validation rules
 

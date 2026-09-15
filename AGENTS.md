@@ -25,7 +25,17 @@ Tests live in `tests/`. Main-process code is unit-tested under an Electron stub
 - New user settings must be added to the `electron-store` schema, the
   `WRITABLE_KEYS` whitelist and `sanitizeConfig()` in `src/config.js`.
 - Service/rule edits go in `data/services.json` + `data/rules.json` (ids are
-  `slugify(name)`); a test verifies the two stay consistent.
+  `slugify(name)`); a test verifies the two stay consistent. The same rule covers
+  `data/logins.json` (login fingerprints) and `data/adapters.json` (chat
+  adapters) — a tests file asserts every id resolves to a known service.
+- Pure logic (classification, cookie math, fingerprint profiles, the OpenAI wire
+  format, adapter validation) must not import Electron: `src/loginstate.js`,
+  `src/cookies.js`, `src/fingerprint.js` and `src/api/{openai,template,queue,
+  adapters,server}.js` are unit-tested without a display. Electron-facing glue
+  lives in `src/logins.js`, `src/sessionstore.js`, `src/stealth.js` and
+  `src/api/{engine,index}.js`.
+- Cookie values are secrets: never send them over IPC to the renderer, never log
+  them, and keep the on-disk snapshot behind `safeStorage` with `0600` perms.
 
 ## Layout map
 

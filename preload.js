@@ -57,9 +57,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openDevTools: (tabId) => ipcRenderer.invoke('open-tab-devtools', tabId),
 
   // -- Session / privacy -----------------------------------------------------
-  clearSessionData: () => ipcRenderer.invoke('clear-session-data'),
+  clearSessionData: (options) => ipcRenderer.invoke('clear-session-data', options),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   getBlockingStats: () => ipcRenderer.invoke('get-blocking-stats'),
+
+  // -- Sessions / logins -------------------------------------------------------
+  getLoginStates: () => ipcRenderer.invoke('get-login-states'),
+  getSessionStats: () => ipcRenderer.invoke('get-session-stats'),
+  reloginService: (serviceId) => ipcRenderer.invoke('relogin-service', serviceId),
+  clearServiceData: (serviceId) => ipcRenderer.invoke('clear-service-data', serviceId),
+  touchSession: (serviceId) => ipcRenderer.invoke('touch-session', serviceId),
+
+  // -- Local OpenAI-compatible API --------------------------------------------
+  getApiStatus: () => ipcRenderer.invoke('get-api-status'),
+  rotateApiToken: () => ipcRenderer.invoke('rotate-api-token'),
+  apiPing: () => ipcRenderer.invoke('api-ping'),
 
   // -- Updates ---------------------------------------------------------------
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
@@ -81,5 +93,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onTabBlocked: (callback) => subscribe('tab-blocked', callback),
   onTabFindResult: (callback) => subscribe('tab-find-result', callback),
   onBlockingState: (callback) => subscribe('blocking-state', callback),
+  onLoginState: (callback) => subscribe('login-state', callback),
+  onSessionState: (callback) => subscribe('session-state', callback),
+  onApiState: (callback) => subscribe('api-state', callback),
   onUpdateState: (callback) => subscribe('update-state', callback)
 });
