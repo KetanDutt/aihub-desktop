@@ -136,6 +136,7 @@ window.AiHub = window.AiHub || {};
     'filter-type',
     'filter-status',
     'filter-login',
+    'filter-access',
     'sort-services',
     'sort-direction',
     'filter-reset',

@@ -49,8 +49,32 @@ function bundledRulesPath() {
 // ---------------------------------------------------------------------------
 
 /**
- * Accept either the legacy `[name, url, type, privacy, color]` tuple or a
- * `{name, url, …}` object and return a single canonical shape.
+ * Services that answer without an account.
+ *
+ * The catalogue decides this per entry (`requiresLogin`, the 6th tuple slot).
+ * This list is the fallback for catalogues downloaded from the remote repo in
+ * the older five-field layout, so "free" sites stay usable (and are labelled as
+ * such) even before the remote data catches up.
+ */
+const KNOWN_FREE_SERVICES = new Set([
+  'perplexity',
+  'microsoftcopilot',
+  'youcom',
+  'pi',
+  'duckduckgo',
+  'phind',
+  'blackbox',
+  'lmsys'
+]);
+
+function isKnownFreeService(serviceId) {
+  return typeof serviceId === 'string' && KNOWN_FREE_SERVICES.has(serviceId.toLowerCase());
+}
+
+/**
+ * Accept either the legacy `[name, url, type, privacy, color]` tuple (optionally
+ * with a 6th `requiresLogin` flag) or a `{name, url, …}` object and return a
+ * single canonical shape.
  * @returns {object|null}
  */
 function normalizeService(raw) {
@@ -59,11 +83,12 @@ function normalizeService(raw) {
   let type;
   let privacy;
   let color;
+  let requiresLogin;
 
   if (Array.isArray(raw)) {
-    [name, url, type, privacy, color] = raw;
+    [name, url, type, privacy, color, requiresLogin] = raw;
   } else if (raw && typeof raw === 'object') {
-    ({ name, url, type, privacy, color } = raw);
+    ({ name, url, type, privacy, color, requiresLogin } = raw);
   } else {
     return null;
   }
@@ -80,13 +105,19 @@ function normalizeService(raw) {
   const cleanColor =
     typeof color === 'string' && /^[0-9a-f]{6}$/i.test(color.trim()) ? color.trim().toLowerCase() : null;
 
+  // Default: a service wants a sign-in. Only an explicit `false` (or a catalogue
+  // entry for one of the known no-account sites) marks it as free, so an
+  // unknown service never gets driven anonymously by mistake.
+  const needsLogin = requiresLogin === undefined ? !isKnownFreeService(id) : requiresLogin !== false;
+
   return {
     id,
     name: cleanName,
     url: cleanUrl,
     type: typeof type === 'string' && type.trim() ? type.trim() : 'AI Service',
     privacy: typeof privacy === 'string' ? privacy.trim() : '',
-    color: cleanColor
+    color: cleanColor,
+    requiresLogin: needsLogin
   };
 }
 
@@ -433,5 +464,7 @@ module.exports = {
   normalizeServicesPayload,
   normalizeRulesPayload,
   fetchUrl,
+  KNOWN_FREE_SERVICES,
+  isKnownFreeService,
   _resetForTests
 };

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedAt": "2026-09-14T00:00:00.000Z",
-  "comment": "Best-effort adapters that let the local OpenAI-compatible endpoint drive a logged-in session. `api` describes the service's own web endpoint (the browser's cookies are replayed onto it), `dom` is the universal fallback: type into the composer, wait for the answer node. Selectors/paths rot when a service ships a redesign — that is expected, and the DOM fallback plus a clear error message is the contract. Override this file by copying it to <userData>/data/adapters.json.",
+  "comment": "Best-effort adapters that let the local OpenAI-compatible endpoint drive a logged-in session. `api` describes the service's own web endpoint (the browser's cookies are replayed onto it), `dom` is the universal fallback: type into the composer, wait for the answer node. Selectors/paths rot when a service ships a redesign — that is expected, and the DOM fallback plus a clear error message is the contract. Override this file by copying it to <userData>/data/adapters.json. `models` lists the upstream model names a service exposes (best effort: they rotate with the service, and a stale name simply falls back to the service default); `defaultModel` is used when a request names nothing the service knows.",
   "default": {
     "strategy": "dom",
     "dom": {
@@ -15,6 +15,22 @@
   "adapters": {
     "chatgpt": {
       "strategy": "auto",
+      "label": "",
+      "defaultModel": "gpt-5",
+      "models": [
+        "gpt-5",
+        "gpt-5-mini",
+        "gpt-4o",
+        "gpt-4o-mini",
+        "gpt-4.1",
+        "o3",
+        "o4-mini"
+      ],
+      "aliases": [
+        "chatgpt",
+        "openai",
+        "auto"
+      ],
       "api": {
         "method": "POST",
         "url": "https://chatgpt.com/backend-api/conversation",
@@ -67,6 +83,19 @@
     },
     "claude": {
       "strategy": "auto",
+      "label": "",
+      "defaultModel": "claude-sonnet-4-5",
+      "models": [
+        "claude-opus-4-1",
+        "claude-sonnet-4-5",
+        "claude-sonnet-4",
+        "claude-haiku-4"
+      ],
+      "aliases": [
+        "claude",
+        "claude-ai",
+        "anthropic"
+      ],
       "api": {
         "method": "POST",
         "url": "https://claude.ai/api/organizations/{organizationId}/chat_conversations",
@@ -109,6 +138,19 @@
     },
     "gemini": {
       "strategy": "dom",
+      "label": "",
+      "defaultModel": "gemini-2.5-flash",
+      "models": [
+        "gemini-2.5-pro",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-auto"
+      ],
+      "aliases": [
+        "gemini",
+        "google",
+        "bard"
+      ],
       "dom": {
         "url": "https://gemini.google.com/app",
         "composer": "rich-textarea .ql-editor, div[contenteditable=\"true\"]",
@@ -120,6 +162,21 @@
     },
     "microsoftcopilot": {
       "strategy": "dom",
+      "label": "",
+      "defaultModel": "copilot-balanced",
+      "models": [
+        "copilot-smart",
+        "copilot-balanced",
+        "copilot-precise",
+        "think-deeper",
+        "gpt-5",
+        "gpt-4o"
+      ],
+      "aliases": [
+        "copilot",
+        "bing",
+        "microsoft"
+      ],
       "dom": {
         "url": "https://copilot.microsoft.com/",
         "composer": "div#searchbox[contenteditable=\"true\"], div[contenteditable=\"true\"]",
@@ -131,6 +188,19 @@
     },
     "perplexity": {
       "strategy": "dom",
+      "label": "",
+      "defaultModel": "sonar",
+      "models": [
+        "sonar",
+        "sonar-pro",
+        "sonar-reasoning",
+        "sonar-reasoning-pro",
+        "sonar-deep-research"
+      ],
+      "aliases": [
+        "perplexity",
+        "pplx"
+      ],
       "dom": {
         "url": "https://www.perplexity.ai/",
         "composer": "textarea[placeholder*=\"Ask\"], div[contenteditable=\"true\"]",
@@ -142,6 +212,17 @@
     },
     "deepseek": {
       "strategy": "dom",
+      "label": "",
+      "defaultModel": "deepseek-chat",
+      "models": [
+        "deepseek-chat",
+        "deepseek-reasoner",
+        "deepseek-v3",
+        "deepseek-r1"
+      ],
+      "aliases": [
+        "deepseek"
+      ],
       "dom": {
         "url": "https://chat.deepseek.com/",
         "composer": "textarea#chat-input, div[contenteditable=\"true\"]",
@@ -153,6 +234,19 @@
     },
     "grok": {
       "strategy": "dom",
+      "label": "",
+      "defaultModel": "grok-4",
+      "models": [
+        "grok-4",
+        "grok-4-fast",
+        "grok-3",
+        "grok-3-mini",
+        "grok-2"
+      ],
+      "aliases": [
+        "grok",
+        "xai"
+      ],
       "dom": {
         "url": "https://grok.com/",
         "composer": "textarea[placeholder*=\"Ask\"], div[contenteditable=\"true\"]",
@@ -164,6 +258,20 @@
     },
     "mistrallechat": {
       "strategy": "dom",
+      "label": "",
+      "defaultModel": "mistral-large",
+      "models": [
+        "mistral-large",
+        "mistral-medium",
+        "mistral-small",
+        "magistral-medium",
+        "codestral",
+        "pixtral-large"
+      ],
+      "aliases": [
+        "mistral",
+        "lechat"
+      ],
       "dom": {
         "url": "https://chat.mistral.ai/chat",
         "composer": "div[contenteditable=\"true\"], textarea[placeholder*=\"Chat\"]",
@@ -175,6 +283,19 @@
     },
     "huggingchat": {
       "strategy": "dom",
+      "label": "",
+      "defaultModel": "meta-llama/Llama-3.3-70B-Instruct",
+      "models": [
+        "meta-llama/Llama-3.3-70B-Instruct",
+        "Qwen/Qwen2.5-72B-Instruct",
+        "deepseek-ai/DeepSeek-R1",
+        "mistralai/Mistral-Nemo-Instruct-2407",
+        "google/gemma-2-27b-it"
+      ],
+      "aliases": [
+        "huggingchat",
+        "hf"
+      ],
       "dom": {
         "url": "https://huggingface.co/chat/",
         "composer": "#chattextarea, textarea[aria-label=\"Chat with HuggingChat\"]",
@@ -186,6 +307,19 @@
     },
     "poe": {
       "strategy": "dom",
+      "label": "",
+      "defaultModel": "Claude-Sonnet-4.5",
+      "models": [
+        "Claude-Sonnet-4.5",
+        "GPT-5",
+        "Gemini-2.5-Pro",
+        "Grok-4",
+        "DeepSeek-R1",
+        "Qwen3-235B"
+      ],
+      "aliases": [
+        "poe"
+      ],
       "dom": {
         "url": "https://poe.com/",
         "composer": "div[contenteditable=\"true\"], textarea[placeholder*=\"Message\"]",
@@ -197,6 +331,19 @@
     },
     "youcom": {
       "strategy": "dom",
+      "label": "",
+      "defaultModel": "you-pro",
+      "models": [
+        "you-pro",
+        "research",
+        "gpt-4o",
+        "claude-sonnet-4-5",
+        "gemini-2.5-pro"
+      ],
+      "aliases": [
+        "you",
+        "youcom"
+      ],
       "dom": {
         "url": "https://you.com/chat",
         "composer": "textarea[placeholder*=\"Ask\"], div[contenteditable=\"true\"]",
@@ -207,19 +354,73 @@
       }
     },
     "coherechat": {
-      "strategy": "dom"
+      "strategy": "dom",
+      "label": "",
+      "defaultModel": "command-a",
+      "models": [
+        "command-a",
+        "command-r-plus",
+        "command-r"
+      ],
+      "aliases": [
+        "cohere"
+      ]
     },
     "metaai": {
-      "strategy": "dom"
+      "strategy": "dom",
+      "label": "",
+      "defaultModel": "llama-4-maverick",
+      "models": [
+        "llama-4-maverick",
+        "llama-4-scout",
+        "llama-3.3-70b"
+      ],
+      "aliases": [
+        "meta",
+        "metaai"
+      ]
     },
     "pi": {
-      "strategy": "dom"
+      "strategy": "dom",
+      "label": "",
+      "defaultModel": "pi-3.1",
+      "models": [
+        "pi-3.1",
+        "pi-3",
+        "pi-2"
+      ],
+      "aliases": [
+        "pi"
+      ]
     },
     "qwenchat": {
-      "strategy": "dom"
+      "strategy": "dom",
+      "label": "",
+      "defaultModel": "qwen3-max",
+      "models": [
+        "qwen3-max",
+        "qwen3-235b-a22b",
+        "qwen-plus",
+        "qwen-turbo",
+        "qwen-vl-max"
+      ],
+      "aliases": [
+        "qwen"
+      ]
     },
     "kimi": {
-      "strategy": "dom"
+      "strategy": "dom",
+      "label": "",
+      "defaultModel": "kimi-k2",
+      "models": [
+        "kimi-k2",
+        "kimi-k1.5",
+        "moonshot-v1-128k"
+      ],
+      "aliases": [
+        "kimi",
+        "moonshot"
+      ]
     }
   }
 }

@@ -53,8 +53,9 @@ const DEFAULTS = {
   antiBotHumanize: true,
   antiBotCanvasNoise: false,
   // -- Local OpenAI-compatible API (the token is generated in main, never
-  //    written by the renderer).
-  apiEnabled: false,
+  //    written by the renderer). On by default: the endpoint is loopback-only,
+  //    bearer-keyed and generated on first run, so there is nothing to set up.
+  apiEnabled: true,
   apiPort: API.DEFAULT_PORT,
   apiToken: '',
   apiExposeAllServices: true,
@@ -109,7 +110,7 @@ const schema = {
   antiBotHardening: { type: 'boolean', default: DEFAULTS.antiBotHardening },
   antiBotHumanize: { type: 'boolean', default: DEFAULTS.antiBotHumanize },
   antiBotCanvasNoise: { type: 'boolean', default: DEFAULTS.antiBotCanvasNoise },
-  apiEnabled: { type: 'boolean', default: DEFAULTS.apiEnabled },
+  apiEnabled: { type: 'boolean', default: true },
   apiPort: { type: 'number', minimum: API.MIN_PORT, maximum: API.MAX_PORT, default: DEFAULTS.apiPort },
   apiToken: { type: 'string', default: '' },
   apiExposeAllServices: { type: 'boolean', default: DEFAULTS.apiExposeAllServices },
@@ -238,6 +239,46 @@ function createStore() {
 }
 
 const store = createStore();
+
+// ---------------------------------------------------------------------------
+// API key
+// ---------------------------------------------------------------------------
+
+/**
+ * There is always a key.
+ *
+ * Nothing else can mint one safely (the renderer must never write it), so the
+ * first read of the config generates a random token and persists it. A key that
+ * came from an earlier build and is too short to be random is replaced too.
+ *
+ * @returns {string} the current key
+ */
+function ensureApiToken() {
+  const current = store.get('apiToken', '');
+  if (typeof current === 'string' && current.length >= 24) return current;
+  try {
+    // Required lazily: `api/server` is electron-free but sits below this module.
+    // eslint-disable-next-line global-require
+    const created = require('./api/server').generateToken();
+    store.set('apiToken', created);
+    log.info('Generated a new key for the local API');
+    return created;
+  } catch (error) {
+    log.error('Unable to generate a local API key:', error.message);
+    return '';
+  }
+}
+
+/** Replace the key with a fresh random one. */
+function rotateApiToken() {
+  // eslint-disable-next-line global-require
+  const created = require('./api/server').generateToken();
+  store.set('apiToken', created);
+  return created;
+}
+
+// Mint a key before anything (the API server included) can read the config.
+ensureApiToken();
 
 // ---------------------------------------------------------------------------
 // Accessors
@@ -457,6 +498,8 @@ module.exports = {
   DEFAULTS,
   schema,
   WRITABLE_KEYS,
+  ensureApiToken,
+  rotateApiToken,
   getConfig,
   getPublicConfig,
   getConfigItem,

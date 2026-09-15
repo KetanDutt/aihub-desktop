@@ -38,6 +38,14 @@ const sessionStore = require('./src/sessionstore');
 const loginMonitor = require('./src/logins');
 const stealth = require('./src/stealth');
 const localApi = require('./src/api');
+const headless = require('./src/headless');
+
+/**
+ * `--headless` / `--api-only` / `AIHUB_HEADLESS=1` runs the local API server
+ * without the desktop shell: no window, no tray, no updater — just the endpoint.
+ */
+const HEADLESS = headless.isHeadless();
+const HEADLESS_OPTIONS = HEADLESS ? headless.options() : { port: null, printKey: false, quiet: false };
 
 // Blink flags for the anti-bot hardening have to exist before any renderer is
 // created, so this runs at require time — not from inside `bootstrap()`.
@@ -141,7 +149,9 @@ app.on('web-contents-created', (event, contents) => {
 // ---------------------------------------------------------------------------
 
 async function bootstrap() {
-  log.info(`Starting ${app.getName()} ${app.getVersion()} (packaged: ${app.isPackaged})`);
+  log.info(
+    `Starting ${app.getName()} ${app.getVersion()} (packaged: ${app.isPackaged}${HEADLESS ? ', headless API server' : ''})`
+  );
 
   ipcManager.setupIpcHandlers();
 
@@ -170,14 +180,23 @@ async function bootstrap() {
       const win = windowManager.getMainWindow();
       if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
     },
-    onRelogin: (request) => windowManager.reloginService(request)
+    onRelogin: (request) => (HEADLESS ? null : windowManager.reloginService(request))
   });
 
-  windowManager.createMainWindow();
-  windowManager.setupTray();
-  const shortcut = windowManager.setupGlobalShortcuts();
-  if (shortcut && !shortcut.ok) {
-    log.warn(`Global shortcut unavailable (${shortcut.error})`);
+  if (HEADLESS) {
+    // No Dock icon on macOS: this process is a server, not an app window.
+    try {
+      if (process.platform === 'darwin' && app.dock && typeof app.dock.hide === 'function') app.dock.hide();
+    } catch (error) {
+      log.debug(`Unable to hide the dock icon: ${error.message}`);
+    }
+  } else {
+    windowManager.createMainWindow();
+    windowManager.setupTray();
+    const shortcut = windowManager.setupGlobalShortcuts();
+    if (shortcut && !shortcut.ok) {
+      log.warn(`Global shortcut unavailable (${shortcut.error})`);
+    }
   }
 
   const mainWindow = windowManager.getMainWindow();
@@ -208,22 +227,74 @@ async function bootstrap() {
   // very first paint of the service list can already show "signed in".
   loginMonitor.primeFromCache((services.ai_services || []).slice(0, 40)).catch(() => {});
 
+  // Register the IPC surface and load the adapters in both modes; headless then
+  // forces the server up (the shell is not there to toggle it).
   await localApi.setup({ send: sendToShell });
-  if (configStore.getConfigItem('apiEnabled', false)) {
-    log.info('Local OpenAI-compatible API is enabled');
-  }
 
-  updaterManager.setupAutoUpdater();
+  if (HEADLESS) {
+    if (configStore.getConfigItem('apiEnabled', true) !== true) {
+      configStore.updateConfigItem('apiEnabled', true);
+    }
+    if (Number.isFinite(HEADLESS_OPTIONS.port) && HEADLESS_OPTIONS.port > 0) {
+      configStore.updateConfigItem('apiPort', Math.round(HEADLESS_OPTIONS.port));
+    }
+    const started = await localApi.start({ force: true, restart: true });
+    const status = localApi.describe();
+    // `console` so it lands on the terminal that launched us, not only the log.
+    if (!HEADLESS_OPTIONS.quiet) {
+      console.log(headless.banner(status, {
+        printKey: HEADLESS_OPTIONS.printKey,
+        version: app.getVersion()
+      }));
+    }
+    if (!started || started.ok === false) {
+      log.error(`Headless API server failed to start: ${(started && started.error) || 'unknown error'}`);
+      app.quit(1);
+      return;
+    }
+    log.info(`Headless API server ready on ${status.baseUrl}`);
+  } else {
+    if (configStore.getConfigItem('apiEnabled', true)) {
+      log.info('Local OpenAI-compatible API is enabled');
+    }
+    updaterManager.setupAutoUpdater();
+  }
 
   // A deep link may have launched the app.
   const initialLink = extractDeepLink(process.argv);
   if (initialLink) handleDeepLinkUrl(initialLink);
 }
 
+// A headless server is stopped the way any terminal process is: Ctrl+C.
+if (HEADLESS) {
+  const shutdown = (signal) => {
+    log.info(`Received ${signal}, stopping the headless API server`);
+    localApi
+      .stop()
+      .catch(() => {})
+      .finally(() => app.quit(0));
+  };
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+}
+
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
   log.info('Another instance is already running, exiting');
+  if (HEADLESS && !HEADLESS_OPTIONS.quiet) {
+    // The desktop app already serves the same endpoint on the same port, so
+    // this is the expected outcome, not a failure — say so instead of exiting
+    // silently and leaving the operator staring at a dead console.
+    console.log(
+      [
+        '',
+        '[aihub] AI Hub Desktop is already running, and its window owns the API server.',
+        '        Use that one, or close the app and re-run this script.',
+        ''
+      ].join('\n')
+    );
+  }
   app.quit();
 } else {
   app.on('second-instance', (event, commandLine) => {
@@ -248,7 +319,9 @@ if (!gotTheLock) {
   });
 
   app.on('activate', () => {
-    // macOS: reopening from the Dock must always give you a window.
+    // macOS: reopening from the Dock must always give you a window. Headless
+    // has no window by design, so there is nothing to restore.
+    if (HEADLESS) return;
     if (webContents.getAllWebContents().length === 0) {
       windowManager.createMainWindow();
     } else {
@@ -257,6 +330,8 @@ if (!gotTheLock) {
   });
 
   app.on('window-all-closed', () => {
+    // Headless never opened a window; quitting here would end the server.
+    if (HEADLESS) return;
     if (process.platform !== 'darwin') app.quit();
   });
 

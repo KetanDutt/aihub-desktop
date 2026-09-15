@@ -51,10 +51,17 @@ your machine.
   client hints are normalised from a stable fingerprint profile, challenges are
   waited out instead of farmed, and typed input keeps a human cadence.
 - **Local OpenAI-compatible API** - `POST /v1/chat/completions` on loopback,
-  answered through your logged-in sessions (streaming included), bearer-keyed
-  and rate limited.
-- **Filterable catalogue** - the Services tab filters by type, enabled state and
-  sign-in state, and sorts by name, type, recency or cached cookies.
+  **on by default** with a key generated on first launch, answered through your
+  logged-in sessions (streaming included), bearer-keyed and rate limited. It
+  publishes every model each service exposes, splits answers into
+  reasoning/code/links/text, and can run **headless** with no window at all.
+- **Free services, kept apart** - the catalogue knows which sites answer without
+  an account (Perplexity, Copilot, You.com, Pi…); they are marked *No sign-in*,
+  filterable on their own, and callable through the API before you log into
+  anything.
+- **Filterable catalogue** - the Services tab filters by type, enabled state,
+  sign-in state and *access* (no sign-in vs sign-in required), and sorts by name,
+  type, recency, cached cookies or "free first".
 - **System integration** - tray with open-tab menu, global show/hide shortcut,
   launch-at-login, `aihub://` deep links, auto-update.
 - **Polished shell** - Liquid Glass dark/light themes, sidebar search, toasts,
@@ -76,8 +83,10 @@ read the log.
 | Script | Action |
 |--------|--------|
 | **`RUN.bat`** (repo root) | **All-in-one**: deps + launch |
+| **`RUN-SERVER.bat`** (repo root) | **API only**: deps + start the local API server, no window |
 | `scripts/windows/Setup.bat` | Install Node.js + dependencies only |
 | `scripts/windows/Run.bat` | Launch (installs deps if needed) |
+| `scripts/windows/RunServer.bat` | Start the API server only (headless); `RunServer.bat --port 8081` |
 | `scripts/windows/Build.bat` | Lint, test and build the installer into `dist\` |
 | `scripts/windows/Test.bat` | Run lint + tests |
 | `scripts/windows/Dev.bat` | Live-reload development loop |
@@ -89,6 +98,7 @@ See [scripts/windows/README.md](scripts/windows/README.md).
 
 ```bash
 npm run one-click     # check/install deps, then launch
+npm run serve         # API server only, no window (-- --port 8081 to choose one)
 # or manually:
 npm install
 npm start

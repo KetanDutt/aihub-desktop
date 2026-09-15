@@ -30,19 +30,17 @@ let setupDone = false;
 // Key management
 // ---------------------------------------------------------------------------
 
-/** The token is main-process owned: generated, rotated and read here only. */
+/**
+ * The token is main-process owned: generated, rotated and read here only.
+ * A key exists from the very first launch — `config` mints one on load and this
+ * re-checks it, so an old or hand-edited config still ends up with a real key.
+ */
 function ensureToken() {
-  const current = configStore.getConfigItem('apiToken', '');
-  if (typeof current === 'string' && current.length >= 24) return current;
-  const created = serverFactory.generateToken();
-  configStore.updateConfigItem('apiToken', created);
-  log.info('Generated a new key for the local API');
-  return created;
+  return configStore.ensureApiToken();
 }
 
 function rotateToken() {
-  const created = serverFactory.generateToken();
-  configStore.updateConfigItem('apiToken', created);
+  const created = configStore.rotateApiToken();
   log.info('Rotated the local API key');
   return created;
 }
@@ -88,9 +86,9 @@ function clampPort(value) {
  * Start listening. On `EADDRINUSE` we walk a handful of ports forward so a
  * developer with something already on 8788 still gets a working endpoint.
  */
-async function start({ restart = false } = {}) {
+async function start({ restart = false, force = false } = {}) {
   const settings = currentSettings();
-  if (!settings.enabled) {
+  if (!settings.enabled && !force) {
     await stop();
     return { ok: false, error: 'disabled' };
   }
@@ -181,6 +179,9 @@ function describe() {
   const token = configStore.getConfigItem('apiToken', '');
   const listing = instance ? instance.server.stats() : null;
   const catalogue = ((dataStore.getServicesCache() || {}).ai_services) || [];
+  const models = engine.models();
+  const freeModels = models.filter((model) => model.aihub && model.aihub.requiresLogin === false);
+  const readyModels = models.filter((model) => model.aihub && model.aihub.ready);
 
   return {
     enabled: settings.enabled,
@@ -190,13 +191,22 @@ function describe() {
     baseUrl: instance ? instance.url : `http://${settings.host}:${settings.port}/v1`,
     key: token || '',
     keyMasked: maskToken(token),
-    models: engine.models().map((model) => ({
+    models: models.map((model) => ({
       id: model.id,
+      owned_by: model.owned_by,
+      description: model.description,
       login: model.aihub ? model.aihub.login : 'unknown',
-      strategy: model.aihub ? model.aihub.strategy : 'dom'
+      strategy: model.aihub ? model.aihub.strategy : 'dom',
+      requiresLogin: model.aihub ? model.aihub.requiresLogin !== false : true,
+      ready: model.aihub ? model.aihub.ready === true : false,
+      service: model.aihub ? model.aihub.service : null,
+      upstreamModel: model.aihub ? model.aihub.upstreamModel : null
     })),
-    modelCount: engine.models().length,
+    modelCount: models.length,
+    readyModelCount: readyModels.length,
+    freeModelCount: freeModels.length,
     exposedServiceCount: engine.exposedServices().length,
+    freeServiceCount: engine.exposedServices().filter((service) => service.requiresLogin === false).length,
     exposeAll: config.apiExposeAllServices !== false,
     catalogueCount: catalogue.length,
     ready: (() => {

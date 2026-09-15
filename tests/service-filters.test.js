@@ -128,12 +128,18 @@ describe('applyServiceFilters — sorting', () => {
 
 describe('filter normalisation', () => {
   it('rejects unknown values instead of trusting the DOM', () => {
-    const filters = utils.normalizeServiceFilters({ sort: 'rm -rf', login: 'wat', direction: 'sideways' });
+    const filters = utils.normalizeServiceFilters({
+      sort: 'rm -rf',
+      login: 'wat',
+      access: 'free-for-all',
+      direction: 'sideways'
+    });
     expect(filters).toEqual({
       query: '',
       type: 'all',
       status: 'all',
       login: 'all',
+      access: 'all',
       sort: 'name',
       direction: 'asc'
     });

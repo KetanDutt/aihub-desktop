@@ -12,7 +12,7 @@ domain allow-list in front of every network request.
 | [Configuration](configuration.md) | Every setting, its default and its effect; where state is stored. |
 | [Security model](security.md) | What the domain filter does and does not do, permission policy, hardening. |
 | [Sessions & anti-bot](sessions.md) | Login detection, cookie caching, re-login on open, fingerprint hardening. |
-| [Local API](local-api.md) | The OpenAI-compatible endpoint on loopback: endpoints, keys, limits, adapters. |
+| [Local API](local-api.md) | The OpenAI-compatible endpoint on loopback: endpoints, keys, models, content types, headless mode, adapters. |
 | [Keyboard shortcuts](keyboard-shortcuts.md) | The full reference shown by the `?` dialog. |
 | [Development](development.md) | Setup, scripts, tests, benchmarks, linting, icon regeneration. |
 | [Packaging](packaging.md) | electron-builder targets, auto-update, deep links, one-click Windows scripts. |

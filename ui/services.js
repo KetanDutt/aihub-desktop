@@ -56,6 +56,19 @@ window.AiHub = window.AiHub || {};
     return dot;
   }
 
+  /**
+   * "No sign-in" chip for services the catalogue marks as usable without an
+   * account — the quickest way to spot what the local API can drive right now.
+   */
+  function freeChip(service) {
+    if (!service || window.AiHubUtils.requiresLogin(service)) return null;
+    const chip = document.createElement('span');
+    chip.className = 'free-chip';
+    chip.textContent = 'No sign-in';
+    chip.title = `${service.name} answers without an account, so the local API can call it straight away.`;
+    return chip;
+  }
+
   function openService(service) {
     app.createTab({ serviceId: service.id, url: service.url, title: service.name });
     if (app.elements.sidebar) app.elements.sidebar.classList.add('hidden');
@@ -138,6 +151,8 @@ window.AiHub = window.AiHub || {};
       header.appendChild(heading);
 
       header.appendChild(loginDot(service.id));
+      const sidebarChip = freeChip(service);
+      if (sidebarChip) header.appendChild(sidebarChip);
 
       if (openIds.has(service.id)) {
         const dot = document.createElement('span');
@@ -224,6 +239,7 @@ window.AiHub = window.AiHub || {};
       type: el.filterType ? el.filterType.value : 'all',
       status: el.filterStatus ? el.filterStatus.value : 'all',
       login: el.filterLogin ? el.filterLogin.value : 'all',
+      access: el.filterAccess ? el.filterAccess.value : 'all',
       sort: el.sortServices ? el.sortServices.value : 'name',
       direction: app.state.serviceFilters.direction || 'asc'
     });
@@ -237,6 +253,7 @@ window.AiHub = window.AiHub || {};
     if (el.filterType) el.filterType.value = filters.type || 'all';
     if (el.filterStatus) el.filterStatus.value = filters.status || 'all';
     if (el.filterLogin) el.filterLogin.value = filters.login || 'all';
+    if (el.filterAccess) el.filterAccess.value = filters.access || 'all';
     if (el.sortServices) el.sortServices.value = filters.sort || 'name';
     if (el.sortDirection) {
       const descending = filters.direction === 'desc';
@@ -283,13 +300,18 @@ window.AiHub = window.AiHub || {};
       el.filterLogin.options[2].disabled = counts.loggedOut === 0;
       el.filterLogin.options[4].disabled = counts.unknown === 0;
     }
+    if (el.filterAccess) {
+      el.filterAccess.options[1].disabled = counts.free === 0;
+      el.filterAccess.options[2].disabled = counts.signin === 0;
+    }
     if (el.filterReset) {
       const searching = Boolean(el.allServicesSearch && el.allServicesSearch.value.trim());
       el.filterReset.disabled =
         !searching &&
         (!el.filterType || el.filterType.value === 'all') &&
         (!el.filterStatus || el.filterStatus.value === 'all') &&
-        (!el.filterLogin || el.filterLogin.value === 'all');
+        (!el.filterLogin || el.filterLogin.value === 'all') &&
+        (!el.filterAccess || el.filterAccess.value === 'all');
     }
   }
 
@@ -311,7 +333,7 @@ window.AiHub = window.AiHub || {};
     const debounced = window.AiHubUtils.debounce(apply, 120);
 
     if (el.allServicesSearch) el.allServicesSearch.addEventListener('input', debounced);
-    for (const node of [el.filterType, el.filterStatus, el.filterLogin, el.sortServices]) {
+    for (const node of [el.filterType, el.filterStatus, el.filterLogin, el.filterAccess, el.sortServices]) {
       if (node) node.addEventListener('change', apply);
     }
     if (el.sortDirection) {
@@ -325,7 +347,15 @@ window.AiHub = window.AiHub || {};
     }
     if (el.filterReset) {
       el.filterReset.addEventListener('click', () => {
-        app.state.serviceFilters = { query: '', type: 'all', status: 'all', login: 'all', sort: 'name', direction: 'asc' };
+        app.state.serviceFilters = {
+          query: '',
+          type: 'all',
+          status: 'all',
+          login: 'all',
+          access: 'all',
+          sort: 'name',
+          direction: 'asc'
+        };
         if (el.allServicesSearch) el.allServicesSearch.value = '';
         app.saveServiceFilters(app.state.serviceFilters);
         syncFilterInputsFromState();
@@ -417,10 +447,16 @@ window.AiHub = window.AiHub || {};
     name.className = 'service-item-name';
     name.textContent = service.name;
     name.appendChild(loginDot(service.id));
+    const chip = freeChip(service);
+    if (chip) name.appendChild(chip);
 
     const meta = document.createElement('p');
     meta.className = 'service-item-type';
-    const bits = [service.type || 'AI Service', LOGIN_LABELS[record.state] || 'Not checked'];
+    const needsLogin = window.AiHubUtils.requiresLogin(service);
+    const bits = [
+      service.type || 'AI Service',
+      needsLogin ? LOGIN_LABELS[record.state] || 'Not checked' : 'No sign-in needed'
+    ];
     if (cookieCount) bits.push(`${cookieCount} cached cookie${cookieCount === 1 ? '' : 's'}`);
     if (record.expiresAt) bits.push(`token until ${utils.relativeTime(new Date(record.expiresAt).toISOString())}`);
     meta.textContent = bits.join(' · ');
@@ -431,7 +467,7 @@ window.AiHub = window.AiHub || {};
     const actions = document.createElement('div');
     actions.className = 'service-item-actions';
 
-    if (record.state !== 'logged-in') {
+    if (needsLogin && record.state !== 'logged-in') {
       const signIn = document.createElement('button');
       signIn.type = 'button';
       signIn.className = 'btn btn-secondary btn-small';

@@ -12,6 +12,7 @@
 npm run one-click  # check/install deps, then launch (any OS)
 npm install        # or run scripts/windows/Setup.bat on Windows
 npm start          # launch
+npm run serve      # API server only, no window (headless)
 npm run dev        # auto-restart on changes (nodemon)
 npm run doctor     # diagnose this environment
 ```
@@ -22,6 +23,7 @@ npm run doctor     # diagnose this environment
 |---------|---------|
 | `npm run one-click` | Check Node, install deps + Electron if needed, then launch. |
 | `npm start` | Run the app (hot reload of the renderer). |
+| `npm run serve` | Start the local API server headless (`-- --port 8081` to choose a port). |
 | `npm run dev` | Restart the whole app on any source change. |
 | `npm test` | Jest suite (unit + integration smoke). |
 | `npm run test:watch` | Jest watch mode. |
@@ -59,6 +61,7 @@ data/              bundled offline catalogue + rules
 build/             generated icons + vector source
 scripts/           doctor/clean/icons/one-click-run + Windows helpers
 RUN.bat / RUN.ps1  root one-click launcher (Windows)
+RUN-SERVER.bat     root headless API-server launcher (Windows)
 ui/findbar.js      find-in-page UI (Ctrl+F)
 tests/             Jest suites
 benchmarks/        performance micro-benchmarks

@@ -51,7 +51,8 @@ window.AiHub = window.AiHub || {};
       const bits = [
         status.listening ? `Listening on ${status.baseUrl}` : 'Stopped',
         `${status.modelCount || 0} model(s)`,
-        `${status.ready || 0} signed in`,
+        `${status.readyModelCount || 0} callable`,
+        `${status.freeModelCount || 0} free`,
         `${counters.requests || 0} request(s)`,
         `${(status.queue && status.queue.active) || 0} running`
       ];
@@ -82,7 +83,8 @@ window.AiHub = window.AiHub || {};
     const el = app.elements.apiCurlExample;
     if (!el) return;
     const base = status.baseUrl || currentBaseUrl || 'http://127.0.0.1:8788/v1';
-    const model = (status.models && status.models[0] && status.models[0].id) || 'aihub/chatgpt';
+    const first = (status.models || []).find((entry) => entry.ready !== false) || (status.models || [])[0];
+    const model = (first && first.id) || 'aihub/chatgpt';
     el.textContent = [
       `curl ${base}/chat/completions \\`,
       '  -H "Authorization: Bearer <key>" \\',
@@ -114,17 +116,36 @@ window.AiHub = window.AiHub || {};
       const id = document.createElement('code');
       id.className = 'api-model-id';
       id.textContent = model.id;
+      if (model.description) {
+        id.title = model.description;
+        row.title = model.description;
+      }
 
       const badge = document.createElement('span');
       badge.className = `login-chip login-${model.login || 'unknown'}`;
-      badge.textContent =
-        model.login === 'logged-in' ? 'ready' : model.login === 'challenge' ? 'verifying' : model.login === 'logged-out' ? 'sign in' : 'unknown';
+      badge.textContent = model.requiresLogin === false
+        ? 'free'
+        : model.login === 'logged-in'
+          ? 'ready'
+          : model.login === 'challenge'
+            ? 'verifying'
+            : model.login === 'logged-out'
+              ? 'sign in'
+              : 'unknown';
 
       const strategy = document.createElement('span');
       strategy.className = 'api-model-strategy';
-      strategy.textContent = model.strategy === 'api' ? 'direct API' : 'browser driver';
+      strategy.textContent = model.strategy === 'api' ? 'direct API' : model.strategy === 'auto' ? 'direct + browser' : 'browser driver';
 
       row.append(id, badge, strategy);
+
+      if (model.description) {
+        const description = document.createElement('span');
+        description.className = 'api-model-description';
+        description.textContent = model.description;
+        row.appendChild(description);
+      }
+
       list.appendChild(row);
     }
   };

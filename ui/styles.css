@@ -2121,6 +2121,20 @@ body:not(.light-mode) .toggle-slider::before {
   white-space: nowrap;
 }
 
+/* "No sign-in" marker: this service answers without an account. */
+.free-chip {
+  margin-left: 6px;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+  color: var(--accent, var(--ok));
+  background: color-mix(in srgb, var(--accent, var(--ok)) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, var(--ok)) 34%, transparent);
+}
+
 .service-item-actions,
 .session-actions {
   display: flex;
@@ -2236,10 +2250,19 @@ body.light-mode .code-block {
 .api-model-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--sp-2);
   padding: 6px 10px;
   border-radius: var(--r-sm);
   border: 1px solid transparent;
+}
+
+/* The human sentence behind a model id: service · model · how · session. */
+.api-model-description {
+  flex: 1 0 100%;
+  font-size: var(--fs-meta);
+  color: var(--text-3);
+  line-height: 1.35;
 }
 
 .api-model-row:hover {

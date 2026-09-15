@@ -99,6 +99,18 @@ function isExposed(serviceId) {
   return exposedServices().some((service) => service.id === serviceId);
 }
 
+/**
+ * Does this service need a signed-in session before it can answer?
+ *
+ * Services flagged `requiresLogin: false` in the catalogue (Perplexity,
+ * Copilot, …) answer anonymously, so the engine must not refuse them just
+ * because no session cookie exists.
+ */
+function serviceRequiresLogin(serviceId) {
+  const service = serviceById(serviceId);
+  return service ? service.requiresLogin !== false : true;
+}
+
 // ---------------------------------------------------------------------------
 // Host allow-list (never leak a session cookie to an unrelated domain)
 // ---------------------------------------------------------------------------
@@ -427,12 +439,15 @@ async function runApiStrategy({ serviceId, adapter, request, onDelta, signal, en
   }
 
   const material = await gatherSessionMaterial(serviceId, adapter, entry);
-  if (!material.cookies.length) {
+  if (!material.cookies.length && serviceRequiresLogin(serviceId)) {
     throw new EngineError(`${serviceId} has no cookies to reuse`, {
       status: 401,
       openaiError: openai.ERRORS.serviceUnavailable(`${serviceId} is not signed in — open the tab and sign in once.`),
       code: 'no-session'
     });
+  }
+  if (!material.cookies.length) {
+    log.debug(`${serviceId} has no session cookies; calling it anonymously (no sign-in required)`);
   }
 
   const flat = template.flattenMessages(request.messages, { includeHistory: request.includeHistory !== false });
@@ -554,7 +569,8 @@ async function runDomStrategy({ serviceId, adapter, request, onDelta, signal }) 
 
   const contents = entry.win.webContents;
   const state = loginMonitor.get(serviceId);
-  if (state && state.state === loginMonitor.STATE.LOGGED_OUT) {
+  const needsLogin = serviceRequiresLogin(serviceId);
+  if (state && state.state === loginMonitor.STATE.LOGGED_OUT && needsLogin) {
     throw new EngineError(`${serviceId} is not signed in — open the tab and sign in once.`, {
       status: 401,
       code: 'not-signed-in',
@@ -650,37 +666,156 @@ async function runDomStrategy({ serviceId, adapter, request, onDelta, signal }) 
 // Public API
 // ---------------------------------------------------------------------------
 
-function modelEntry(service, adapter, loginState) {
+// ---------------------------------------------------------------------------
+// Model catalogue
+// ---------------------------------------------------------------------------
+
+/** Stable `created` for catalogue entries (the list is data, not a snapshot). */
+const MODEL_CATALOGUE_CREATED = 1700000000;
+
+/** Who actually runs the model behind a service id. */
+const VENDOR_BY_SERVICE = {
+  chatgpt: 'openai',
+  claude: 'anthropic',
+  gemini: 'google',
+  microsoftcopilot: 'microsoft',
+  copilot: 'microsoft',
+  perplexity: 'perplexity',
+  deepseek: 'deepseek',
+  grok: 'xai',
+  mistrallechat: 'mistral',
+  mistral: 'mistral',
+  huggingchat: 'huggingface',
+  poe: 'quora',
+  youcom: 'you',
+  coherechat: 'cohere',
+  metaai: 'meta',
+  pi: 'inflection',
+  qwenchat: 'alibaba',
+  kimi: 'moonshot'
+};
+
+/** `https://chat.deepseek.com/` -> `deepseek`. */
+function vendorFromUrl(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    const parts = host.split('.');
+    return parts.length > 1 ? parts[parts.length - 2] : host;
+  } catch (e) {
+    return 'aihub';
+  }
+}
+
+function vendorFor(service) {
+  return VENDOR_BY_SERVICE[service.id] || vendorFromUrl(service.url || '');
+}
+
+function loginLabel(state, requiresLogin) {
+  if (!requiresLogin) return 'no sign-in needed';
+  if (!state) return 'session unknown';
+  return state.state === loginMonitor.STATE.LOGGED_IN
+    ? 'signed in'
+    : state.state === loginMonitor.STATE.CHALLENGE
+      ? 'verifying'
+      : state.state === loginMonitor.STATE.LOGGED_OUT
+        ? 'sign in required'
+        : 'session unknown';
+}
+
+function strategyLabel(adapter) {
+  const strategy = adapter ? adapter.strategy : 'dom';
+  if (strategy === 'api') return 'direct API';
+  if (strategy === 'auto') return 'direct API with browser fallback';
+  return 'browser driver';
+}
+
+/**
+ * One catalogue entry.
+ *
+ * @param {object} service
+ * @param {object|null} adapter
+ * @param {object|null} loginState
+ * @param {{upstreamModel?: string, base?: boolean}} [options]
+ */
+function modelEntry(service, adapter, loginState, options = {}) {
+  const upstreamModel = options.upstreamModel || (adapter && adapter.defaultModel) || 'default';
+  const base = options.base !== false;
+  const id = base ? openai.modelIdFor(service.id) : `${openai.modelIdFor(service.id)}:${upstreamModel}`;
+  const strategy = adapter ? adapter.strategy : 'dom';
+  const requiresLogin = service.requiresLogin !== false;
+  const state = loginState ? loginState.state : 'unknown';
+  const models = adapter && adapter.models && adapter.models.length ? adapter.models : ['default'];
+  const knownModels = models.filter((name) => name && name !== 'default');
+
+  // `ChatGPT (default: gpt-5) · direct API · sign in required`
+  const subject = base ? `${service.name} (default: ${upstreamModel})` : `${service.name} — ${upstreamModel}`;
+  const description = `${subject} · ${strategyLabel(adapter)} · ${
+    requiresLogin ? loginLabel(loginState, true) : 'free, no sign-in needed'
+  }`;
+
   return {
-    id: openai.modelIdFor(service.id),
+    id,
     object: 'model',
-    created: 0,
-    owned_by: `aihub-desktop/${adapter ? adapter.strategy : 'dom'}`,
+    created: MODEL_CATALOGUE_CREATED,
+    owned_by: vendorFor(service),
+    description,
     // Extensions that OpenAI SDKs ignore but `curl` users find useful.
     aihub: {
       service: service.id,
-      name: service.name,
+      serviceName: service.name,
       url: service.url,
       type: service.type || 'AI Service',
-      strategy: adapter ? adapter.strategy : 'dom',
+      vendor: vendorFor(service),
+      strategy,
       hasApiAdapter: Boolean(adapter && adapter.api),
-      models: adapter ? adapter.models : ['default'],
-      login: loginState ? loginState.state : 'unknown',
+      upstreamModel,
+      models: knownModels.length > 0 ? knownModels : ['default'],
+      aliases: (adapter && adapter.aliases) || [],
+      requiresLogin,
+      signInRequired: requiresLogin,
+      ready: !requiresLogin || state === loginMonitor.STATE.LOGGED_IN,
+      login: state,
       expiresAt: loginState ? loginState.expiresAt : null
     }
   };
 }
 
+/**
+ * Every model this endpoint can serve.
+ *
+ * One entry per service (`aihub/<service>`) plus one per upstream model the
+ * service exposes (`aihub/<service>:<model>`), free services included — a
+ * service that needs no sign-in is listed before you ever log into anything.
+ */
 function models() {
-  return exposedServices().map((service) =>
-    modelEntry(service, adapterFor(service.id), loginMonitor.get(service.id))
-  );
+  const entries = [];
+
+  for (const service of exposedServices()) {
+    const adapter = adapterFor(service.id);
+    const loginState = loginMonitor.get(service.id);
+    entries.push(modelEntry(service, adapter, loginState, { base: true }));
+
+    const models_ = adapter && adapter.models && adapter.models.length ? adapter.models : ['default'];
+    const seen = new Set([openai.modelIdFor(service.id)]);
+    for (const upstreamModel of models_) {
+      if (!upstreamModel || upstreamModel === 'default') continue;
+      const entry = modelEntry(service, adapter, loginState, { upstreamModel, base: false });
+      if (seen.has(entry.id)) continue;
+      seen.add(entry.id);
+      entries.push(entry);
+    }
+  }
+
+  // Publish the ids so a bare upstream name (`gpt-5`) routes to its service.
+  openai.registerModelIds(entries);
+  return entries;
 }
 
 function sessions() {
   const out = {};
   for (const service of exposedServices()) {
     const state = loginMonitor.get(service.id) || { state: 'unknown' };
+    const requiresLogin = service.requiresLogin !== false;
     out[service.id] = {
       name: service.name,
       state: state.state,
@@ -688,6 +823,10 @@ function sessions() {
       expiresAt: state.expiresAt || null,
       lastCheckedAt: state.lastCheckedAt || null,
       hasSnapshot: state.hasSnapshot === true,
+      requiresLogin,
+      // A free service is usable the moment it is exposed; everything else is
+      // only "ready" once its session is live.
+      ready: !requiresLogin || state.state === loginMonitor.STATE.LOGGED_IN,
       adapter: (() => {
         const adapter = adapterFor(service.id);
         return adapter ? { strategy: adapter.strategy, api: Boolean(adapter.api) } : null;
@@ -837,7 +976,9 @@ module.exports = {
   adapterFor,
   exposedServices,
   isExposed,
+  serviceRequiresLogin,
   models,
+  modelEntry,
   sessions,
   complete,
   status,
@@ -847,6 +988,7 @@ module.exports = {
   assertAllowedHost,
   resolveModel,
   originOf,
+  vendorFor,
   // exposed for tests
   _hiddenWindows: hiddenWindows,
   HIDDEN_IDLE_MS
