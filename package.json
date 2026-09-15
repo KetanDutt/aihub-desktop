@@ -1,8 +1,8 @@
 {
   "name": "aihub-desktop",
   "productName": "AI Hub Desktop",
-  "version": "1.3.0",
-  "description": "One window for every AI assistant: tabbed WebContentsViews, per-service domain filtering and automatic tab hibernation.",
+  "version": "1.4.0",
+  "description": "One window for every AI assistant: tabbed WebContentsViews, per-service domain filtering, cached logins with re-login on open, anti-bot hardening and a local OpenAI-compatible API.",
   "main": "main.js",
   "author": "SilentCoderHere",
   "license": "MIT",

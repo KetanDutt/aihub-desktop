@@ -14,8 +14,15 @@ const fs = require('fs');
 const path = require('path');
 const log = require('electron-log');
 
-const { LIMITS, STORAGE, GLOBAL_SHORTCUT_DEFAULT, HIBERNATION } = require('./constants');
-const { clampNumber, toBoolean, isSafeHttpUrl, uniqueStrings, isNonEmptyString } = require('./utils');
+const {
+  LIMITS,
+  STORAGE,
+  GLOBAL_SHORTCUT_DEFAULT,
+  HIBERNATION,
+  SESSION,
+  API
+} = require('./constants');
+const { clampNumber, toBoolean, isSafeHttpUrl, uniqueStrings, isNonEmptyString, slugify } = require('./utils');
 
 const DEFAULT_PROXY_URL = 'https://eu.proxysite.com/includes/process.php?action=update';
 
@@ -35,12 +42,34 @@ const DEFAULTS = {
   autoUpdateServices: true,
   enabledServices: ['chatgpt', 'claude', 'gemini'],
   lastActiveService: null,
+  // -- Sessions / login stability
+  sessionPersistence: true,
+  autoRelogin: true,
+  isolateSessions: false,
+  keepAliveSessions: true,
+  keepAliveMinutes: SESSION.DEFAULT_KEEPALIVE_MINUTES,
+  // -- Anti-bot hardening
+  antiBotHardening: true,
+  antiBotHumanize: true,
+  antiBotCanvasNoise: false,
+  // -- Local OpenAI-compatible API (the token is generated in main, never
+  //    written by the renderer).
+  apiEnabled: false,
+  apiPort: API.DEFAULT_PORT,
+  apiToken: '',
+  apiExposeAllServices: true,
+  apiServices: [],
+  apiMaxConcurrent: API.DEFAULT_CONCURRENCY,
+  apiRateLimitPerMinute: API.DEFAULT_RATE_LIMIT_PER_MINUTE,
+  apiTimeoutSeconds: API.DEFAULT_TIMEOUT_SECONDS,
   remoteUrls: {
     services: 'https://raw.githubusercontent.com/SilentCoderHere/aihub-config-data/main/ai_services_list.json',
     rules: 'https://raw.githubusercontent.com/SilentCoderHere/aihub-config-data/main/domain_filtering_rules.json'
   },
   openTabs: [],
-  activeTabId: null
+  activeTabId: null,
+  // Internal: last known login state per service (never renderer-writable).
+  sessionStates: {}
 };
 
 const schema = {
@@ -67,6 +96,33 @@ const schema = {
     items: { type: 'string' },
     default: DEFAULTS.enabledServices
   },
+  sessionPersistence: { type: 'boolean', default: DEFAULTS.sessionPersistence },
+  autoRelogin: { type: 'boolean', default: DEFAULTS.autoRelogin },
+  isolateSessions: { type: 'boolean', default: DEFAULTS.isolateSessions },
+  keepAliveSessions: { type: 'boolean', default: DEFAULTS.keepAliveSessions },
+  keepAliveMinutes: {
+    type: 'number',
+    minimum: SESSION.MIN_KEEPALIVE_MINUTES,
+    maximum: SESSION.MAX_KEEPALIVE_MINUTES,
+    default: DEFAULTS.keepAliveMinutes
+  },
+  antiBotHardening: { type: 'boolean', default: DEFAULTS.antiBotHardening },
+  antiBotHumanize: { type: 'boolean', default: DEFAULTS.antiBotHumanize },
+  antiBotCanvasNoise: { type: 'boolean', default: DEFAULTS.antiBotCanvasNoise },
+  apiEnabled: { type: 'boolean', default: DEFAULTS.apiEnabled },
+  apiPort: { type: 'number', minimum: API.MIN_PORT, maximum: API.MAX_PORT, default: DEFAULTS.apiPort },
+  apiToken: { type: 'string', default: '' },
+  apiExposeAllServices: { type: 'boolean', default: DEFAULTS.apiExposeAllServices },
+  apiServices: { type: 'array', items: { type: 'string' }, default: [] },
+  apiMaxConcurrent: {
+    type: 'number',
+    minimum: 1,
+    maximum: API.MAX_CONCURRENCY,
+    default: DEFAULTS.apiMaxConcurrent
+  },
+  apiRateLimitPerMinute: { type: 'number', minimum: 1, maximum: API.MAX_RATE_LIMIT_PER_MINUTE },
+  apiTimeoutSeconds: { type: 'number', minimum: API.MIN_TIMEOUT_SECONDS, maximum: API.MAX_TIMEOUT_SECONDS },
+  serviceUsage: { type: 'object', default: {} },
   lastActiveService: { type: ['string', 'null'], default: null },
   remoteUrls: {
     type: 'object',
@@ -77,7 +133,8 @@ const schema = {
     default: DEFAULTS.remoteUrls
   },
   openTabs: { type: 'array', default: [] },
-  activeTabId: { type: ['string', 'null'], default: null }
+  activeTabId: { type: ['string', 'null'], default: null },
+  sessionStates: { type: 'object', default: {} }
 };
 
 // Keys the renderer is allowed to write. Internal state is deliberately absent.
@@ -94,7 +151,22 @@ const WRITABLE_KEYS = new Set([
   'launchAtLogin',
   'globalShortcut',
   'autoUpdateServices',
-  'enabledServices'
+  'enabledServices',
+  'sessionPersistence',
+  'autoRelogin',
+  'isolateSessions',
+  'keepAliveSessions',
+  'keepAliveMinutes',
+  'antiBotHardening',
+  'antiBotHumanize',
+  'antiBotCanvasNoise',
+  'apiEnabled',
+  'apiPort',
+  'apiExposeAllServices',
+  'apiServices',
+  'apiMaxConcurrent',
+  'apiRateLimitPerMinute',
+  'apiTimeoutSeconds'
 ]);
 
 // ---------------------------------------------------------------------------
@@ -181,6 +253,10 @@ function getPublicConfig() {
   const config = store.store;
   return {
     ...config,
+    // The API token never travels to the renderer inside the bulk config: it
+    // is fetched on demand through `get-api-status` so it cannot leak with an
+    // unrelated config snapshot.
+    apiToken: undefined,
     openTabs: Array.isArray(config.openTabs) ? config.openTabs : [],
     activeTabId: config.activeTabId || null
   };
@@ -243,7 +319,57 @@ function sanitizeConfig(newConfig) {
       case 'launchAtLogin':
       case 'hibernateTabs':
       case 'autoUpdateServices':
+      case 'sessionPersistence':
+      case 'autoRelogin':
+      case 'isolateSessions':
+      case 'keepAliveSessions':
+      case 'antiBotHardening':
+      case 'antiBotHumanize':
+      case 'antiBotCanvasNoise':
+      case 'apiEnabled':
+      case 'apiExposeAllServices':
         clean[key] = toBoolean(newConfig[key], DEFAULTS[key]);
+        break;
+      case 'apiPort':
+        clean[key] = clampNumber(newConfig[key], API.MIN_PORT, API.MAX_PORT, DEFAULTS.apiPort);
+        break;
+      case 'apiMaxConcurrent':
+        clean[key] = clampNumber(newConfig[key], 1, API.MAX_CONCURRENCY, DEFAULTS.apiMaxConcurrent);
+        break;
+      case 'apiRateLimitPerMinute':
+        clean[key] = clampNumber(
+          newConfig[key],
+          1,
+          API.MAX_RATE_LIMIT_PER_MINUTE,
+          DEFAULTS.apiRateLimitPerMinute
+        );
+        break;
+      case 'apiTimeoutSeconds':
+        clean[key] = clampNumber(
+          newConfig[key],
+          API.MIN_TIMEOUT_SECONDS,
+          API.MAX_TIMEOUT_SECONDS,
+          DEFAULTS.apiTimeoutSeconds
+        );
+        break;
+      case 'apiServices':
+        // Slugs only: the engine compares against catalogue ids, and this list
+        // decides which logged-in sessions a local caller may drive.
+        clean[key] = uniqueStrings(
+          (Array.isArray(newConfig[key]) ? newConfig[key] : [])
+            .filter((id) => typeof id === 'string')
+            .map((id) => slugify(id))
+        )
+          .filter(Boolean)
+          .slice(0, 200);
+        break;
+      case 'keepAliveMinutes':
+        clean[key] = clampNumber(
+          newConfig[key],
+          SESSION.MIN_KEEPALIVE_MINUTES,
+          SESSION.MAX_KEEPALIVE_MINUTES,
+          DEFAULTS.keepAliveMinutes
+        );
         break;
       case 'maxActiveServices':
         clean[key] = clampNumber(

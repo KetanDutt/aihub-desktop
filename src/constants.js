@@ -54,6 +54,77 @@ const HIBERNATION = {
   SWEEP_INTERVAL_MS: 60 * 1000 // how often the idle sweep runs
 };
 
+// -- Login / session persistence ---------------------------------------------
+const SESSION = {
+  /** Prefix of the persistent partition used when sessions are isolated. */
+  PARTITION_PREFIX: 'persist:aihub-',
+  /** How often the login/keep-alive sweep runs. */
+  SWEEP_INTERVAL_MS: 60 * 1000,
+  /** Session cookies are re-stamped with this lifetime so they survive a quit. */
+  COOKIE_PIN_LIFETIME_MS: 30 * 24 * 60 * 60 * 1000, // 30 days
+  /** Never shorten a cookie below this remaining lifetime when pinning. */
+  COOKIE_PIN_MIN_REMAINING_MS: 24 * 60 * 60 * 1000, // 1 day
+  /** Cookies older than this are treated as suspicious when restoring. */
+  COOKIE_MAX_AGE_MS: 400 * 24 * 60 * 60 * 1000, // ~13 months
+  /** A service is "needs relogin" when it was logged in and now is not. */
+  RELOGIN_GRACE_MS: 5 * 60 * 1000,
+  /** Snapshot cadence (cookie backup written to disk). */
+  SNAPSHOT_INTERVAL_MS: 10 * 60 * 1000,
+  /** Default keep-alive cadence for logged-in services. */
+  DEFAULT_KEEPALIVE_MINUTES: 45,
+  MIN_KEEPALIVE_MINUTES: 5,
+  MAX_KEEPALIVE_MINUTES: 720,
+  /** Max cookies handled per service (guard against hostile payloads). */
+  MAX_COOKIES_PER_SERVICE: 500
+};
+
+// -- Local OpenAI-compatible API ---------------------------------------------
+const API = {
+  DEFAULT_PORT: 8788,
+  MIN_PORT: 1024,
+  MAX_PORT: 65535,
+  /** Only these bind targets are allowed (loopback). */
+  LOOPBACK_HOSTS: ['127.0.0.1', 'localhost', '::1'],
+  MAX_BODY_BYTES: 1024 * 1024, // 1 MB
+  MAX_MESSAGES: 200,
+  MAX_MESSAGE_CHARS: 64 * 1024,
+  DEFAULT_TIMEOUT_SECONDS: 180,
+  MIN_TIMEOUT_SECONDS: 5,
+  MAX_TIMEOUT_SECONDS: 900,
+  DEFAULT_CONCURRENCY: 2,
+  MAX_CONCURRENCY: 8,
+  DEFAULT_RATE_LIMIT_PER_MINUTE: 60,
+  MAX_RATE_LIMIT_PER_MINUTE: 600,
+  /** How many past requests are kept for the settings panel. */
+  REQUEST_LOG_ENTRIES: 25,
+  /** Prefix stripped from model ids (`aihub/chatgpt` -> `chatgpt`). */
+  MODEL_PREFIX: 'aihub/',
+  /** Deliberate delay when a request is unauthenticated, in ms. */
+  AUTH_FAILURE_DELAY_MS: 400
+};
+
+// -- Anti-bot hardening ------------------------------------------------------
+const STEALTH = {
+  /** Challenge pages we wait out instead of treating as a logged-out state. */
+  CHALLENGE_HOSTS: [
+    'challenges.cloudflare.com',
+    'cf-challenge.cloudflare.com',
+    'geo.captcha-delivery.com',
+    'captcha-delivery.com',
+    'fastly.com'
+  ],
+  /** Retries when a tab lands on a bot challenge. */
+  CHALLENGE_MAX_RETRIES: 3,
+  CHALLENGE_BASE_DELAY_MS: 4000,
+  CHALLENGE_JITTER_MS: 3500,
+  /** Minimum spacing between two automated reloads of the same tab. */
+  MIN_RETRY_SPACING_MS: 5000,
+  KEYSTROKE_MIN_DELAY_MS: 18,
+  KEYSTROKE_MAX_DELAY_MS: 70,
+  /** Blink features that must be off for a non-automated fingerprint. */
+  DISABLED_BLINK_FEATURES: ['AutomationControlled']
+};
+
 // -- Storage -----------------------------------------------------------------
 const STORAGE = {
   CONFIG_PROJECT: 'aihub-desktop',
@@ -64,7 +135,14 @@ const STORAGE = {
   BUNDLED_DIRNAME: 'bundled-data',
   LOCAL_SERVICES_FILENAME: 'services.json',
   LOCAL_RULES_FILENAME: 'rules.json',
-  FAVICON_DIRNAME: 'favicons'
+  LOCAL_LOGINS_FILENAME: 'logins.json',
+  LOCAL_ADAPTERS_FILENAME: 'adapters.json',
+  FAVICON_DIRNAME: 'favicons',
+  // Session cache: pinned cookies + login records, one file per service.
+  SESSIONS_DIRNAME: 'sessions',
+  SESSION_INDEX_FILENAME: 'index.json',
+  SESSION_COOKIE_SUFFIX: '.cookies.json',
+  FINGERPRINT_FILENAME: 'fingerprint.json'
 };
 
 // Remote service/rules data is refreshed in the background when older than this.
@@ -105,6 +183,16 @@ const IPC = {
   GET_UPDATE_STATUS: 'get-update-status',
   QUIT_AND_INSTALL: 'quit-and-install',
   GET_BLOCKING_STATS: 'get-blocking-stats',
+  // -- Sessions / logins
+  GET_LOGIN_STATES: 'get-login-states',
+  GET_SESSION_STATS: 'get-session-stats',
+  RELOGIN_SERVICE: 'relogin-service',
+  CLEAR_SERVICE_DATA: 'clear-service-data',
+  TOUCH_SESSION: 'touch-session',
+  // -- Local OpenAI-compatible API
+  GET_API_STATUS: 'get-api-status',
+  ROTATE_API_TOKEN: 'rotate-api-token',
+  API_PING: 'api-ping',
   MINIMIZE_WINDOW: 'minimize-window',
   MAXIMIZE_WINDOW: 'maximize-window',
   CLOSE_WINDOW: 'close-window',
@@ -119,6 +207,9 @@ const IPC = {
   TAB_BLOCKED: 'tab-blocked',
   TAB_FIND_RESULT: 'tab-find-result',
   BLOCKING_STATE: 'blocking-state',
+  LOGIN_STATE: 'login-state',
+  SESSION_STATE: 'session-state',
+  API_STATE: 'api-state',
   UPDATE_STATE: 'update-state',
   APP_LOG: 'app-log'
 };
@@ -134,6 +225,9 @@ module.exports = {
   LAYOUT,
   LIMITS,
   HIBERNATION,
+  SESSION,
+  API,
+  STEALTH,
   STORAGE,
   STALE_DATA_MS,
   IPC

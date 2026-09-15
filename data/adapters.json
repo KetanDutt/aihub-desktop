@@ -1,0 +1,225 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-14T00:00:00.000Z",
+  "comment": "Best-effort adapters that let the local OpenAI-compatible endpoint drive a logged-in session. `api` describes the service's own web endpoint (the browser's cookies are replayed onto it), `dom` is the universal fallback: type into the composer, wait for the answer node. Selectors/paths rot when a service ships a redesign — that is expected, and the DOM fallback plus a clear error message is the contract. Override this file by copying it to <userData>/data/adapters.json.",
+  "default": {
+    "strategy": "dom",
+    "dom": {
+      "composer": "textarea[data-testid=\"chat-input\"], textarea[aria-label*=\"Chat\"], textarea[placeholder], div[contenteditable=\"true\"]",
+      "submit": "enter",
+      "answer": "[data-message-author-role=\"assistant\"], [data-role=\"assistant\"], [class*=\"markdown\"]",
+      "pending": "[data-testid=\"stop-button\"], button[aria-label*=\"Stop\"]",
+      "idlePolls": 3
+    }
+  },
+  "adapters": {
+    "chatgpt": {
+      "strategy": "auto",
+      "api": {
+        "method": "POST",
+        "url": "https://chatgpt.com/backend-api/conversation",
+        "sse": true,
+        "deltaPath": "messages.0.content.parts.0",
+        "resultPath": "message.content.parts.0",
+        "errorPath": "detail",
+        "conversationIdPath": "conversation_id",
+        "headers": {
+          "content-type": "application/json",
+          "accept": "text/event-stream",
+          "oai-language": "{language}"
+        },
+        "body": {
+          "action": "next",
+          "messages": [
+            {
+              "role": "user",
+              "content": {
+                "content_type": "text",
+                "parts": [
+                  "{prompt}"
+                ]
+              }
+            }
+          ],
+          "model": "{model}",
+          "timezone": "{timezone}",
+          "group_id": null,
+          "prompt_mode": {},
+          "system_harm_metadata": null
+        },
+        "authHeaders": [
+          {
+            "header": "chatgpt-account-id",
+            "from": "localStorage",
+            "key": "oai-client-info",
+            "jsonPath": "accountId"
+          }
+        ]
+      },
+      "dom": {
+        "url": "https://chatgpt.com/",
+        "composer": "#prompt-textarea, textarea[aria-label=\"Chat with ChatGPT\"], div[contenteditable=\"true\"]",
+        "submit": "enter",
+        "answer": "[data-message-author-role=\"assistant\"] .markdown, [data-message-author-role=\"assistant\"]",
+        "pending": "[data-testid=\"stop-button\"]",
+        "idlePolls": 4
+      }
+    },
+    "claude": {
+      "strategy": "auto",
+      "api": {
+        "method": "POST",
+        "url": "https://claude.ai/api/organizations/{organizationId}/chat_conversations",
+        "sse": true,
+        "deltaPath": "completion",
+        "resultPath": "completion",
+        "errorPath": "error.error.message",
+        "conversationIdPath": "id",
+        "headers": {
+          "content-type": "application/json",
+          "accept": "text/event-stream"
+        },
+        "body": {
+          "model": "{model}",
+          "timeouts": {
+            "sec_per_token": 600
+          },
+          "completion": {
+            "prompt": "{prompt}",
+            "timezone": "{timezone}"
+          }
+        },
+        "systemField": null,
+        "urlParams": [
+          {
+            "name": "organizationId",
+            "from": "urlPattern",
+            "pattern": "organizations/([A-Za-z0-9-]{8,64})"
+          }
+        ]
+      },
+      "dom": {
+        "url": "https://claude.ai/new",
+        "composer": "div[contenteditable=\"true\"][role=\"textbox\"], .dmzique",
+        "submit": "enter",
+        "answer": "[data-testid=\"assistant-message\"], div[dir=\"auto\"]",
+        "pending": "button[aria-label=\"Stop Reply\"], [data-testid=\"stop-button\"]",
+        "idlePolls": 4
+      }
+    },
+    "gemini": {
+      "strategy": "dom",
+      "dom": {
+        "url": "https://gemini.google.com/app",
+        "composer": "rich-textarea .ql-editor, div[contenteditable=\"true\"]",
+        "submit": "enter",
+        "answer": "message-content .markdown, .response-content",
+        "pending": "button[aria-label=\"Stop response\"], .stop-icon",
+        "idlePolls": 4
+      }
+    },
+    "microsoftcopilot": {
+      "strategy": "dom",
+      "dom": {
+        "url": "https://copilot.microsoft.com/",
+        "composer": "div#searchbox[contenteditable=\"true\"], div[contenteditable=\"true\"]",
+        "submit": "enter",
+        "answer": "[data-state=\"complete\"], .turn",
+        "pending": "[data-testid=\"stop-btn\"]",
+        "idlePolls": 4
+      }
+    },
+    "perplexity": {
+      "strategy": "dom",
+      "dom": {
+        "url": "https://www.perplexity.ai/",
+        "composer": "textarea[placeholder*=\"Ask\"], div[contenteditable=\"true\"]",
+        "submit": "enter",
+        "answer": "[data-testid=\"answer\"] .ProseMirror, [class*=\"MessageContent\"]",
+        "pending": "[data-testid=\"stop-button\"]",
+        "idlePolls": 5
+      }
+    },
+    "deepseek": {
+      "strategy": "dom",
+      "dom": {
+        "url": "https://chat.deepseek.com/",
+        "composer": "textarea#chat-input, div[contenteditable=\"true\"]",
+        "submit": "enter",
+        "answer": ".ds-message .markdown-body, [class*=\"message-content\"]",
+        "pending": "[class*=\"stop\"]",
+        "idlePolls": 4
+      }
+    },
+    "grok": {
+      "strategy": "dom",
+      "dom": {
+        "url": "https://grok.com/",
+        "composer": "textarea[placeholder*=\"Ask\"], div[contenteditable=\"true\"]",
+        "submit": "enter",
+        "answer": "[data-testid=\"response\"], .prose",
+        "pending": "button[aria-label=\"Stop\"]",
+        "idlePolls": 4
+      }
+    },
+    "mistrallechat": {
+      "strategy": "dom",
+      "dom": {
+        "url": "https://chat.mistral.ai/chat",
+        "composer": "div[contenteditable=\"true\"], textarea[placeholder*=\"Chat\"]",
+        "submit": "enter",
+        "answer": "[data-testid=\"assistant-message\"], .message-content",
+        "pending": "button[aria-label=\"Stop\"]",
+        "idlePolls": 4
+      }
+    },
+    "huggingchat": {
+      "strategy": "dom",
+      "dom": {
+        "url": "https://huggingface.co/chat/",
+        "composer": "#chattextarea, textarea[aria-label=\"Chat with HuggingChat\"]",
+        "submit": "enter",
+        "answer": ".prose.dark pre, .message.assistant .prose",
+        "pending": "button[aria-label=\"Stop generating\"]",
+        "idlePolls": 4
+      }
+    },
+    "poe": {
+      "strategy": "dom",
+      "dom": {
+        "url": "https://poe.com/",
+        "composer": "div[contenteditable=\"true\"], textarea[placeholder*=\"Message\"]",
+        "submit": "enter",
+        "answer": "[class*=\"markdown\"]",
+        "pending": "[class*=\"stopButton\"]",
+        "idlePolls": 5
+      }
+    },
+    "youcom": {
+      "strategy": "dom",
+      "dom": {
+        "url": "https://you.com/chat",
+        "composer": "textarea[placeholder*=\"Ask\"], div[contenteditable=\"true\"]",
+        "submit": "enter",
+        "answer": "[data-testid=\"answer\"], .prose",
+        "pending": "[data-testid=\"stop\"]",
+        "idlePolls": 4
+      }
+    },
+    "coherechat": {
+      "strategy": "dom"
+    },
+    "metaai": {
+      "strategy": "dom"
+    },
+    "pi": {
+      "strategy": "dom"
+    },
+    "qwenchat": {
+      "strategy": "dom"
+    },
+    "kimi": {
+      "strategy": "dom"
+    }
+  }
+}

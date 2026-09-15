@@ -37,7 +37,44 @@ window.AiHub = window.AiHub || {};
     blocking: { enabled: true, blocked: 0, allowed: 0 },
     update: null,
     appInfo: null,
-    ready: false
+    ready: false,
+    // Login detection + session cache (main process is the source of truth).
+    logins: {},
+    sessionStats: null,
+    hardening: null,
+    api: null,
+    // Services tab filters, mirrored to localStorage so a restart keeps them.
+    serviceFilters: { query: '', type: 'all', status: 'all', login: 'all', sort: 'name', direction: 'asc' },
+    filtersLoaded: false
+  };
+
+  const FILTER_STORAGE_KEY = 'aihub.serviceFilters.v1';
+
+  /** Restore the filter bar from a previous session (never throws). */
+  app.loadServiceFilters = function loadServiceFilters() {
+    const fallback = { query: '', type: 'all', status: 'all', login: 'all', sort: 'name', direction: 'asc' };
+    try {
+      const raw = window.localStorage.getItem(FILTER_STORAGE_KEY);
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw);
+      return { ...fallback, ...(parsed && typeof parsed === 'object' ? parsed : {}) };
+    } catch (error) {
+      return fallback;
+    }
+  };
+
+  app.saveServiceFilters = function saveServiceFilters(filters) {
+    try {
+      window.localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
+    } catch (error) {
+      /* private mode / quota: filters simply do not persist */
+    }
+  };
+
+  /** Login record for a service id, or a benign "unknown". */
+  app.loginStateOf = function loginStateOf(serviceId) {
+    const record = app.state.logins[serviceId];
+    return record && record.state ? record : { state: 'unknown', reason: 'not-checked', hasSnapshot: false };
   };
 
   const ELEMENT_IDS = [
@@ -93,7 +130,45 @@ window.AiHub = window.AiHub || {};
     'overlay-root',
     'toast-root',
     'shortcuts-modal',
-    'btn-close-shortcuts'
+    'btn-close-shortcuts',
+    // Services tab: filters + sorting
+    'services-filter-summary',
+    'filter-type',
+    'filter-status',
+    'filter-login',
+    'sort-services',
+    'sort-direction',
+    'filter-reset',
+    // Sessions tab
+    'session-summary',
+    'session-list',
+    'hardening-summary',
+    'toggle-session-persistence',
+    'toggle-auto-relogin',
+    'toggle-keep-alive',
+    'keep-alive-minutes',
+    'toggle-isolate-sessions',
+    'btn-refresh-sessions',
+    'toggle-anti-bot',
+    'toggle-humanize',
+    'toggle-canvas-noise',
+    'btn-signout-all',
+    // Local API tab
+    'api-status-line',
+    'api-endpoint-line',
+    'toggle-api-enabled',
+    'api-port',
+    'toggle-api-all-services',
+    'api-services-list',
+    'api-key-field',
+    'btn-api-reveal',
+    'btn-api-copy',
+    'btn-api-rotate',
+    'btn-api-ping',
+    'btn-api-copy-curl',
+    'api-curl-example',
+    'api-model-list',
+    'api-log'
   ];
 
   /** Cache every element the UI touches (call once after DOMContentLoaded). */

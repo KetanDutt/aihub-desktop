@@ -57,6 +57,9 @@ window.AiHub = window.AiHub || {};
 
       app.renderEnabledServices();
       app.renderAllServices();
+      // Login state changes the filter facets, so repaint once the sessions are known.
+      if (app.refreshSessions) app.refreshSessions();
+      if (app.refreshApi) app.refreshApi();
       return services;
     } catch (error) {
       console.error('Unable to load services:', error);

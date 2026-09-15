@@ -168,7 +168,218 @@
     }
   }
 
+  // -- Service filters -----------------------------------------------------
+  //
+  // Pure on purpose: the Services tab renders whatever this returns, so the
+  // filtering/sorting rules are unit-testable without a DOM.
+
+  const SERVICE_SORTS = [
+    { id: 'name', label: 'Name' },
+    { id: 'type', label: 'Type' },
+    { id: 'status', label: 'Enabled first' },
+    { id: 'login', label: 'Sign-in state' },
+    { id: 'recent', label: 'Recently used' },
+    { id: 'cookies', label: 'Cached cookies' }
+  ];
+
+  const SERVICE_STATUS_FILTERS = [
+    { id: 'all', label: 'All' },
+    { id: 'enabled', label: 'Enabled' },
+    { id: 'disabled', label: 'Disabled' },
+    { id: 'open', label: 'Open in a tab' },
+    { id: 'closed', label: 'Not open' }
+  ];
+
+  const SERVICE_LOGIN_FILTERS = [
+    { id: 'all', label: 'Any' },
+    { id: 'logged-in', label: 'Signed in' },
+    { id: 'logged-out', label: 'Signed out' },
+    { id: 'challenge', label: 'Verifying' },
+    { id: 'unknown', label: 'Unknown' }
+  ];
+
+  const LOGIN_RANK = { 'logged-in': 0, challenge: 1, 'logged-out': 2, unknown: 3 };
+
+  function normalizeServiceFilters(raw) {
+    const filters = raw && typeof raw === 'object' ? raw : {};
+    const oneOf = (value, options, fallback) =>
+      options.some((option) => option.id === value) ? value : fallback;
+
+    return {
+      query: typeof filters.query === 'string' ? filters.query.slice(0, 120) : '',
+      type: typeof filters.type === 'string' && filters.type ? filters.type.slice(0, 60) : 'all',
+      status: oneOf(filters.status, SERVICE_STATUS_FILTERS, 'all'),
+      login: oneOf(filters.login, SERVICE_LOGIN_FILTERS, 'all'),
+      sort: oneOf(filters.sort, SERVICE_SORTS, 'name'),
+      direction: filters.direction === 'desc' ? 'desc' : 'asc'
+    };
+  }
+
+  function serviceTypeKey(service) {
+    const type = String((service && service.type) || 'AI Service').trim();
+    return type || 'AI Service';
+  }
+
+  function matchesQuery(service, query) {
+    const term = String(query || '').trim().toLowerCase();
+    if (!term) return true;
+    const haystack = [
+      service.name,
+      service.type,
+      service.id,
+      service.privacy,
+      service.url
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return term.split(/\s+/).every((word) => haystack.includes(word));
+  }
+
+  /**
+   * Filter + sort a service list, with facet counts for the chips.
+   *
+   * @param {object[]} services
+   * @param {object} rawFilters `{query, type, status, login, sort, direction}`
+   * @param {{enabledIds?: string[]|Set, openIds?: string[]|Set, loginStates?: object,
+   *           usage?: object, cookieCounts?: object}} [context]
+   * @returns {{services: object[], counts: object, activeCount: number}}
+   */
+  function applyServiceFilters(services, rawFilters, context) {
+    const filters = normalizeServiceFilters(rawFilters);
+    const ctx = context || {};
+    const enabled = ctx.enabledIds instanceof Set ? ctx.enabledIds : new Set(ctx.enabledIds || []);
+    const open = ctx.openIds instanceof Set ? ctx.openIds : new Set(ctx.openIds || []);
+    const loginStates = ctx.loginStates || {};
+    const usage = ctx.usage || {};
+    const cookieCounts = ctx.cookieCounts || {};
+
+    const list = Array.isArray(services) ? services.filter(Boolean) : [];
+    const stateOf = (service) => (loginStates[service.id] && loginStates[service.id].state) || 'unknown';
+
+    const counts = {
+      total: list.length,
+      shown: 0,
+      enabled: 0,
+      disabled: 0,
+      open: 0,
+      loggedIn: 0,
+      loggedOut: 0,
+      unknown: 0,
+      challenge: 0,
+      byType: {}
+    };
+
+    for (const service of list) {
+      const type = serviceTypeKey(service);
+      counts.byType[type] = (counts.byType[type] || 0) + 1;
+      if (enabled.has(service.id)) counts.enabled += 1;
+      else counts.disabled += 1;
+      if (open.has(service.id)) counts.open += 1;
+      const state = stateOf(service);
+      if (state === 'logged-in') counts.loggedIn += 1;
+      else if (state === 'logged-out') counts.loggedOut += 1;
+      else if (state === 'challenge') counts.challenge += 1;
+      else counts.unknown += 1;
+    }
+
+    let result = list.filter((service) => {
+      if (!matchesQuery(service, filters.query)) return false;
+      if (filters.type !== 'all' && serviceTypeKey(service) !== filters.type) return false;
+      if (filters.status === 'enabled' && !enabled.has(service.id)) return false;
+      if (filters.status === 'disabled' && enabled.has(service.id)) return false;
+      if (filters.status === 'open' && !open.has(service.id)) return false;
+      if (filters.status === 'closed' && open.has(service.id)) return false;
+      if (filters.login !== 'all' && stateOf(service) !== filters.login) return false;
+      return true;
+    });
+
+    const direction = filters.direction === 'desc' ? -1 : 1;
+    const nameOf = (service) => String(service.name || '').toLowerCase();
+    const tie = (a, b) => (nameOf(a) < nameOf(b) ? -1 : nameOf(a) > nameOf(b) ? 1 : 0);
+
+    result = result.slice().sort((a, b) => {
+      let delta = 0;
+      switch (filters.sort) {
+        case 'type':
+          delta =
+            serviceTypeKey(a).localeCompare(serviceTypeKey(b)) || tie(a, b);
+          break;
+        case 'status':
+          delta = (enabled.has(a.id) ? 0 : 1) - (enabled.has(b.id) ? 0 : 1) || tie(a, b);
+          break;
+        case 'login': {
+          const rankA = LOGIN_RANK[stateOf(a)] === undefined ? 4 : LOGIN_RANK[stateOf(a)];
+          const rankB = LOGIN_RANK[stateOf(b)] === undefined ? 4 : LOGIN_RANK[stateOf(b)];
+          delta = rankA - rankB || tie(a, b);
+          break;
+        }
+        case 'recent': {
+          // "Ascending" means "most interesting first" throughout this list, so
+          // for recency that is newest first; the toggle reverses it.
+          delta = (Number(usage[b.id] || 0) - Number(usage[a.id] || 0)) || tie(a, b);
+          break;
+        }
+        case 'cookies': {
+          const countA = Number(cookieCounts[a.id] || 0);
+          const countB = Number(cookieCounts[b.id] || 0);
+          delta = countB - countA || tie(a, b);
+          break;
+        }
+        default:
+          delta = nameOf(a) < nameOf(b) ? -1 : nameOf(a) > nameOf(b) ? 1 : 0;
+      }
+      return delta * direction;
+    });
+
+    counts.shown = result.length;
+    const activeCount =
+      (filters.query.trim() ? 1 : 0) +
+      (filters.type !== 'all' ? 1 : 0) +
+      (filters.status !== 'all' ? 1 : 0) +
+      (filters.login !== 'all' ? 1 : 0);
+
+    return { services: result, counts, activeCount, filters };
+  }
+
+  /** Distinct types, alphabetically, for the type dropdown. */
+  function serviceTypes(services) {
+    const seen = new Map();
+    for (const service of Array.isArray(services) ? services : []) {
+      const type = serviceTypeKey(service);
+      seen.set(type, (seen.get(type) || 0) + 1);
+    }
+    return [...seen.entries()]
+      .map(([type, count]) => ({ type, count }))
+      .sort((a, b) => a.type.localeCompare(b.type));
+  }
+
+  /** Human summary: `3 of 16 · type “Search” · signed in`. */
+  function describeFilters(summary, filters) {
+    const parts = [`${summary.shown} of ${summary.total}`];
+    if (filters.query.trim()) parts.push(`“${filters.query.trim()}”`);
+    if (filters.type !== 'all') parts.push(filters.type);
+    if (filters.status !== 'all') {
+      const found = SERVICE_STATUS_FILTERS.find((option) => option.id === filters.status);
+      parts.push(found ? found.label.toLowerCase() : filters.status);
+    }
+    if (filters.login !== 'all') {
+      const found = SERVICE_LOGIN_FILTERS.find((option) => option.id === filters.login);
+      parts.push(found ? found.label.toLowerCase() : filters.login);
+    }
+    return parts.join(' · ');
+  }
+
   return {
+    SERVICE_SORTS,
+    SERVICE_STATUS_FILTERS,
+    SERVICE_LOGIN_FILTERS,
+    normalizeServiceFilters,
+    applyServiceFilters,
+    serviceTypes,
+    serviceTypeKey,
+    describeFilters,
+    matchesQuery,
     showStatus,
     formatDate,
     relativeTime,

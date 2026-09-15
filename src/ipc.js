@@ -16,6 +16,10 @@ const blocking = require('./blocking');
 const security = require('./security');
 const favicon = require('./favicon');
 const updater = require('./updater');
+const sessionStore = require('./sessionstore');
+const loginMonitor = require('./logins');
+const stealth = require('./stealth');
+const localApi = require('./api');
 const paths = require('./paths');
 const { IPC, APP_NAME, LIMITS } = require('./constants');
 const { isSafeHttpUrl, slugify, clampFloat } = require('./utils');
@@ -36,6 +40,44 @@ function validServiceId(serviceId) {
     if (!known) return null;
   }
   return id;
+}
+
+/** Push the session/login picture to the shell UI. */
+function sendSessions() {
+  const win = windowManager.getMainWindow();
+  if (!win || win.isDestroyed()) return;
+  win.webContents.send(IPC.SESSION_STATE, { logins: loginMonitor.getAll(), hardening: stealth.getStatus() });
+}
+
+/** Everything the Sessions + Local API panels show, in one round trip. */
+async function sessionsSnapshot() {
+  const config = configStore.getConfig();
+  const services = (dataStore.getServicesCache() || {}).ai_services || [];
+  const wanted = new Set([...services.map((service) => service.id), ...sessionStore.listSnapshots()]);
+  const perService = {};
+
+  for (const serviceId of wanted) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      perService[serviceId] = await sessionStore.getStats(serviceId, services.find((s) => s.id === serviceId));
+    } catch (error) {
+      perService[serviceId] = { serviceId, error: error.message };
+    }
+  }
+
+  return {
+    perService,
+    hardening: stealth.getStatus(),
+    isolation: Boolean(config.isolateSessions),
+    persistence: config.sessionPersistence !== false,
+    keepAlive: {
+      enabled: config.keepAliveSessions !== false,
+      minutes: config.keepAliveMinutes,
+      nextIn: null
+    },
+    snapshots: sessionStore.listSnapshots().length,
+    usage: config.serviceUsage || {}
+  };
 }
 
 /** Keep the blocking engine in sync with config + rules. */
@@ -71,6 +113,7 @@ function setupIpcHandlers() {
 
   ipcMain.handle(IPC.SAVE_CONFIG, async (event, newConfig) => {
     try {
+      const before = configStore.getConfig();
       const config = configStore.saveConfig(newConfig);
 
       refreshBlocking();
@@ -78,7 +121,32 @@ function setupIpcHandlers() {
       windowManager.registerGlobalShortcut(config.globalShortcut);
       applyLoginItemSetting(config.launchAtLogin);
 
-      return { success: true, config: configStore.getPublicConfig() };
+      // Which changes need the user to know that a restart is required?
+      const notices = [];
+      if (Boolean(before.isolateSessions) !== Boolean(config.isolateSessions)) {
+        notices.push(
+          'Session isolation changed. Close and reopen your tabs so each one attaches to the right profile.'
+        );
+      }
+      if (Boolean(before.antiBotHardening) !== Boolean(config.antiBotHardening)) {
+        notices.push('Anti-bot hardening applies to newly opened tabs.');
+        stealth.getProfile({ force: true });
+      }
+      if (Boolean(before.antiBotCanvasNoise) !== Boolean(config.antiBotCanvasNoise)) {
+        notices.push('Fingerprint noise changed: reload any tab that is already open.');
+      }
+
+      // The local endpoint follows the settings live.
+      await localApi.onConfigChanged(before, config).catch((error) => {
+        notices.push(`Local API: ${error.message}`);
+      });
+      if (config.sessionPersistence === false && before.sessionPersistence !== false) {
+        loginMonitor.stopSweeps();
+      } else if (config.sessionPersistence !== false && before.sessionPersistence === false) {
+        loginMonitor.startSweeps();
+      }
+
+      return { success: true, config: configStore.getPublicConfig(), notices };
     } catch (error) {
       log.warn('Rejected config update:', error.message);
       return { success: false, error: error.message };
@@ -107,6 +175,9 @@ function setupIpcHandlers() {
         }
       })(),
       data: dataStore.getDataStatus(),
+      hardening: stealth.getStatus(),
+      api: localApi.describe(),
+      sessions: { logins: loginMonitor.getAll(), snapshots: sessionStore.listSnapshots().length },
       blocking: { ...blocking.getBlockingSnapshot(), ...blocking.getStats() },
       tabs: windowManager.getTabStates(),
       update: updater.getStatus(),
@@ -144,18 +215,67 @@ function setupIpcHandlers() {
     security.openExternal(url, { parent: windowManager.getMainWindow() })
   );
 
-  ipcMain.handle(IPC.CLEAR_SESSION_DATA, async () => {
+  /**
+   * Two scopes, because one button used to sign you out of everything:
+   *   `cache` — HTTP cache + cached icons + counters. Logins stay.
+   *   `all`   — the full wipe (cookies, storage) *and* the cached session
+   *             snapshots, i.e. a genuine sign-out.
+   */
+  ipcMain.handle(IPC.CLEAR_SESSION_DATA, async (event, options) => {
+    const scope = options && options.scope === 'all' ? 'all' : 'cache';
     try {
-      if (session.defaultSession) {
-        await session.defaultSession.clearStorageData();
+      if (scope === 'all') {
+        if (session.defaultSession) await session.defaultSession.clearStorageData();
+        for (const serviceId of sessionStore.listSnapshots()) {
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            await sessionStore.clearService(serviceId);
+          } catch (e) {
+            /* one bad service must not abort the wipe */
+          }
+        }
+        for (const record of [...loginMonitor._records.keys()]) loginMonitor._records.delete(record);
+        loginMonitor.persistRecords();
+      } else if (session.defaultSession && typeof session.defaultSession.clearCache === 'function') {
+        await session.defaultSession.clearCache();
       }
+
       await favicon.clearCache();
       security.clearPermissionMemory();
       blocking.resetStats();
       refreshBlocking();
-      return { success: true };
+      sendSessions();
+      return { success: true, scope };
     } catch (error) {
       log.error('Unable to clear session data:', error.message);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // -- Sessions / logins -----------------------------------------------------
+
+  ipcMain.handle(IPC.GET_SESSION_STATS, async () => ({ logins: loginMonitor.getAll(), ...(await sessionsSnapshot()) }));
+
+  ipcMain.handle(IPC.CLEAR_SERVICE_DATA, async (event, serviceId) => {
+    const id = slugify(typeof serviceId === 'string' ? serviceId : '');
+    if (!id) return { success: false, error: 'invalid_service' };
+    if (!validServiceId(id)) return { success: false, error: 'unknown_service' };
+
+    try {
+      const result = await sessionStore.clearService(id);
+      const record = loginMonitor._records.get(id);
+      if (record) {
+        record.state = loginMonitor.STATE.LOGGED_OUT;
+        record.reason = 'cleared-by-user';
+        record.signedInAt = null;
+      }
+      loginMonitor.persistRecords();
+      const tabId = windowManager.tabIdForService(id);
+      if (tabId) windowManager.navReload(tabId);
+      sendSessions();
+      return { success: true, ...result };
+    } catch (error) {
+      log.warn(`Unable to clear the ${id} session: ${error.message}`);
       return { success: false, error: error.message };
     }
   });
@@ -172,6 +292,8 @@ function setupIpcHandlers() {
     if (!isSafeHttpUrl(data.url)) return { success: false, error: 'invalid_url' };
 
     log.info(`Creating tab ${data.tabId} for ${serviceId}`);
+    // Opening a tab is the moment a login is (re)established, so the monitor is
+    // pointed at it and the cached cookies are already in place.
     return windowManager.createTab({
       tabId: data.tabId,
       serviceId,
@@ -293,6 +415,8 @@ function setupIpcHandlers() {
 
 module.exports = {
   setupIpcHandlers,
+  sendSessions,
+  sessionsSnapshot,
   refreshBlocking,
   applyLoginItemSetting,
   validTabId,

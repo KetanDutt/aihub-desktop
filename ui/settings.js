@@ -15,6 +15,8 @@ window.AiHub = window.AiHub || {};
     app.selectSettingsTab(tabName);
     app.refreshAbout();
     app.refreshPrivacyInfo();
+    if (tabName === 'sessions' || tabName === 'services') app.refreshSessions();
+    if (tabName === 'api') app.refreshApi();
   };
 
   app.closeSettings = function closeSettings() {
@@ -57,11 +59,19 @@ window.AiHub = window.AiHub || {};
     check(el.toggleLaunchLogin, config.launchAtLogin);
     check(el.toggleAutoUpdate, config.autoUpdateServices);
     check(el.toggleProxy, config.useProxy);
+    check(el.toggleSessionPersistence, config.sessionPersistence);
+    check(el.toggleAutoRelogin, config.autoRelogin);
+    check(el.toggleKeepAlive, config.keepAliveSessions);
+    check(el.toggleIsolateSessions, config.isolateSessions);
+    check(el.toggleAntiBot, config.antiBotHardening);
+    check(el.toggleHumanize, config.antiBotHumanize);
+    check(el.toggleCanvasNoise, config.antiBotCanvasNoise);
 
     set(el.maxServices, config.maxActiveServices);
     set(el.hibernateMinutes, config.hibernateAfterMinutes);
     set(el.globalShortcut, config.globalShortcut);
     set(el.proxyUrl, config.proxyUrl);
+    set(el.keepAliveMinutes, config.keepAliveMinutes);
 
     utils.updateBlockingUI({ enabled: config.blockingEnabled, blocked: app.state.blocking.blocked });
     utils.applyDarkMode(config.darkMode);
@@ -91,7 +101,19 @@ window.AiHub = window.AiHub || {};
       globalShortcut: el.globalShortcut ? el.globalShortcut.value.trim() : '',
       autoUpdateServices: el.toggleAutoUpdate ? el.toggleAutoUpdate.checked : true,
       useProxy: el.toggleProxy ? el.toggleProxy.checked : false,
-      proxyUrl: el.proxyUrl ? el.proxyUrl.value.trim() : ''
+      proxyUrl: el.proxyUrl ? el.proxyUrl.value.trim() : '',
+      sessionPersistence: el.toggleSessionPersistence ? el.toggleSessionPersistence.checked : true,
+      autoRelogin: el.toggleAutoRelogin ? el.toggleAutoRelogin.checked : true,
+      keepAliveSessions: el.toggleKeepAlive ? el.toggleKeepAlive.checked : true,
+      keepAliveMinutes: utils.clamp(el.keepAliveMinutes ? el.keepAliveMinutes.value : 45, 5, 720, 45),
+      isolateSessions: el.toggleIsolateSessions ? el.toggleIsolateSessions.checked : false,
+      antiBotHardening: el.toggleAntiBot ? el.toggleAntiBot.checked : true,
+      antiBotHumanize: el.toggleHumanize ? el.toggleHumanize.checked : true,
+      antiBotCanvasNoise: el.toggleCanvasNoise ? el.toggleCanvasNoise.checked : false,
+      apiEnabled: el.toggleApiEnabled ? el.toggleApiEnabled.checked : false,
+      apiPort: utils.clamp(el.apiPort ? el.apiPort.value : 8788, 1024, 65535, 8788),
+      apiExposeAllServices: el.toggleApiAllServices ? el.toggleApiAllServices.checked : true,
+      apiServices: app.state.config.apiServices || []
     };
   }
 
@@ -114,6 +136,8 @@ window.AiHub = window.AiHub || {};
       app.state.config = result.config;
       app.state.limit = result.config.maxActiveServices;
       app.state.blocking.enabled = result.config.blockingEnabled;
+
+      for (const notice of result.notices || []) app.toast(notice, 'info');
 
       utils.applyDarkMode(result.config.darkMode);
       utils.updateBlockingUI({
@@ -235,11 +259,20 @@ window.AiHub = window.AiHub || {};
       el.toggleMinimizeTray,
       el.toggleLaunchLogin,
       el.toggleAutoUpdate,
-      el.toggleProxy
+      el.toggleProxy,
+      el.toggleSessionPersistence,
+      el.toggleAutoRelogin,
+      el.toggleKeepAlive,
+      el.toggleIsolateSessions,
+      el.toggleAntiBot,
+      el.toggleHumanize,
+      el.toggleCanvasNoise,
+      el.toggleApiEnabled,
+      el.toggleApiAllServices
     ];
     changeInputs.forEach((input) => input && input.addEventListener('change', debouncedSave));
 
-    [el.maxServices, el.hibernateMinutes, el.globalShortcut, el.proxyUrl].forEach(
+    [el.maxServices, el.hibernateMinutes, el.globalShortcut, el.proxyUrl, el.keepAliveMinutes, el.apiPort].forEach(
       (input) => input && input.addEventListener('input', debouncedSave)
     );
 
@@ -285,16 +318,16 @@ window.AiHub = window.AiHub || {};
     if (el.btnClearSession) {
       el.btnClearSession.addEventListener('click', async () => {
         const ok = await app.confirm({
-          title: 'Clear session data?',
+          title: 'Clear caches?',
           message:
-            'This signs you out of every AI service and removes cookies, caches and cached icons. Open tabs stay open.',
-          confirmLabel: 'Clear data',
-          danger: true
+            'Removes the HTTP cache and cached icons. Cookies and the cached sessions stay, so you remain signed in — use “Clear cookies and cached sessions” on the Sessions tab to sign out.',
+          confirmLabel: 'Clear caches',
+          danger: false
         });
         if (!ok) return;
 
         try {
-          const result = await window.electronAPI.clearSessionData();
+          const result = await window.electronAPI.clearSessionData({ scope: 'cache' });
           if (result && result.success) {
             app.toast('Session data cleared', 'success');
             if (app.state.currentTabId) window.electronAPI.navReload(app.state.currentTabId);
@@ -350,8 +383,8 @@ window.AiHub = window.AiHub || {};
     if (el.serviceSearch) {
       el.serviceSearch.addEventListener('input', utils.debounce(() => app.renderEnabledServices(), 120));
     }
-    if (el.allServicesSearch) {
-      el.allServicesSearch.addEventListener('input', utils.debounce(() => app.renderAllServices(), 120));
-    }
+    if (app.initServiceFilters) app.initServiceFilters();
+    if (app.initSessions) app.initSessions();
+    if (app.initApiPanel) app.initApiPanel();
   };
 })(window.AiHub);

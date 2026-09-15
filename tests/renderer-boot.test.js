@@ -21,6 +21,8 @@ const SCRIPTS = [
   'motion.js',
   'overlays.js',
   'services.js',
+  'sessions.js',
+  'apipanel.js',
   'tabs.js',
   'findbar.js',
   'settings.js',
@@ -53,7 +55,21 @@ const BASE_CONFIG = {
   autoUpdateServices: true,
   lastUpdate: null,
   openTabs: [],
-  activeTabId: null
+  activeTabId: null,
+  sessionPersistence: true,
+  autoRelogin: true,
+  isolateSessions: false,
+  keepAliveSessions: true,
+  keepAliveMinutes: 45,
+  antiBotHardening: true,
+  antiBotHumanize: true,
+  antiBotCanvasNoise: false,
+  apiEnabled: false,
+  apiPort: 8788,
+  apiExposeAllServices: true,
+  apiServices: [],
+  serviceUsage: { chatgpt: Date.now() },
+  logins: { chatgpt: { state: 'logged-in' } }
 };
 
 function installElectronApiStub() {
@@ -110,6 +126,37 @@ function installElectronApiStub() {
     clearSessionData: jest.fn().mockResolvedValue({ success: true }),
     openExternal: jest.fn().mockResolvedValue(true),
     getBlockingStats: jest.fn().mockResolvedValue({ enabled: true, blocked: 0, allowed: 0 }),
+    getLoginStates: jest.fn().mockResolvedValue({ chatgpt: { state: 'logged-in', reason: 'session-cookie', expiresAt: Date.now() + 86400000 } }),
+    getSessionStats: jest.fn().mockResolvedValue({
+      logins: { chatgpt: { state: 'logged-in', reason: 'session-cookie', hasSnapshot: true } },
+      perService: { chatgpt: { serviceId: 'chatgpt', cookies: 7, authCookies: 3, pinned: 2, isolated: false, cacheSize: 2048 } },
+      hardening: { enabled: true, attachedTabs: 1, chromeMajor: '141', languages: ['en-US'], humanize: true, canvasNoise: false },
+      isolation: false,
+      persistence: true,
+      keepAlive: { enabled: true, minutes: 45 },
+      snapshots: 1,
+      usage: { chatgpt: Date.now() }
+    }),
+    reloginService: jest.fn().mockResolvedValue({ ok: true }),
+    clearServiceData: jest.fn().mockResolvedValue({ success: true, cleared: 4 }),
+    touchSession: jest.fn().mockResolvedValue({ ok: true, status: 200 }),
+    getApiStatus: jest.fn().mockResolvedValue({
+      enabled: false,
+      listening: false,
+      baseUrl: 'http://127.0.0.1:8788/v1',
+      port: 8788,
+      key: 'aihub-test',
+      keyMasked: 'aihub-…test',
+      models: [{ id: 'aihub/chatgpt', login: 'logged-in', strategy: 'api' }],
+      modelCount: 1,
+      ready: 1,
+      exposeAll: true,
+      counters: { requests: 2, completed: 2, failed: 0, cancelled: 0, streaming: 1 },
+      queue: { active: 0, queued: 0, limit: 2 },
+      recent: [{ route: '/v1/chat/completions', model: 'aihub/chatgpt', status: 200, ms: 812, stream: true }]
+    }),
+    rotateApiToken: jest.fn().mockResolvedValue({ ok: true, key: 'aihub-rotated', keyMasked: 'aihub-…ated' }),
+    apiPing: jest.fn().mockResolvedValue({ ok: true, status: 200, body: '{"ok":true}' }),
     checkForUpdates: jest.fn().mockResolvedValue({ status: 'up-to-date', currentVersion: '1.2.0' }),
     getUpdateStatus: jest.fn().mockResolvedValue({ status: 'idle', currentVersion: '1.2.0' }),
     quitAndInstall: jest.fn().mockResolvedValue(false),
@@ -125,7 +172,10 @@ function installElectronApiStub() {
     onTabBlocked: noopSubscribe,
     onTabFindResult: noopSubscribe,
     onBlockingState: noopSubscribe,
-    onUpdateState: noopSubscribe
+    onUpdateState: noopSubscribe,
+    onLoginState: noopSubscribe,
+    onSessionState: noopSubscribe,
+    onApiState: noopSubscribe
   };
   window.electronAPI = api;
   return api;

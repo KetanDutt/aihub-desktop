@@ -26,7 +26,7 @@ if (!app.isPackaged && process.env.NODE_ENV !== 'test' && process.env.AIHUB_NO_R
   }
 }
 
-const { PROTOCOL } = require('./src/constants');
+const { PROTOCOL, IPC } = require('./src/constants');
 const { slugify } = require('./src/utils');
 
 const dataStore = require('./src/data');
@@ -34,6 +34,14 @@ const windowManager = require('./src/window');
 const blockingManager = require('./src/blocking');
 const ipcManager = require('./src/ipc');
 const updaterManager = require('./src/updater');
+const sessionStore = require('./src/sessionstore');
+const loginMonitor = require('./src/logins');
+const stealth = require('./src/stealth');
+const localApi = require('./src/api');
+
+// Blink flags for the anti-bot hardening have to exist before any renderer is
+// created, so this runs at require time — not from inside `bootstrap()`.
+stealth.applyCommandLineFlags();
 
 /** Deep links received before the shell UI is ready. */
 const pendingDeepLinks = [];
@@ -140,11 +148,30 @@ async function bootstrap() {
   // Load the bundled/downloaded catalogue before anything can open a tab.
   await dataStore.initialize();
 
-  blockingManager.updateBlockingState(require('./src/config').getConfig(), dataStore.getRulesCache());
+  const configStore = require('./src/config');
+  blockingManager.updateBlockingState(configStore.getConfig(), dataStore.getRulesCache());
   blockingManager.setupWebRequestBlocking();
 
   const securityManager = require('./src/security');
   securityManager.hardenSession(session.defaultSession);
+
+  // --- Sessions: cached cookies first, then watch, then react -------------
+  // Replaying the cached jar *before* any tab navigates is what turns a
+  // "welcome back" into a silent resume instead of a sign-in wall.
+  sessionStore.loadProfiles();
+  stealth.initialise(session.defaultSession);
+
+  const services = (await dataStore.loadServices()) || { ai_services: [] };
+  const restore = await sessionStore.restoreAll(services.ai_services || []);
+  if (restore.restored > 0) log.info(`Replayed ${restore.restored} cached cookie(s) at startup`);
+
+  loginMonitor.setup({
+    send: (channel, payload) => {
+      const win = windowManager.getMainWindow();
+      if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
+    },
+    onRelogin: (request) => windowManager.reloginService(request)
+  });
 
   windowManager.createMainWindow();
   windowManager.setupTray();
@@ -155,7 +182,35 @@ async function bootstrap() {
 
   const mainWindow = windowManager.getMainWindow();
   if (mainWindow) {
-    mainWindow.webContents.on('did-finish-load', flushPendingDeepLinks);
+    mainWindow.webContents.on('did-finish-load', () => {
+      flushPendingDeepLinks();
+      // Once the shell is up: work out where every session actually stands, and
+      // re-open sign-in pages for the ones that quietly expired.
+      setTimeout(() => {
+        loginMonitor
+          .reloginOnOpen(windowManager.openServiceIds())
+          .then((result) => {
+            if (result && result.attempted && result.attempted.length > 0) {
+              sendToShell(IPC.LOGIN_STATE, { relogin: result.attempted });
+            }
+          })
+          .catch((error) => log.warn(`Relogin pass failed: ${error.message}`));
+      }, 1500);
+    });
+  }
+
+  function sendToShell(channel, payload) {
+    const win = windowManager.getMainWindow();
+    if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
+  }
+
+  // Prime the login states from the freshly restored jar (no DOM yet), so the
+  // very first paint of the service list can already show "signed in".
+  loginMonitor.primeFromCache((services.ai_services || []).slice(0, 40)).catch(() => {});
+
+  await localApi.setup({ send: sendToShell });
+  if (configStore.getConfigItem('apiEnabled', false)) {
+    log.info('Local OpenAI-compatible API is enabled');
   }
 
   updaterManager.setupAutoUpdater();
@@ -207,12 +262,22 @@ if (!gotTheLock) {
 
   app.on('before-quit', () => {
     windowManager.setQuitting(true);
+    // Cache while the sessions are still alive: this is the snapshot the next
+    // launch restores. Best-effort — a slow page must never block quitting.
+    try {
+      void loginMonitor.flush();
+    } catch (error) {
+      log.debug(`Session flush on quit skipped: ${error.message}`);
+    }
   });
 
   app.on('will-quit', () => {
     try {
       windowManager.shutdown();
       blockingManager.teardownWebRequestBlocking();
+      stealth.teardown();
+      void localApi.stop();
+      loginMonitor.stopSweeps();
     } catch (error) {
       log.error('Error during shutdown:', error.message);
     }

@@ -4,6 +4,54 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] - 2026-09-14
+
+### Added
+
+- **Login detection and stable sessions.** Each service's sign-in state is now
+  classified from its own session cookies (with URL and page hints), kept in sync
+  live as cookies change, and surfaced in the sidebar, the Services tab and a new
+  Sessions settings tab.
+- **Re-login on open.** A service that was signed in last session but has since
+  expired gets its sign-in page reopened at launch instead of failing silently.
+- **Cookie and browser-data cache.** Session cookies are re-stamped so Chromium
+  persists them across restarts, snapshots are kept per service (`0600`,
+  encrypted via `safeStorage` when available) and replayed before the first
+  navigation. A background keep-alive ping rolls warm sessions forward.
+- **Per-service profiles (opt-in).** `persist:aihub-<id>` partitions, plus
+  "clear this service only" without touching anyone else's login.
+- **Anti-bot hardening.** `AutomationControlled` is disabled at the Blink level;
+  the Electron/app UA tokens are stripped and aligned with `Sec-CH-UA*` client
+  hints and `Accept-Language`; a main-world patch (CDP, before page scripts)
+  normalises `navigator.webdriver`, `userAgentData`, plugins, `window.chrome`,
+  WebGL vendor strings and screen metrics from a *stable* seeded profile; bot
+  challenges are waited out with jittered backoff, and typed input uses a human
+  cadence. Canvas noise exists but is off by default.
+- **Local OpenAI-compatible API** (off by default): `GET /v1/models`,
+  `POST /v1/chat/completions` (buffered + SSE streaming) and the legacy
+  `POST /v1/completions` on `127.0.0.1`, answered by the logged-in sessions —
+  either by replaying a service's own endpoint with its cookies or by driving a
+  hidden, sandboxed window. Loopback-only, bearer-key guarded, no CORS, rate and
+  concurrency limited, cancellable, adapter data overrideable in
+  `data/adapters.json`.
+- **Filters and sorting in Settings ▸ Services.** Search now spans name, type, id,
+  privacy note and URL, with type/status/sign-in facets (each showing live counts),
+  sorting by name, type, enabled state, sign-in state, recency or cached cookies,
+  a direction toggle and a clear-filters control. The choice persists.
+
+### Changed
+
+- "Clear session data" in Settings ▸ Privacy now clears *caches* and leaves you
+  signed in; signing out of everything moved to Sessions, where it also removes
+  the cached snapshots.
+- The service picker shows a per-service sign-in dot; rows in the Services tab
+  show cached cookie counts and token expiry, with a Sign in shortcut.
+
+### Docs
+
+- New [sessions.md](../docs/sessions.md) and [local-api.md](../docs/local-api.md);
+  configuration, IPC, architecture and security pages updated.
+
 ## [1.3.0] - 2026-09-14
 
 ### Changed (visual — Liquid Glass v2)

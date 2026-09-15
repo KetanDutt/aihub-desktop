@@ -21,6 +21,84 @@ jest.mock('electron-store', () => ({
 
 const { sanitizeConfig, validateAccelerator, validateProxyUrl } = require('../src/config');
 
+describe('session, anti-bot and local API settings', () => {
+  const config = require('../src/config');
+
+  it('accepts the new keys and coerces them', () => {
+    const clean = config.sanitizeConfig({
+      sessionPersistence: 'false',
+      autoRelogin: 'true',
+      isolateSessions: 'yes-please',
+      keepAliveMinutes: 4000,
+      antiBotHardening: true,
+      antiBotCanvasNoise: 'false',
+      apiEnabled: true,
+      apiPort: 1,
+      apiMaxConcurrent: 99,
+      apiRateLimitPerMinute: 'abc',
+      apiTimeoutSeconds: 4,
+      apiServices: ['chatgpt', 'chatgpt', '', 7]
+    });
+
+    expect(clean.sessionPersistence).toBe(false);
+    expect(clean.autoRelogin).toBe(true);
+    expect(clean.isolateSessions).toBe(false); // junk never becomes a session change
+    expect(clean.keepAliveMinutes).toBe(720);
+    expect(clean.antiBotCanvasNoise).toBe(false);
+    expect(clean.apiPort).toBe(1024);
+    expect(clean.apiMaxConcurrent).toBe(8);
+    expect(clean.apiRateLimitPerMinute).toBe(60); // falls back rather than going unlimited
+    expect(clean.apiTimeoutSeconds).toBe(5);
+    expect(clean.apiServices).toEqual(['chatgpt']);
+  });
+
+  it('keeps the API token and internal state out of a renderer write', () => {
+    const clean = config.sanitizeConfig({
+      apiToken: 'stolen',
+      sessionStates: { chatgpt: { state: 'logged-in' } },
+      serviceUsage: { chatgpt: 1 }
+    });
+    expect(clean).not.toHaveProperty('apiToken');
+    expect(clean).not.toHaveProperty('sessionStates');
+    expect(clean).not.toHaveProperty('serviceUsage');
+  });
+
+  it('never ships the API token to the renderer with the config snapshot', () => {
+    const publicConfig = config.getPublicConfig();
+    expect(publicConfig.apiToken).toBeUndefined();
+  });
+
+  it('documents every new setting in the schema and the whitelist', () => {
+    const keys = [
+      'sessionPersistence',
+      'autoRelogin',
+      'isolateSessions',
+      'keepAliveSessions',
+      'keepAliveMinutes',
+      'antiBotHardening',
+      'antiBotHumanize',
+      'antiBotCanvasNoise',
+      'apiEnabled',
+      'apiPort',
+      'apiExposeAllServices',
+      'apiServices',
+      'apiMaxConcurrent',
+      'apiRateLimitPerMinute',
+      'apiTimeoutSeconds'
+    ];
+    for (const key of keys) {
+      expect(config.schema).toHaveProperty(key);
+      expect(config.WRITABLE_KEYS.has(key)).toBe(true);
+      expect(config.DEFAULTS).toHaveProperty(key);
+    }
+    // Internal-but-persisted keys must exist in the schema without being writable.
+    for (const internal of ['apiToken', 'sessionStates', 'serviceUsage']) {
+      expect(config.schema).toHaveProperty(internal);
+      expect(config.WRITABLE_KEYS.has(internal)).toBe(false);
+    }
+  });
+});
+
 describe('sanitizeConfig', () => {
   it('drops internal state even when supplied', () => {
     const clean = sanitizeConfig({

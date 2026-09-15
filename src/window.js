@@ -25,6 +25,9 @@ const configStore = require('./config');
 const dataStore = require('./data');
 const blocking = require('./blocking');
 const security = require('./security');
+const stealth = require('./stealth');
+const sessionStore = require('./sessionstore');
+const loginMonitor = require('./logins');
 const { TabManager } = require('./tabs');
 const {
   LAYOUT,
@@ -359,6 +362,33 @@ function notifyTabState(tab) {
   });
 }
 
+/** Cheap re-check of the challenge rule (the monitor owns the real logic). */
+function isLoginChallenge(url) {
+  try {
+    // eslint-disable-next-line global-require
+    const { isChallengeUrl } = require('./loginstate');
+    return isChallengeUrl(url);
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Remember that a service was used, for "most recently used" ordering in the
+ * service picker. Written straight through to the store; the renderer never
+ * touches this key.
+ */
+function noteServiceUsage(serviceId) {
+  if (!serviceId) return;
+  try {
+    const usage = { ...(configStore.getConfigItem('serviceUsage', {}) || {}) };
+    usage[serviceId] = Date.now();
+    configStore.updateConfigItem('serviceUsage', usage);
+  } catch (e) {
+    /* usage tracking is optional */
+  }
+}
+
 /** Add a view to the window unless it is already a child (keeps z-order sane). */
 function ensureChildView(view) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -412,17 +442,22 @@ function injectProxyHost(allowList) {
 function createViewForTab(tab) {
   if (!mainWindow) return null;
 
+  const partition = sessionStore.partitionFor(tab.serviceId);
   const view = new WebContentsView({
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
       spellcheck: true,
-      backgroundThrottling: true
+      backgroundThrottling: true,
+      // Isolating the jar per service is opt-in; by default everything shares
+      // the persistent default session, which is what makes SSO work.
+      ...(partition ? { partition } : {})
     }
   });
 
   if (tab.userAgent) view.webContents.userAgent = tab.userAgent;
+  else stealth.applyToSession(view.webContents.session);
 
   const webContentsId = view.webContents.id;
 
@@ -453,6 +488,14 @@ function createViewForTab(tab) {
 
   const contents = view.webContents;
 
+  // Anti-bot hardening: main-world patch ahead of page scripts. Failure is
+  // non-fatal (DevTools owns the debugger, or CDP is unavailable) — the tab
+  // still works, just without the mask.
+  stealth.applyToWebContents(contents).catch(() => {});
+
+  // Login detection: cookie + URL + selector evidence, per service.
+  loginMonitor.observe(contents, tab.serviceId);
+
   contents.on('did-start-loading', () => {
     tabs.update(tab.id, { loading: true });
     notifyTabState(tabs.get(tab.id));
@@ -465,12 +508,21 @@ function createViewForTab(tab) {
 
   const syncNavigation = () => {
     if (contents.isDestroyed()) return;
+    const url = contents.getURL();
     tabs.update(tab.id, {
-      url: contents.getURL(),
+      url,
       canGoBack: contents.canGoBack(),
       canGoForward: contents.canGoForward()
     });
-    notifyTabState(tabs.get(tab.id));
+    notifyTabState(tab);
+
+    // A bot challenge is waited out with jittered backoff, and it must never be
+    // misread as a signed-out session.
+    if (url && isLoginChallenge(url)) {
+      stealth.handleChallenge(contents, { url, serviceId: tab.serviceId });
+    } else {
+      stealth.noteChallengeCleared(contents);
+    }
   };
   contents.on('did-navigate', syncNavigation);
   contents.on('did-navigate-in-page', syncNavigation);
@@ -657,6 +709,7 @@ function createTab({
     return { success: false, error: 'view_failed' };
   }
 
+  noteServiceUsage(serviceId);
   activateTab(tabId);
   persistTabsNow();
   refreshTrayMenu();
@@ -692,6 +745,7 @@ function activateTab(tabId) {
   applyViewBounds();
   configStore.updateConfigItem('lastActiveService', tab.serviceId);
   configStore.updateConfigItem('activeTabId', tabId);
+  noteServiceUsage(tab.serviceId);
   notifyTabState(tab);
   refreshTrayMenu();
   return true;
@@ -946,6 +1000,64 @@ function setTabLimit(limit) {
   return tabs.setLimit(limit);
 }
 
+// ---------------------------------------------------------------------------
+// Session / login helpers
+// ---------------------------------------------------------------------------
+
+/** The live tab for a service, if any. */
+function tabIdForService(serviceId) {
+  return (tabs.list().find((tab) => tab.serviceId === serviceId) || {}).id || null;
+}
+
+/**
+ * Take the user to a service's sign-in page.
+ *
+ * Reuses the tab when it is open (and revives it from hibernation) so a stale
+ * session is refreshed in place instead of eating a tab slot; otherwise opens a
+ * new tab, which the tab limit may still refuse — that is reported, not hidden.
+ *
+ * @param {{serviceId: string, url: string}} request
+ */
+function reloginService({ serviceId, url }) {
+  if (!serviceId || !url) return { ok: false, error: 'invalid_request' };
+
+  const tabId = tabIdForService(serviceId);
+  const tab = tabId ? tabs.get(tabId) : null;
+
+  if (tab) {
+    // Hibernated tabs have no view: wake it first, then navigate.
+    if (tab.hibernated || !views.has(tabId)) activateTab(tabId);
+    const view = views.get(tabId);
+    if (view && !view.webContents.isDestroyed()) {
+      try {
+        view.webContents.loadURL(url);
+        notifyTabState(tabs.get(tabId));
+        return { ok: true, tabId, reused: true };
+      } catch (error) {
+        log.warn(`Unable to navigate ${tabId} to its sign-in page: ${error.message}`);
+        return { ok: false, error: 'navigation-failed' };
+      }
+    }
+  }
+
+  const freshId = `${serviceId}-relogin-${Date.now().toString(36)}`;
+  const created = createTab({ tabId: freshId, serviceId, url, title: `${serviceId} — sign in` });
+  if (created.success) send(IPC.TAB_CREATED, { tabId: freshId, serviceId, url, title: 'Sign in' });
+  return { ok: created.success, tabId: created.success ? freshId : null, reused: false, error: created.error };
+}
+
+/** Reload every live tab of a service (used after a cookie restore). */
+function reloadService(serviceId) {
+  const affected = tabs.list().filter((tab) => tab.serviceId === serviceId);
+  for (const tab of affected) navReload(tab.id);
+  return affected.length;
+}
+
+/** Service ids that currently have a tab. */
+function openServiceIds() {
+  return [...new Set(tabs.list().map((tab) => tab.serviceId))];
+}
+
 module.exports = {
   createMainWindow,
   getMainWindow,
@@ -977,6 +1089,11 @@ module.exports = {
   restoreTabs,
   getTabStates,
   setTabLimit,
+  reloginService,
+  reloadService,
+  tabIdForService,
+  openServiceIds,
+  noteServiceUsage,
   shutdown,
   // exposed for tests / status reporting
   _tabs: tabs,

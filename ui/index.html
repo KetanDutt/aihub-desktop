@@ -183,6 +183,8 @@
         <div class="settings-tabs" role="tablist">
           <button class="settings-tab active" data-tab="general" role="tab" aria-selected="true">General</button>
           <button class="settings-tab" data-tab="services" role="tab" aria-selected="false">Services</button>
+          <button class="settings-tab" data-tab="sessions" role="tab" aria-selected="false">Sessions</button>
+          <button class="settings-tab" data-tab="api" role="tab" aria-selected="false">API</button>
           <button class="settings-tab" data-tab="privacy" role="tab" aria-selected="false">Privacy</button>
           <button class="settings-tab" data-tab="about" role="tab" aria-selected="false">About</button>
         </div>
@@ -275,13 +277,209 @@
               <div class="services-manager-header">
                 <div>
                   <h3>Manage services</h3>
-                  <p class="hint-text">Choose which services appear in the picker.</p>
+                  <p class="hint-text" id="services-filter-summary">Choose which services appear in the picker.</p>
                 </div>
                 <input id="all-services-search" type="search" class="input-field" placeholder="Search…"
                        autocomplete="off" spellcheck="false" aria-label="Search all services">
               </div>
+
+              <!-- Filters + sorting. The type list is filled from the catalogue. -->
+              <div class="services-filters" id="services-filters">
+                <label class="filter-field">
+                  <span class="filter-label">Type</span>
+                  <select id="filter-type" class="input-field select-field" aria-label="Filter by type">
+                    <option value="all">All types</option>
+                  </select>
+                </label>
+                <label class="filter-field">
+                  <span class="filter-label">Status</span>
+                  <select id="filter-status" class="input-field select-field" aria-label="Filter by status">
+                    <option value="all">Any status</option>
+                    <option value="enabled">Enabled</option>
+                    <option value="disabled">Disabled</option>
+                    <option value="open">Open in a tab</option>
+                    <option value="closed">Not open</option>
+                  </select>
+                </label>
+                <label class="filter-field">
+                  <span class="filter-label">Sign-in</span>
+                  <select id="filter-login" class="input-field select-field" aria-label="Filter by sign-in state">
+                    <option value="all">Any session</option>
+                    <option value="logged-in">Signed in</option>
+                    <option value="logged-out">Signed out</option>
+                    <option value="challenge">Verifying</option>
+                    <option value="unknown">Unknown</option>
+                  </select>
+                </label>
+                <label class="filter-field">
+                  <span class="filter-label">Sort by</span>
+                  <select id="sort-services" class="input-field select-field" aria-label="Sort services">
+                    <option value="name">Name</option>
+                    <option value="type">Type</option>
+                    <option value="status">Enabled first</option>
+                    <option value="login">Sign-in state</option>
+                    <option value="recent">Recently used</option>
+                    <option value="cookies">Cached cookies</option>
+                  </select>
+                </label>
+                <button id="sort-direction" class="btn btn-icon btn-sort-dir" type="button"
+                        title="Sort direction: ascending" aria-label="Toggle sort direction">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+                       stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 19V5M5 12l7-7 7 7"></path>
+                  </svg>
+                </button>
+                <button id="filter-reset" class="btn btn-secondary btn-small" type="button" disabled>
+                  Clear filters
+                </button>
+              </div>
+
               <div id="all-services-list" class="all-services-list"></div>
             </div>
+          </div>
+
+          <!-- ---------- Sessions ---------- -->
+          <div id="tab-sessions" class="settings-tab-content" role="tabpanel">
+            <section class="setting-group">
+              <h3 class="setting-section-title">Login stability</h3>
+              <div class="info-box">
+                <p id="session-summary" class="mono">Checking your sessions…</p>
+                <p class="hint-text">Cookies are cached locally so a restart, a crash or an
+                  evicted cache does not sign you out. Expired sessions are re-opened on launch.</p>
+              </div>
+              <label class="setting-label toggle-row">
+                <span>
+                  <span class="setting-name">Keep me signed in</span>
+                  <small class="setting-hint">Cache cookies and re-stamp session cookies so they survive a quit.</small>
+                </span>
+                <span class="toggle-switch"><input type="checkbox" id="toggle-session-persistence" checked><span class="toggle-slider"></span></span>
+              </label>
+              <label class="setting-label toggle-row">
+                <span>
+                  <span class="setting-name">Re-login on open</span>
+                  <small class="setting-hint">If a service that was signed in is no longer, open its sign-in page at startup.</small>
+                </span>
+                <span class="toggle-switch"><input type="checkbox" id="toggle-auto-relogin" checked><span class="toggle-slider"></span></span>
+              </label>
+              <label class="setting-label toggle-row">
+                <span>
+                  <span class="setting-name">Refresh idle sessions</span>
+                  <small class="setting-hint">A background ping rolls the provider's own token forward before it lapses.</small>
+                </span>
+                <span class="toggle-switch"><input type="checkbox" id="toggle-keep-alive" checked><span class="toggle-slider"></span></span>
+              </label>
+              <div class="setting-field">
+                <label class="setting-label" for="keep-alive-minutes">Refresh interval (minutes)</label>
+                <input type="number" id="keep-alive-minutes" min="5" max="720" value="45" class="input-field input-narrow">
+              </div>
+              <label class="setting-label toggle-row">
+                <span>
+                  <span class="setting-name">Isolate sessions per service</span>
+                  <small class="setting-hint">Separate cookie jar per service. Blocks cross-service sign-on; existing tabs must be reopened.</small>
+                </span>
+                <span class="toggle-switch"><input type="checkbox" id="toggle-isolate-sessions"><span class="toggle-slider"></span></span>
+              </label>
+              <div class="button-row">
+                <button id="btn-refresh-sessions" class="btn btn-secondary btn-small">Re-check all sessions</button>
+              </div>
+            </section>
+
+            <section class="setting-group">
+              <h3 class="setting-section-title">Anti-bot hardening</h3>
+              <p id="hardening-summary" class="hint-text">Hardening status unavailable.</p>
+              <label class="setting-label toggle-row">
+                <span>
+                  <span class="setting-name">Normalise the browser fingerprint</span>
+                  <small class="setting-hint">Strips <code>Electron</code> from the UA, aligns client hints, hides automation flags.</small>
+                </span>
+                <span class="toggle-switch"><input type="checkbox" id="toggle-anti-bot" checked><span class="toggle-slider"></span></span>
+              </label>
+              <label class="setting-label toggle-row">
+                <span>
+                  <span class="setting-name">Human-paced input</span>
+                  <small class="setting-hint">Jittered cadence for text this app types for you, and patience with bot challenges.</small>
+                </span>
+                <span class="toggle-switch"><input type="checkbox" id="toggle-humanize" checked><span class="toggle-slider"></span></span>
+              </label>
+              <label class="setting-label toggle-row">
+                <span>
+                  <span class="setting-name">Canvas noise</span>
+                  <small class="setting-hint">Advanced. Perturbs canvas read-back; can also break fingerprint-based login persistence.</small>
+                </span>
+                <span class="toggle-switch"><input type="checkbox" id="toggle-canvas-noise"><span class="toggle-slider"></span></span>
+              </label>
+            </section>
+
+            <section class="setting-group">
+              <h3 class="setting-section-title">Per-service sessions</h3>
+              <div id="session-list" class="session-list"></div>
+            </section>
+
+            <section class="setting-group danger-zone">
+              <h3 class="setting-section-title">Sign out</h3>
+              <button id="btn-signout-all" class="btn btn-danger btn-small">Clear cookies and cached sessions</button>
+              <small class="setting-hint">Removes every cookie, all local storage and the cached session snapshots.</small>
+            </section>
+          </div>
+
+          <!-- ---------- Local API ---------- -->
+          <div id="tab-api" class="settings-tab-content" role="tabpanel">
+            <section class="setting-group">
+              <h3 class="setting-section-title">OpenAI-compatible endpoint</h3>
+              <p class="hint-text">Serves <code>/v1/chat/completions</code> on your machine and answers it
+                through the logged-in sessions above — no API keys from the provider, no extra account.</p>
+              <div class="info-box">
+                <p id="api-status-line" class="mono">Stopped</p>
+                <p id="api-endpoint-line" class="mono"></p>
+              </div>
+              <label class="setting-label toggle-row">
+                <span>
+                  <span class="setting-name">Enable the local API</span>
+                  <small class="setting-hint">Loopback only. Requests from other machines and from web pages are refused.</small>
+                </span>
+                <span class="toggle-switch"><input type="checkbox" id="toggle-api-enabled"><span class="toggle-slider"></span></span>
+              </label>
+              <div class="setting-field">
+                <label class="setting-label" for="api-port">Port</label>
+                <input type="number" id="api-port" min="1024" max="65535" value="8788" class="input-field input-narrow">
+                <small class="setting-hint">If the port is busy the app walks forward up to six ports.</small>
+              </div>
+              <label class="setting-label toggle-row">
+                <span>
+                  <span class="setting-name">Expose every service</span>
+                  <small class="setting-hint">Off: only the services ticked below are callable.</small>
+                </span>
+                <span class="toggle-switch"><input type="checkbox" id="toggle-api-all-services" checked><span class="toggle-slider"></span></span>
+              </label>
+              <div id="api-services-list" class="api-services-list"></div>
+            </section>
+
+            <section class="setting-group">
+              <h3 class="setting-section-title">Key</h3>
+              <div class="api-key-row">
+                <input id="api-key-field" type="password" class="input-field mono" readonly value=""
+                       spellcheck="false" aria-label="Local API key">
+                <button id="btn-api-reveal" class="btn btn-secondary btn-small" type="button">Show</button>
+                <button id="btn-api-copy" class="btn btn-secondary btn-small" type="button">Copy</button>
+                <button id="btn-api-rotate" class="btn btn-secondary btn-small" type="button">Rotate</button>
+              </div>
+              <div class="button-row">
+                <button id="btn-api-ping" class="btn btn-secondary btn-small">Test the endpoint</button>
+                <button id="btn-api-copy-curl" class="btn btn-secondary btn-small">Copy curl example</button>
+              </div>
+              <pre id="api-curl-example" class="code-block" aria-label="curl example"></pre>
+            </section>
+
+            <section class="setting-group">
+              <h3 class="setting-section-title">Models</h3>
+              <p class="hint-text">A model id is <code>aihub/&lt;service&gt;</code>; use the service slug if your client is strict.</p>
+              <div id="api-model-list" class="api-model-list"></div>
+            </section>
+
+            <section class="setting-group">
+              <h3 class="setting-section-title">Recent requests</h3>
+              <div id="api-log" class="api-log"></div>
+            </section>
           </div>
 
           <!-- ---------- Privacy ---------- -->
@@ -394,6 +592,8 @@
   <script src="motion.js"></script>
   <script src="overlays.js"></script>
   <script src="services.js"></script>
+  <script src="sessions.js"></script>
+  <script src="apipanel.js"></script>
   <script src="tabs.js"></script>
   <script src="findbar.js"></script>
   <script src="settings.js"></script>

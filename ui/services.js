@@ -1,6 +1,6 @@
 /**
  * Service catalogue rendering: the sidebar, the welcome screen quick start and
- * the Services tab in Settings.
+ * the Services tab in Settings (filters + sorting live here).
  */
 
 window.AiHub = window.AiHub || {};
@@ -9,6 +9,13 @@ window.AiHub = window.AiHub || {};
   const PLUS_SVG =
     '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" ' +
     'stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+
+  const LOGIN_LABELS = {
+    'logged-in': 'Signed in',
+    'logged-out': 'Signed out',
+    challenge: 'Verifying',
+    unknown: 'Not checked'
+  };
 
   function avatarFor(service, size = 'sm') {
     const wrap = document.createElement('span');
@@ -33,6 +40,20 @@ window.AiHub = window.AiHub || {};
 
     wrap.append(img, initials);
     return wrap;
+  }
+
+  /** Small status dot shown on cards and rows. */
+  function loginDot(serviceId) {
+    const record = app.loginStateOf(serviceId);
+    const dot = document.createElement('span');
+    dot.className = `login-dot login-${record.state}`;
+    const expires =
+      record.expiresAt && typeof record.expiresAt === 'number'
+        ? ` · expires ${window.AiHubUtils.formatDate(new Date(record.expiresAt).toISOString())}`
+        : '';
+    dot.title = `${LOGIN_LABELS[record.state] || record.state}${record.reason ? ` (${record.reason})` : ''}${expires}`;
+    dot.setAttribute('aria-label', LOGIN_LABELS[record.state] || record.state);
+    return dot;
   }
 
   function openService(service) {
@@ -116,6 +137,8 @@ window.AiHub = window.AiHub || {};
       heading.textContent = service.name;
       header.appendChild(heading);
 
+      header.appendChild(loginDot(service.id));
+
       if (openIds.has(service.id)) {
         const dot = document.createElement('span');
         dot.className = 'service-open-dot';
@@ -191,15 +214,167 @@ window.AiHub = window.AiHub || {};
     }
   };
 
+  // -- Filters ---------------------------------------------------------------
+
+  /** Filter values as currently chosen in the Services tab. */
+  app.currentServiceFilters = function currentServiceFilters() {
+    const el = app.elements;
+    return window.AiHubUtils.normalizeServiceFilters({
+      query: el.allServicesSearch ? el.allServicesSearch.value : '',
+      type: el.filterType ? el.filterType.value : 'all',
+      status: el.filterStatus ? el.filterStatus.value : 'all',
+      login: el.filterLogin ? el.filterLogin.value : 'all',
+      sort: el.sortServices ? el.sortServices.value : 'name',
+      direction: app.state.serviceFilters.direction || 'asc'
+    });
+  };
+
+  /** Push the filter bar's DOM state into `app.state.serviceFilters`. */
+  function syncFilterInputsFromState() {
+    const el = app.elements;
+    const filters = app.state.serviceFilters;
+    if (el.allServicesSearch && el.allServicesSearch.value !== filters.query) el.allServicesSearch.value = filters.query;
+    if (el.filterType) el.filterType.value = filters.type || 'all';
+    if (el.filterStatus) el.filterStatus.value = filters.status || 'all';
+    if (el.filterLogin) el.filterLogin.value = filters.login || 'all';
+    if (el.sortServices) el.sortServices.value = filters.sort || 'name';
+    if (el.sortDirection) {
+      const descending = filters.direction === 'desc';
+      el.sortDirection.classList.toggle('is-desc', descending);
+      el.sortDirection.title = `Sort direction: ${descending ? 'descending' : 'ascending'}`;
+    }
+  }
+
+  /** Type options with facet counts, e.g. `Conversational AI (7)`. */
+  function populateTypeFilter(counts) {
+    const select = app.elements.filterType;
+    if (!select) return;
+
+    const options = window.AiHubUtils.serviceTypes(app.state.services);
+    const wanted = select.value || 'all';
+
+    select.innerHTML = '';
+    const all = document.createElement('option');
+    all.value = 'all';
+    all.textContent = `All types (${counts.total})`;
+    select.appendChild(all);
+
+    for (const entry of options) {
+      const option = document.createElement('option');
+      option.value = entry.type;
+      option.textContent = `${entry.type} (${entry.count})`;
+      select.appendChild(option);
+    }
+
+    // Keep the current choice when it still exists, else fall back to "all".
+    select.value = [...select.options].some((option) => option.value === wanted) ? wanted : 'all';
+  }
+
+  /** Grey out filter values that cannot match anything right now. */
+  function refreshFilterAffordances(counts) {
+    const el = app.elements;
+    if (el.filterStatus) {
+      el.filterStatus.options[1].disabled = counts.enabled === 0;
+      el.filterStatus.options[2].disabled = counts.disabled === 0;
+      el.filterStatus.options[3].disabled = counts.open === 0;
+    }
+    if (el.filterLogin) {
+      el.filterLogin.options[1].disabled = counts.loggedIn === 0;
+      el.filterLogin.options[2].disabled = counts.loggedOut === 0;
+      el.filterLogin.options[4].disabled = counts.unknown === 0;
+    }
+    if (el.filterReset) {
+      const searching = Boolean(el.allServicesSearch && el.allServicesSearch.value.trim());
+      el.filterReset.disabled =
+        !searching &&
+        (!el.filterType || el.filterType.value === 'all') &&
+        (!el.filterStatus || el.filterStatus.value === 'all') &&
+        (!el.filterLogin || el.filterLogin.value === 'all');
+    }
+  }
+
+  app.initServiceFilters = function initServiceFilters() {
+    const el = app.elements;
+    if (!el.filterType && !el.filterStatus && !el.sortServices) return;
+
+    const persisted = app.loadServiceFilters();
+    app.state.serviceFilters = { ...app.state.serviceFilters, ...persisted };
+    app.state.filtersLoaded = true;
+    syncFilterInputsFromState();
+
+    const apply = () => {
+      app.state.serviceFilters = app.currentServiceFilters();
+      app.saveServiceFilters(app.state.serviceFilters);
+      app.renderAllServices();
+    };
+
+    const debounced = window.AiHubUtils.debounce(apply, 120);
+
+    if (el.allServicesSearch) el.allServicesSearch.addEventListener('input', debounced);
+    for (const node of [el.filterType, el.filterStatus, el.filterLogin, el.sortServices]) {
+      if (node) node.addEventListener('change', apply);
+    }
+    if (el.sortDirection) {
+      el.sortDirection.addEventListener('click', () => {
+        const current = app.state.serviceFilters.direction === 'desc' ? 'asc' : 'desc';
+        app.state.serviceFilters.direction = current;
+        app.saveServiceFilters(app.state.serviceFilters);
+        syncFilterInputsFromState();
+        app.renderAllServices();
+      });
+    }
+    if (el.filterReset) {
+      el.filterReset.addEventListener('click', () => {
+        app.state.serviceFilters = { query: '', type: 'all', status: 'all', login: 'all', sort: 'name', direction: 'asc' };
+        if (el.allServicesSearch) el.allServicesSearch.value = '';
+        app.saveServiceFilters(app.state.serviceFilters);
+        syncFilterInputsFromState();
+        app.renderAllServices();
+        if (el.allServicesSearch) el.allServicesSearch.focus();
+      });
+    }
+  };
+
   // -- Settings: manage services --------------------------------------------
 
   app.renderAllServices = function renderAllServices() {
     const list = app.elements && app.elements.allServicesList;
     if (!list) return;
 
-    const query = app.elements.allServicesSearch ? app.elements.allServicesSearch.value : '';
-    const services = app.filterServices(app.state.services, query);
-    const enabled = new Set(app.state.config.enabledServices || []);
+    if (!app.state.filtersLoaded && app.initServiceFilters) {
+      // The filter bar may not have been wired yet (catalogue loads first).
+      syncFilterInputsFromState();
+    }
+
+    const filters = app.currentServiceFilters();
+    const enabledIds = new Set(app.state.config.enabledServices || []);
+    const cookieCounts = {};
+    for (const [id, stats] of Object.entries(app.state.sessionStats || {})) {
+      if (stats && typeof stats.cookies === 'number') cookieCounts[id] = stats.cookies;
+    }
+
+    const result = window.AiHubUtils.applyServiceFilters(
+      app.state.services,
+      filters,
+      {
+        enabledIds,
+        openIds: app.openServiceIds(),
+        loginStates: app.state.logins,
+        usage: (app.state.config.serviceUsage) || {},
+        cookieCounts
+      }
+    );
+
+    populateTypeFilter(result.counts);
+    refreshFilterAffordances(result.counts);
+
+    const summary = app.elements.servicesFilterSummary;
+    if (summary) {
+      summary.textContent =
+        result.counts.total === 0
+          ? 'No services loaded yet.'
+          : window.AiHubUtils.describeFilters(result.counts, filters);
+    }
 
     list.innerHTML = '';
 
@@ -208,60 +383,94 @@ window.AiHub = window.AiHub || {};
       return;
     }
 
-    if (services.length === 0) {
-      list.appendChild(emptyState(`No service matches “${query}”.`));
+    if (result.services.length === 0) {
+      const wrap = emptyState(
+        `No service matches the current filters (${result.counts.total} in the catalogue).`,
+        null
+      );
+      list.appendChild(wrap);
       return;
     }
 
-    for (const service of services) {
-      const row = document.createElement('div');
-      row.className = 'service-item';
-      row.dataset.id = service.id;
-
-      row.appendChild(avatarFor(service, 'sm'));
-
-      const info = document.createElement('div');
-      info.className = 'service-item-info';
-
-      const name = document.createElement('h4');
-      name.className = 'service-item-name';
-      name.textContent = service.name;
-
-      const type = document.createElement('p');
-      type.className = 'service-item-type';
-      type.textContent = service.type || 'AI Service';
-
-      info.append(name, type);
-      row.appendChild(info);
-
-      const toggle = document.createElement('label');
-      toggle.className = 'toggle-switch';
-
-      const input = document.createElement('input');
-      input.type = 'checkbox';
-      input.checked = enabled.has(service.id);
-      input.setAttribute('aria-label', `Enable ${service.name}`);
-
-      const slider = document.createElement('span');
-      slider.className = 'toggle-slider';
-
-      toggle.append(input, slider);
-      row.appendChild(toggle);
-
-      input.addEventListener('change', async (event) => {
-        const target = event.target;
-        try {
-          const result = await window.electronAPI.toggleService(service.id);
-          app.state.config.enabledServices = result;
-          app.renderEnabledServices();
-          app.toast(`${service.name} ${target.checked ? 'enabled' : 'disabled'}`, 'success');
-        } catch (error) {
-          target.checked = !target.checked;
-          app.toast('Unable to update this service', 'error');
-        }
-      });
-
-      list.appendChild(row);
+    for (const service of result.services) {
+      list.appendChild(serviceRow(service, enabledIds, cookieCounts[service.id] || 0));
     }
   };
+
+  /** One row of the Services tab: identity, session state and the toggle. */
+  function serviceRow(service, enabledIds, cookieCount) {
+    const utils = window.AiHubUtils;
+    const record = app.loginStateOf(service.id);
+
+    const row = document.createElement('div');
+    row.className = 'service-item';
+    row.dataset.id = service.id;
+    if (enabledIds.has(service.id)) row.classList.add('is-enabled');
+    if (app.openServiceIds().has(service.id)) row.classList.add('is-open');
+
+    row.appendChild(avatarFor(service, 'sm'));
+
+    const info = document.createElement('div');
+    info.className = 'service-item-info';
+
+    const name = document.createElement('h4');
+    name.className = 'service-item-name';
+    name.textContent = service.name;
+    name.appendChild(loginDot(service.id));
+
+    const meta = document.createElement('p');
+    meta.className = 'service-item-type';
+    const bits = [service.type || 'AI Service', LOGIN_LABELS[record.state] || 'Not checked'];
+    if (cookieCount) bits.push(`${cookieCount} cached cookie${cookieCount === 1 ? '' : 's'}`);
+    if (record.expiresAt) bits.push(`token until ${utils.relativeTime(new Date(record.expiresAt).toISOString())}`);
+    meta.textContent = bits.join(' · ');
+
+    info.append(name, meta);
+    row.appendChild(info);
+
+    const actions = document.createElement('div');
+    actions.className = 'service-item-actions';
+
+    if (record.state !== 'logged-in') {
+      const signIn = document.createElement('button');
+      signIn.type = 'button';
+      signIn.className = 'btn btn-secondary btn-small';
+      signIn.textContent = 'Sign in';
+      signIn.addEventListener('click', () => {
+        app.createTab({ serviceId: service.id, url: service.url, title: service.name });
+        window.electronAPI.reloginService(service.id).catch(() => {});
+      });
+      actions.appendChild(signIn);
+    }
+
+    const toggle = document.createElement('label');
+    toggle.className = 'toggle-switch';
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = enabledIds.has(service.id);
+    input.setAttribute('aria-label', `Enable ${service.name}`);
+
+    const slider = document.createElement('span');
+    slider.className = 'toggle-slider';
+
+    toggle.append(input, slider);
+    row.append(actions, toggle);
+
+    input.addEventListener('change', async (event) => {
+      const target = event.target;
+      try {
+        const result = await window.electronAPI.toggleService(service.id);
+        app.state.config.enabledServices = result;
+        app.renderEnabledServices();
+        app.renderAllServices();
+        app.toast(`${service.name} ${target.checked ? 'enabled' : 'disabled'}`, 'success');
+      } catch (error) {
+        target.checked = !target.checked;
+        app.toast('Unable to update this service', 'error');
+      }
+    });
+
+    return row;
+  }
 })(window.AiHub);
