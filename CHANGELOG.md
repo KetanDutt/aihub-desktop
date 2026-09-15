@@ -4,6 +4,46 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] - 2026-09-15
+
+### Added
+
+- **More no-login services.** Duck.ai, Phind, Blackbox AI and DeepAI Chat join
+  the catalogue with domain rules, login fingerprints and DOM adapters, each
+  flagged `requiresLogin: false` — 20 services, 109 published models.
+- **Free services are separated from sign-in ones.** The catalogue now carries a
+  `requiresLogin` flag (6th tuple slot, or `requiresLogin: false` on an object
+  entry); services that answer without an account are badged *No sign-in* in the
+  sidebar and the Services tab, get their own **Sign-in needed** filter
+  (`free` / `signin`, with facet counts) and a "Free first" sort.
+- **Headless API server.** `RUN-SERVER.bat` (repo root),
+  `scripts/windows/RunServer.bat` and `npm run serve` start the local API with no
+  window, no tray and no updater: `--headless` / `--api-only` / `--no-gui`,
+  `--port <n>`, `--print-key`, `--quiet`, `AIHUB_HEADLESS=1`, Ctrl+C to stop. The
+  console prints the base URL, the key and a ready-to-paste `curl` example.
+- **Every model is published.** `GET /v1/models` lists one entry per service
+  *and* one per upstream model (`aihub/gemini:gemini-2.5-flash`), each with
+  `owned_by` (openai, google, anthropic, …) and a one-line `description`. Bare
+  upstream names (`gpt-5`, `claude-sonnet-4-5`) route to the service that owns
+  them. Free services are listed and are `ready` before you sign in to anything.
+- **Typed answers.** Responses now describe what an answer is made of:
+  `aihub.content.segments` splits it into `thinking`, `code` (with language),
+  `link` (with url + label), `table`, `list`, `heading`, `quote` and `text`;
+  reasoning is mirrored to `reasoning_content`; streaming annotates each delta
+  (`aihub.segment`, `aihub.segmentEvent`) and sends reasoning deltas to
+  `reasoning_content` instead of `content`.
+
+### Changed
+
+- Adapter overrides now merge `dom`/`api` field by field with the `default`
+  entry, so a partial override (only `answer`, say) keeps the inherited
+  `composer` instead of silently losing the driver.
+- **The local API is on by default** (`apiEnabled: true`) and a random
+  `aihub-<hex>` key is generated the first time the config is read, so the
+  endpoint works immediately instead of after a settings detour.
+- Free services no longer need a session: the engine drives them anonymously
+  instead of failing with `session_unavailable`.
+
 ## [1.4.0] - 2026-09-14
 
 ### Added

@@ -12,24 +12,78 @@
 const { API } = require('../constants');
 const { clampNumber, clampFloat, truncate } = require('../utils');
 const { contentToText, getPath } = require('./template');
+const contentClassifier = require('./content');
 
 const CHATML_ROLES = ['system', 'developer', 'user', 'assistant', 'tool', 'function'];
 const ID_PREFIX = 'chatcmpl-aihub';
 
 let counter = 0;
 
+// ---------------------------------------------------------------------------
+// Model registry
+// ---------------------------------------------------------------------------
+//
+// `aihub/<service>` is always a valid model id, but a client should also be able
+// to ask for `gemini-2.5-flash` or `gpt-5` directly. The catalogue publishes
+// every id it can serve (`GET /v1/models`) and this map — rebuilt on each
+// catalogue read — turns a bare upstream name back into a service id.
+const modelRegistry = new Map();
+
+/**
+ * Register the ids the catalogue can serve.
+ * @param {Array<{id: string, aihub?: {service?: string, upstreamModel?: string, aliases?: string[]}}>} entries
+ */
+function registerModelIds(entries) {
+  if (!Array.isArray(entries)) return modelRegistry.size;
+
+  for (const entry of entries) {
+    if (!entry || typeof entry.id !== 'string' || !entry.id) continue;
+    const service = entry.aihub && entry.aihub.service;
+    if (!service) continue;
+    // Ids are published as `aihub/<service>[:<model>]`; route on the tail too.
+    const raw = entry.id.toLowerCase();
+    const keys = [raw, raw.startsWith(API.MODEL_PREFIX) ? raw.slice(API.MODEL_PREFIX.length) : raw];
+    const upstream = entry.aihub.upstreamModel ? String(entry.aihub.upstreamModel).toLowerCase() : '';
+    if (upstream && upstream !== 'default') keys.push(upstream);
+    for (const alias of Array.isArray(entry.aihub.aliases) ? entry.aihub.aliases : []) {
+      if (typeof alias === 'string' && alias) keys.push(alias.toLowerCase());
+    }
+    for (const key of keys) {
+      // First writer wins: a name claimed by two services routes to the one
+      // listed first, which keeps routing deterministic instead of random.
+      if (key && !modelRegistry.has(key)) modelRegistry.set(key, service);
+    }
+  }
+
+  return modelRegistry.size;
+}
+
+/** Forget every registered id (used by tests and on adapter reload). */
+function clearModelRegistry() {
+  modelRegistry.clear();
+}
+
 function nextId(seed = Date.now()) {
   counter = (counter + 1) % 100000;
   return `${ID_PREFIX}-${seed.toString(36)}${counter.toString(36)}`;
 }
 
-/** `aihub/chatgpt`, `chatgpt`, `chatgpt:latest` -> `chatgpt`. */
+/**
+ * `aihub/chatgpt`, `chatgpt`, `chatgpt:gpt-5` -> `chatgpt`, and a bare upstream
+ * name the catalogue published (`gpt-5`) -> `chatgpt`.
+ */
 function serviceIdFromModel(model) {
   if (typeof model !== 'string') return '';
   let id = model.trim().toLowerCase();
   if (id.startsWith(API.MODEL_PREFIX)) id = id.slice(API.MODEL_PREFIX.length);
+  if (modelRegistry.has(id)) return modelRegistry.get(id);
   const colon = id.indexOf(':');
-  if (colon > -1) id = id.slice(0, colon);
+  if (colon > -1) {
+    const tail = id.slice(colon + 1);
+    if (modelRegistry.has(tail)) return modelRegistry.get(tail);
+    id = id.slice(0, colon);
+  }
+  if (modelRegistry.has(id)) return modelRegistry.get(id);
   return id.replace(/[^a-z0-9_-]/g, '');
 }
 
@@ -184,9 +238,25 @@ function completionsToChatBody(body) {
   };
 }
 
+/**
+ * Split an answer into typed parts and build the assistant message.
+ *
+ * `content` stays the whole answer (that is what OpenAI clients expect); the
+ * typed view rides along in `aihub.content` and the reasoning is mirrored to
+ * `reasoning_content`, the field reasoning UIs already look for.
+ */
+function buildAssistantMessage(text) {
+  const body = typeof text === 'string' ? text : String(text ?? '');
+  const analysis = contentClassifier.analyzeContent(body);
+  const message = { role: 'assistant', content: body };
+  if (analysis.thinking) message.reasoning_content = analysis.thinking;
+  return { message, analysis };
+}
+
 /** A `chat.completion` object. */
 function buildCompletion({ id, model, text, usage, finishReason = 'stop', created, systemFingerprint }) {
   const content = typeof text === 'string' ? text : String(text ?? '');
+  const { message, analysis } = buildAssistantMessage(content);
   return {
     id: id || nextId(),
     object: 'chat.completion',
@@ -195,18 +265,31 @@ function buildCompletion({ id, model, text, usage, finishReason = 'stop', create
     choices: [
       {
         index: 0,
-        message: { role: 'assistant', content },
+        message,
         logprobs: null,
         finish_reason: finishReason
       }
     ],
     usage: usage || usageFrom(content, content),
+    // Extensions: what the answer is made of, for clients that care.
+    aihub: {
+      content: {
+        segments: analysis.segments,
+        types: analysis.types,
+        links: analysis.links,
+        code: analysis.code.map((block) => ({ language: block.language, chars: block.text.length })),
+        thinking: analysis.thinking || null,
+        hasThinking: analysis.hasThinking,
+        hasCode: analysis.hasCode,
+        hasLinks: analysis.hasLinks
+      }
+    },
     ...(systemFingerprint ? { system_fingerprint: systemFingerprint } : {})
   };
 }
 
 /** One `chat.completion.chunk` frame. */
-function buildChunk({ id, model, created, delta, finishReason = null, usage = null }) {
+function buildChunk({ id, model, created, delta, finishReason = null, usage = null, aihub = null }) {
   const chunk = {
     id: id || nextId(),
     object: 'chat.completion.chunk',
@@ -215,6 +298,7 @@ function buildChunk({ id, model, created, delta, finishReason = null, usage = nu
     choices: [{ index: 0, delta: delta || {}, logprobs: null, finish_reason: finishReason }]
   };
   if (usage) chunk.usage = usage;
+  if (aihub) chunk.aihub = aihub;
   return chunk;
 }
 
@@ -222,12 +306,27 @@ function firstChunk({ id, model, created }) {
   return buildChunk({ id, model, created, delta: { role: 'assistant', content: '' } });
 }
 
-function deltaChunk({ id, model, created, text }) {
-  return buildChunk({ id, model, created, delta: { content: text } });
+/**
+ * One streamed delta.
+ *
+ * `reasoning` sends the text to `reasoning_content` instead of `content` (it is
+ * the model thinking out loud, not the answer); `segment` tells the client which
+ * kind of block the delta landed in, so code, links and reasoning can be
+ * rendered as they arrive rather than after the fact.
+ */
+function deltaChunk({ id, model, created, text, reasoning = false, segment = null, extra = null }) {
+  const delta = reasoning ? { reasoning_content: text } : { content: text };
+  return buildChunk({
+    id,
+    model,
+    created,
+    delta,
+    ...(segment || extra ? { aihub: { ...(segment ? { segment } : {}), ...(extra || {}) } } : {})
+  });
 }
 
-function finalChunk({ id, model, created, finishReason = 'stop', usage }) {
-  return buildChunk({ id, model, created, delta: {}, finishReason, usage });
+function finalChunk({ id, model, created, finishReason = 'stop', usage, aihub = null }) {
+  return buildChunk({ id, model, created, delta: {}, finishReason, usage, aihub });
 }
 
 /** `data: {...}\n\n` — SSE with no `event:` field, like OpenAI. */
@@ -349,10 +448,13 @@ module.exports = {
   normalizeChatRequest,
   completionsToChatBody,
   buildCompletion,
+  buildAssistantMessage,
   buildChunk,
   firstChunk,
   deltaChunk,
   finalChunk,
+  registerModelIds,
+  clearModelRegistry,
   sseFrame,
   SSE_DONE,
   createSseParser,

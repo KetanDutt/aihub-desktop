@@ -158,6 +158,25 @@ describe('payload normalisation', () => {
     expect([...map.keys()].sort()).toEqual(['broken', 'chatgpt', 'inherits']);
     // `inherits` had nothing of its own, so the default composer applies.
     expect(map.get('inherits').dom.composer).toBe('#prompt-textarea');
+    // A partial `dom` override keeps the fields it did not mention.
+    expect(map.get('chatgpt').dom.composer).toBe('a');
+    expect(map.get('chatgpt').dom.url).toBe('https://chatgpt.com/');
+    expect(map.get('chatgpt').dom.submit).toBe('enter');
+  });
+
+  it('merges a partial dom block with the default instead of replacing it', () => {
+    const map = adapters.normalizeAdaptersPayload({
+      default: { strategy: 'dom', dom: { ...VALID_DOM, submit: 'button', submitSelector: '#send' } },
+      adapters: { onlyAnswer: { dom: { url: 'https://example.com/chat' } } }
+    });
+
+    const adapter = map.get('onlyanswer');
+    expect(adapter).toBeDefined();
+    expect(adapter.dom.url).toBe('https://example.com/chat');
+    // inherited from the default entry
+    expect(adapter.dom.composer).toBe('#prompt-textarea');
+    expect(adapter.dom.answer).toBe(VALID_DOM.answer);
+    expect(adapter.dom.submit).toBe('button');
   });
 
   it('returns null without an adapters map', () => {

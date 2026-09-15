@@ -1,7 +1,7 @@
 {
   "name": "aihub-desktop",
   "productName": "AI Hub Desktop",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "One window for every AI assistant: tabbed WebContentsViews, per-service domain filtering, cached logins with re-login on open, anti-bot hardening and a local OpenAI-compatible API.",
   "main": "main.js",
   "author": "SilentCoderHere",
@@ -29,6 +29,7 @@
   },
   "scripts": {
     "start": "electron .",
+    "serve": "electron . --headless",
     "dev": "nodemon",
     "one-click": "node scripts/one-click-run.js",
     "doctor": "node scripts/doctor.js",

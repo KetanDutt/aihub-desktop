@@ -178,6 +178,7 @@
     { id: 'type', label: 'Type' },
     { id: 'status', label: 'Enabled first' },
     { id: 'login', label: 'Sign-in state' },
+    { id: 'access', label: 'Free first' },
     { id: 'recent', label: 'Recently used' },
     { id: 'cookies', label: 'Cached cookies' }
   ];
@@ -198,6 +199,44 @@
     { id: 'unknown', label: 'Unknown' }
   ];
 
+  // Free = usable with no account. Everything else wants a sign-in before the
+  // API (or a tab) can do anything useful with it.
+  const SERVICE_ACCESS_FILTERS = [
+    { id: 'all', label: 'Any' },
+    { id: 'free', label: 'No sign-in' },
+    { id: 'signin', label: 'Sign-in required' }
+  ];
+
+  /** Does the catalogue say this service works without an account? */
+  function requiresLogin(service) {
+    if (!service || typeof service !== 'object') return true;
+    return service.requiresLogin !== false;
+  }
+
+  const ACCESS_GROUPS = [
+    { id: 'free', label: 'No sign-in needed' },
+    { id: 'signin', label: 'Sign-in required' }
+  ];
+
+  /**
+   * Split a list into the two access groups (free first), so the Services tab
+   * can render them as separate sections instead of one mixed list.
+   *
+   * @param {object[]} services already filtered + sorted
+   * @returns {{groups: {id: string, label: string, services: object[]}[], single: boolean}}
+   */
+  function groupServicesByAccess(services) {
+    const list = Array.isArray(services) ? services.filter(Boolean) : [];
+    const free = list.filter((service) => !requiresLogin(service));
+    const signin = list.filter((service) => requiresLogin(service));
+
+    const groups = [];
+    if (free.length > 0) groups.push({ ...ACCESS_GROUPS[0], services: free });
+    if (signin.length > 0) groups.push({ ...ACCESS_GROUPS[1], services: signin });
+
+    return { groups, single: groups.length <= 1 };
+  }
+
   const LOGIN_RANK = { 'logged-in': 0, challenge: 1, 'logged-out': 2, unknown: 3 };
 
   function normalizeServiceFilters(raw) {
@@ -210,6 +249,7 @@
       type: typeof filters.type === 'string' && filters.type ? filters.type.slice(0, 60) : 'all',
       status: oneOf(filters.status, SERVICE_STATUS_FILTERS, 'all'),
       login: oneOf(filters.login, SERVICE_LOGIN_FILTERS, 'all'),
+      access: oneOf(filters.access, SERVICE_ACCESS_FILTERS, 'all'),
       sort: oneOf(filters.sort, SERVICE_SORTS, 'name'),
       direction: filters.direction === 'desc' ? 'desc' : 'asc'
     };
@@ -267,6 +307,8 @@
       loggedOut: 0,
       unknown: 0,
       challenge: 0,
+      free: 0,
+      signin: 0,
       byType: {}
     };
 
@@ -281,6 +323,8 @@
       else if (state === 'logged-out') counts.loggedOut += 1;
       else if (state === 'challenge') counts.challenge += 1;
       else counts.unknown += 1;
+      if (requiresLogin(service)) counts.signin += 1;
+      else counts.free += 1;
     }
 
     let result = list.filter((service) => {
@@ -291,6 +335,8 @@
       if (filters.status === 'open' && !open.has(service.id)) return false;
       if (filters.status === 'closed' && open.has(service.id)) return false;
       if (filters.login !== 'all' && stateOf(service) !== filters.login) return false;
+      if (filters.access === 'free' && requiresLogin(service)) return false;
+      if (filters.access === 'signin' && !requiresLogin(service)) return false;
       return true;
     });
 
@@ -312,6 +358,11 @@
           const rankA = LOGIN_RANK[stateOf(a)] === undefined ? 4 : LOGIN_RANK[stateOf(a)];
           const rankB = LOGIN_RANK[stateOf(b)] === undefined ? 4 : LOGIN_RANK[stateOf(b)];
           delta = rankA - rankB || tie(a, b);
+          break;
+        }
+        case 'access': {
+          // Free services first: they are callable right now.
+          delta = (requiresLogin(a) ? 1 : 0) - (requiresLogin(b) ? 1 : 0) || tie(a, b);
           break;
         }
         case 'recent': {
@@ -337,7 +388,8 @@
       (filters.query.trim() ? 1 : 0) +
       (filters.type !== 'all' ? 1 : 0) +
       (filters.status !== 'all' ? 1 : 0) +
-      (filters.login !== 'all' ? 1 : 0);
+      (filters.login !== 'all' ? 1 : 0) +
+      (filters.access !== 'all' ? 1 : 0);
 
     return { services: result, counts, activeCount, filters };
   }
@@ -367,6 +419,10 @@
       const found = SERVICE_LOGIN_FILTERS.find((option) => option.id === filters.login);
       parts.push(found ? found.label.toLowerCase() : filters.login);
     }
+    if (filters.access !== 'all') {
+      const found = SERVICE_ACCESS_FILTERS.find((option) => option.id === filters.access);
+      parts.push(found ? found.label.toLowerCase() : filters.access);
+    }
     return parts.join(' · ');
   }
 
@@ -374,6 +430,10 @@
     SERVICE_SORTS,
     SERVICE_STATUS_FILTERS,
     SERVICE_LOGIN_FILTERS,
+    SERVICE_ACCESS_FILTERS,
+    ACCESS_GROUPS,
+    requiresLogin,
+    groupServicesByAccess,
     normalizeServiceFilters,
     applyServiceFilters,
     serviceTypes,

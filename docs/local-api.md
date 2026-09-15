@@ -11,14 +11,17 @@ curl http://127.0.0.1:8788/v1/chat/completions \
   -d '{"model":"aihub/chatgpt","stream":true,"messages":[{"role":"user","content":"Summarise what I asked this morning"}]}'
 ```
 
-Enable it in **Settings ▸ Local API** (off by default).
+It is **on by default** and a random API key is generated on first launch, so
+the endpoint works the moment the app starts (Settings ▸ Local API shows the key,
+the port and a copyable example). Turn it off there if you would rather nothing
+listened.
 
 ## Endpoints
 
 | Method + path | Purpose |
 |---------------|---------|
 | `GET /health` | liveness; no key required, no secrets returned |
-| `GET /v1/models` | the services this app exposes, as models |
+| `GET /v1/models` | every callable model, free services included |
 | `POST /v1/chat/completions` | chat, buffered or `stream: true` (SSE) |
 | `POST /v1/completions` | legacy `prompt` shim, mapped onto chat |
 | `GET /v1/aihub/sessions` | per-service login state (extension) |
@@ -30,10 +33,48 @@ and this page is it.
 ### Models
 
 A service id is `aihub/<slug>` (`aihub/chatgpt`, `aihub/claude`, `aihub/gemini`,
-…). Clients that insist on a plain name can send the bare slug, and
-`aihub/grok:grok-3` style suffixes resolve to the upstream model when the
-adapter knows it. `GET /v1/models` lists what is available right now, each entry
-carrying an `aihub` block with `login`, `strategy` and the adapter's model list.
+…), and every upstream model that service exposes is published too, as
+`aihub/<slug>:<model>` (`aihub/chatgpt:gpt-5`, `aihub/gemini:gemini-2.5-flash`).
+A bare upstream name works as well — `gpt-5`, `claude-sonnet-4-5`,
+`gemini-2.5-flash` — because the catalogue registers which service owns it
+(first come, first served when two services publish the same name).
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "aihub/gemini:gemini-2.5-flash",
+      "object": "model",
+      "created": 1700000000,
+      "owned_by": "google",
+      "description": "Gemini — gemini-2.5-flash · browser driver · sign in required",
+      "aihub": {
+        "service": "gemini",
+        "upstreamModel": "gemini-2.5-flash",
+        "vendor": "google",
+        "strategy": "dom",
+        "requiresLogin": true,
+        "ready": false,
+        "login": "logged-out"
+      }
+    }
+  ]
+}
+```
+
+`owned_by` is the company behind the model, `description` is a one-line summary
+(service, model, how it is driven, session state), and the `aihub` block carries
+everything a client might branch on: `service`, `upstreamModel`, `strategy`,
+`requiresLogin`, `ready`, `login`, `expiresAt`, `aliases`, `models`.
+
+**Free services are listed too.** Every service marked `requiresLogin: false` in
+the catalogue (Perplexity, Microsoft Copilot, You.com, Pi, Duck.ai, Phind,
+Blackbox AI, DeepAI Chat …) is published, is
+`ready` from the first launch, and is callable with no session at all — the
+engine drives it anonymously instead of failing with `session_unavailable`.
+Services that want a sign-in are still listed; they simply report
+`ready: false` until you log in once.
 
 Only *enabled* services appear; `apiExposeAllServices: false` narrows it to the
 list in `apiServices`.
@@ -68,6 +109,44 @@ Buffered responses are a normal `chat.completion`. Streaming is
 `data: [DONE]`, including a `usage` object estimated from text length (÷4 chars
 and word count, whichever is larger) — these services do not expose exact token
 counts to their own web UI.
+
+An answer is rarely one blob of prose, so both shapes describe what it is made
+of (`aihub.content`), and the reasoning a model shows is mirrored into
+`reasoning_content` — the field reasoning UIs already look for:
+
+```jsonc
+{
+  "choices": [{ "message": { "role": "assistant",
+                "content": "…whole answer…",
+                "reasoning_content": "…only the <thinking> part…" } }],
+  "aihub": {
+    "service": "chatgpt", "upstreamModel": "gpt-5", "strategy": "auto",
+    "content": {
+      "segments": [ { "type": "thinking", "text": "…" },
+                   { "type": "code", "language": "js", "text": "…" },
+                   { "type": "link", "url": "https://…", "label": "docs" },
+                   { "type": "text", "text": "…" } ],
+      "types": { "thinking": 1, "code": 1, "link": 1, "text": 2 },
+      "links": [{ "url": "https://…", "label": "docs" }],
+      "code": [{ "language": "js", "chars": 42 }],
+      "hasThinking": true, "hasCode": true, "hasLinks": true
+    }
+  }
+}
+```
+
+Segment types: `thinking` (`<thinking>`/`<think>` blocks and their friends),
+`code` (fenced blocks, with `language`), `link` (markdown links and bare URLs,
+with `url` + `label`), `table`, `list`, `heading`, `quote`, `text`.
+
+Streaming classifies as it goes, so a client can render each kind while the
+answer arrives:
+
+* deltas inside reasoning arrive as `delta.reasoning_content`, everything else as
+  the usual `delta.content`;
+* every chunk carries `aihub.segment` (`{type, index}`), and a boundary emits
+  `aihub.segmentEvent` (`"start"` / `"end"`) with the segment descriptor;
+* the final chunk repeats the whole `aihub.content` summary above.
 
 Errors use the OpenAI error envelope so SDKs surface them properly:
 
@@ -110,7 +189,7 @@ can never be sent to an unrelated domain by a template bug.
 
 | Setting | Default | Note |
 |---------|---------|------|
-| `apiEnabled` | `false` | nothing listens until you say so |
+| `apiEnabled` | `true` | on by default; the key is generated on first launch |
 | `apiPort` | `8788` | busy → walks up to 6 ports forward |
 | `apiMaxConcurrent` | `2` | each request drives a real renderer |
 | backlog | `4 × concurrency` | past that: `503`, not an unbounded queue |
@@ -133,6 +212,8 @@ can never be sent to an unrelated domain by a template bug.
   `get-api-status`) and never written to the log file. **Rotate** in Settings
   invalidates old clients immediately.
 * Cookies are read per service and only attached to that service's own host.
+  A service marked `requiresLogin: false` needs none, so it is driven
+  anonymously rather than refused.
 
 ## Using it from a client
 
@@ -151,6 +232,53 @@ Anything that takes a custom `base_url` works the same way: CLI helpers, LangCha
 shims, editor integrations. Treat it as "automation over your own logged-in
 browser", not as a model API: latency is human-scale, token counts are estimates,
 and the answers come from whatever plan the browser session has.
+
+## Running it headless (API server only)
+
+No window, no tray, no UI: just the endpoint. Useful on a machine you only reach
+over SSH, in CI, or when you want the app's sessions available to scripts without
+a desktop shell on screen.
+
+| How | Command |
+|-----|---------|
+| Windows, one click | **`RUN-SERVER.bat`** (repo root) or `scripts\windows\RunServer.bat` |
+| Windows, PowerShell | `RUN-SERVER.ps1 -Port 8081 -PrintKey` |
+| Any OS | `npm run serve` |
+| Pick a port | `npm run serve -- --port 8081` |
+| Echo the key | `npm run serve -- --print-key` |
+| Environment flag | `AIHUB_HEADLESS=1 npm start` |
+
+Flags: `--headless` / `--api-only` / `--server` / `--no-gui` (all equivalent),
+`--port <n>` / `--port=<n>`, `--print-key`, `--quiet`. Ctrl+C stops the server
+cleanly.
+
+The window, tray, global shortcut and updater are skipped, the macOS Dock icon is
+hidden, and closing a window (there is none) never quits the app. Console output
+is the whole interface:
+
+```
+============================================================
+ AI Hub Desktop v1.4.0 — API server (headless)
+============================================================
+
+ Base URL   http://127.0.0.1:8788/v1
+ Key        aihub-8f3c…9a21
+ Listening  yes (127.0.0.1:8788)
+ Models     90 (4 ready, 4 need no sign-in)
+
+ Try it:
+   curl http://127.0.0.1:8788/v1/models -H "Authorization: Bearer <key>"
+   curl http://127.0.0.1:8788/v1/chat/completions -H "Authorization: Bearer <key>" \
+     -H "Content-Type: application/json" \
+     -d '{"model":"aihub/perplexity","messages":[{"role":"user","content":"hi"}]}'
+
+ Add --print-key to echo the key; it is always in Settings > Local API.
+ Press Ctrl+C to stop the server.
+```
+
+Everything else is identical to the desktop mode: the same loopback-only bind,
+the same bearer key, the same adapters, the same hidden browser windows for the
+DOM driver.
 
 ## Adapters are best-effort by design
 

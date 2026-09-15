@@ -41,7 +41,7 @@ installs Node.js 20+, npm dependencies and the Electron runtime, runs the
 environment doctor, then launches the desktop app (web UI shell).
 
 Finer-grained helpers live in `scripts/windows/` — see
-`scripts/windows/README.md`. `Setup.bat`, `Run.bat`, `Build.bat`, `Test.bat`,
+`scripts/windows/README.md`. `Setup.bat`, `Run.bat`, `RunServer.bat`, `Build.bat`, `Test.bat`,
 `Dev.bat` and `Clean.bat` detect/install Node.js and dependencies, then perform
 the action - designed to be double-clicked with no terminal experience.
 

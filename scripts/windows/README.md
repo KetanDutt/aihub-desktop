@@ -11,9 +11,11 @@ From the **repository root**, double-click:
 | Script | What it does |
 |--------|----------------|
 | **`RUN.bat`** | **All-in-one**: checks/installs Node.js 20+, npm deps + Electron, runs the doctor, then launches the desktop app (web UI shell). |
+| **`RUN-SERVER.bat`** | **API only**: same checks, then starts just the local OpenAI-compatible server with no window (`npm run serve`). Stays in the foreground; Ctrl+C stops it. Extra switches pass through, e.g. `RUN-SERVER.bat --port 8081 --print-key`. PowerShell equivalent: `RUN-SERVER.ps1 -Port 8081 -PrintKey`. |
 
-That is the only file most people need. The scripts below live in this folder
-for finer-grained control.
+`RUN.bat` is all most people need. `RUN-SERVER.bat` is for turning the machine
+into an endpoint host (SSH box, CI, or simply no UI wanted). The scripts below
+live in this folder for finer-grained control.
 
 ## Scripts in this folder
 
@@ -21,6 +23,7 @@ for finer-grained control.
 |-------------|------------------------------------------------------------------------------|
 | `Setup.bat` | Installs/verifies Node.js 20+ (via winget/choco/scoop), installs npm deps, downloads Electron, then runs the environment doctor. |
 | `Run.bat`   | Verifies dependencies, runs doctor, then launches the app (`npm start`).     |
+| `RunServer.bat` | Verifies dependencies, then starts **only** the local API server — no desktop window (`npm run serve`). Stays in the foreground; Ctrl+C stops it. Extra switches pass through, e.g. `RunServer.bat --port 8081 --print-key`. |
 | `Dev.bat`   | Starts the live-reload development loop (`npm run dev` via nodemon).         |
 | `Test.bat`  | Installs what is needed, then runs ESLint + the Jest suite (`npm run check`).|
 | `Build.bat` | Verifies toolchain, runs lint + tests, then builds the NSIS installer into `dist\` (`npm run build:win`). |
@@ -47,6 +50,7 @@ The same actions exist as npm scripts (see the root `README.md`):
 ```
 npm run one-click  # check deps + launch (any OS; Node must already be installed)
 npm start          # Run
+npm run serve      # Headless: API server only, no window (add -- --port 8081)
 npm run dev        # Dev
 npm run check      # Test
 npm run build:win  # Build

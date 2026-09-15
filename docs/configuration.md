@@ -30,7 +30,7 @@ tries to write it.
 | `antiBotHardening` | bool | `true` | UA/client-hint/renderer normalization. See [sessions.md](sessions.md). |
 | `antiBotHumanize` | bool | `true` | Human-paced typing and jittered challenge backoff. |
 | `antiBotCanvasNoise` | bool | `false` | Optional canvas read-back noise; can break fingerprint-based login persistence. |
-| `apiEnabled` | bool | `false` | Serve the local OpenAI-compatible endpoint. See [local-api.md](local-api.md). |
+| `apiEnabled` | bool | `true` | Serve the local OpenAI-compatible endpoint (on by default; the key is generated on first launch). See [local-api.md](local-api.md). |
 | `apiPort` | int 1024–65535 | `8788` | Loopback port for that endpoint. |
 | `apiExposeAllServices` | bool | `true` | Off: only `apiServices` is callable. |
 | `apiServices` | string[] | `[]` | Service ids the endpoint may drive. |
@@ -46,7 +46,7 @@ tries to write it.
 | `openTabs` | Persisted session (ordered). |
 | `activeTabId` | Tab that was active on exit. |
 | `remoteUrls` | Where the catalogue/rules are downloaded from. |
-| `apiToken` | Bearer key for the local endpoint. Generated in main; the renderer may only rotate it (`rotate-api-token`). |
+| `apiToken` | Bearer key for the local endpoint. Generated on first launch and whenever it is missing/rotated; the renderer may only rotate it (`rotate-api-token`). |
 | `sessionStates` | Last known login state per service — the evidence re-login-on-open acts on. |
 | `serviceUsage` | `serviceId → timestamp`, used by "recently used" sorting in the Services tab. |
 
@@ -57,6 +57,7 @@ tries to write it.
 | `AIHUB_DATA_DIR` | Override the writable data directory. |
 | `AIHUB_BUNDLED_DIR` | Override the bundled (read-only) data directory. |
 | `AIHUB_NO_RELOAD=1` | Disable `electron-reload` (used by `npm run dev`). |
+| `AIHUB_HEADLESS=1` | Run the API server only, with no desktop window (same as `--headless`). |
 | `NODE_ENV=test` | Disable hot reload in tests. |
 
 The proxy host is automatically added to each tab's allow-list while

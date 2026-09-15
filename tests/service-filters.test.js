@@ -128,12 +128,18 @@ describe('applyServiceFilters — sorting', () => {
 
 describe('filter normalisation', () => {
   it('rejects unknown values instead of trusting the DOM', () => {
-    const filters = utils.normalizeServiceFilters({ sort: 'rm -rf', login: 'wat', direction: 'sideways' });
+    const filters = utils.normalizeServiceFilters({
+      sort: 'rm -rf',
+      login: 'wat',
+      access: 'free-for-all',
+      direction: 'sideways'
+    });
     expect(filters).toEqual({
       query: '',
       type: 'all',
       status: 'all',
       login: 'all',
+      access: 'all',
       sort: 'name',
       direction: 'asc'
     });
@@ -163,5 +169,35 @@ describe('filter helpers', () => {
   it('describeFilters summarises the active selection', () => {
     const result = utils.applyServiceFilters(SERVICES, { query: 'gpt', login: 'logged-in' }, { loginStates: LOGIN });
     expect(utils.describeFilters(result.counts, result.filters)).toBe('1 of 5 · “gpt” · signed in');
+  });
+});
+
+describe('access grouping', () => {
+  const MIXED = [
+    { id: 'chatgpt', name: 'ChatGPT', type: 'Conversational AI' },
+    { id: 'perplexity', name: 'Perplexity', type: 'Answer engine', requiresLogin: false },
+    { id: 'claude', name: 'Claude', type: 'Conversational AI' },
+    { id: 'youcom', name: 'You.com', type: 'Answer engine', requiresLogin: false }
+  ];
+
+  it('splits the list into free and sign-in groups, free first', () => {
+    const { groups, single } = utils.groupServicesByAccess(MIXED);
+    expect(single).toBe(false);
+    expect(groups.map((g) => g.id)).toEqual(['free', 'signin']);
+    expect(groups[0].services.map((s) => s.id)).toEqual(['perplexity', 'youcom']);
+    expect(groups[1].services.map((s) => s.id)).toEqual(['chatgpt', 'claude']);
+  });
+
+  it('reports a single group when nothing is free (or everything is)', () => {
+    expect(utils.groupServicesByAccess(MIXED.slice(0, 1)).single).toBe(true);
+    expect(utils.groupServicesByAccess([]).groups).toEqual([]);
+    expect(utils.groupServicesByAccess(null).groups).toEqual([]);
+    expect(utils.groupServicesByAccess(MIXED.filter((s) => s.requiresLogin === false)).groups.length).toBe(1);
+  });
+
+  it('counts both groups', () => {
+    const { counts } = utils.applyServiceFilters(MIXED, { sort: 'access' }, {});
+    expect(counts.free).toBe(2);
+    expect(counts.signin).toBe(2);
   });
 });

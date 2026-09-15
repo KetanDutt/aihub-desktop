@@ -199,6 +199,15 @@ function normalizeAdaptersPayload(payload) {
     // before normalisation so a partial service block is validated as a whole.
     const base = payload.default && typeof payload.default === 'object' ? payload.default : {};
     const merged = { ...base, strategy: raw && raw.strategy ? raw.strategy : base.strategy, ...(raw || {}) };
+    // `dom` and `api` are merged field by field: an override that only sets
+    // `answer` must keep the default `composer`, otherwise a partial entry
+    // quietly loses the driver and the service becomes unusable.
+    for (const block of ['dom', 'api']) {
+      const inherited = base[block] && typeof base[block] === 'object' ? base[block] : null;
+      const own = raw && raw[block] && typeof raw[block] === 'object' ? raw[block] : null;
+      if (own) merged[block] = { ...(inherited || {}), ...own };
+      else if (inherited) merged[block] = { ...inherited };
+    }
     void defaults;
     const adapter = normalizeAdapter(merged, id);
     if (adapter) adapters.set(id, adapter);

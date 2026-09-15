@@ -27,6 +27,7 @@ const crypto = require('crypto');
 
 const { API } = require('../constants');
 const openai = require('./openai');
+const contentClassifier = require('./content');
 
 const MAX_BODY_BYTES = API.MAX_BODY_BYTES;
 
@@ -219,12 +220,39 @@ function createApiServer(deps = {}) {
         res.write(openai.sseFrame(openai.firstChunk(request)));
       }
 
+      // Classify as the answer arrives: reasoning goes to `reasoning_content`,
+      // and every segment boundary is announced so a client can render code,
+      // links and tables while the text is still streaming.
+      const segmenter = contentClassifier.createStreamSegmenter();
+
       const result = await complete(request, {
         signal: watch,
         stream,
         onDelta: (text) => {
-          if (!stream || !res.writable) return;
-          res.write(openai.sseFrame(openai.deltaChunk({ ...request, text })));
+          if (!stream || !res.writable || !text) return;
+          const info = segmenter.push(text);
+          for (const event of info.events) {
+            res.write(
+              openai.sseFrame(
+                openai.deltaChunk({
+                  ...request,
+                  text: '',
+                  segment: event.segment,
+                  extra: { segmentEvent: event.kind }
+                })
+              )
+            );
+          }
+          res.write(
+            openai.sseFrame(
+              openai.deltaChunk({
+                ...request,
+                text,
+                reasoning: info.type === contentClassifier.SEGMENT_TYPES.THINKING,
+                segment: { type: info.type, index: info.index }
+              })
+            )
+          );
         },
         onMeta: (meta) => {
           if (!stream || !res.writable) return;
@@ -233,23 +261,50 @@ function createApiServer(deps = {}) {
       });
 
       const usage = result.usage || openai.usageFrom(request.messages.map((m) => m.content).join('\n'), result.text);
+      // Some engines only hand back a finished answer (no deltas), so the
+      // segmenter may be empty: classify the result itself in that case.
+      const analysis =
+        segmenter.text && segmenter.text.length >= (result.text || '').length
+          ? segmenter.finish()
+          : contentClassifier.analyzeContent(result.text);
+      const aihub = {
+        service: result.service || request.serviceId,
+        upstreamModel: result.upstreamModel || null,
+        strategy: result.strategy || null,
+        ...(result.conversationId ? { conversationId: result.conversationId } : {}),
+        content: {
+          segments: analysis.segments,
+          types: analysis.types,
+          links: analysis.links,
+          code: analysis.code.map((block) => ({ language: block.language, chars: block.text.length })),
+          thinking: analysis.thinking || null,
+          hasThinking: analysis.hasThinking,
+          hasCode: analysis.hasCode,
+          hasLinks: analysis.hasLinks
+        }
+      };
 
       if (stream) {
-        res.write(openai.sseFrame(openai.finalChunk({ ...request, finishReason: result.finishReason || 'stop', usage })));
+        res.write(
+          openai.sseFrame(
+            openai.finalChunk({ ...request, finishReason: result.finishReason || 'stop', usage, aihub })
+          )
+        );
         res.write(openai.SSE_DONE);
         res.end();
       } else {
+        const completion = openai.buildCompletion({
+          id: request.id,
+          model: request.model,
+          created: request.created,
+          text: result.text,
+          usage,
+          finishReason: result.finishReason || 'stop'
+        });
         sendJson(res, 200, {
-          ...openai.buildCompletion({
-            id: request.id,
-            model: request.model,
-            created: request.created,
-            text: result.text,
-            usage,
-            finishReason: result.finishReason || 'stop'
-          }),
-          ...(result.conversationId ? { conversation_id: result.conversationId } : {}),
-          ...(result.service ? { aihub: { service: result.service, strategy: result.strategy } } : {})
+          ...completion,
+          aihub: { ...(completion.aihub || {}), ...aihub },
+          ...(result.conversationId ? { conversation_id: result.conversationId } : {})
         });
       }
 
