@@ -11,7 +11,7 @@ From the **repository root**, double-click:
 | Script | What it does |
 |--------|----------------|
 | **`RUN.bat`** | **All-in-one**: checks/installs Node.js 20+, npm deps + Electron, runs the doctor, then launches the desktop app (web UI shell). |
-| **`RUN-SERVER.bat`** | **API only**: same checks, then starts just the local OpenAI-compatible server with no window (`npm run serve`). |
+| **`RUN-SERVER.bat`** | **API only**: same checks, then starts just the local OpenAI-compatible server with no window (`npm run serve`). Stays in the foreground; Ctrl+C stops it. Extra switches pass through, e.g. `RUN-SERVER.bat --port 8081 --print-key`. PowerShell equivalent: `RUN-SERVER.ps1 -Port 8081 -PrintKey`. |
 
 `RUN.bat` is all most people need. `RUN-SERVER.bat` is for turning the machine
 into an endpoint host (SSH box, CI, or simply no UI wanted). The scripts below

@@ -213,6 +213,30 @@
     return service.requiresLogin !== false;
   }
 
+  const ACCESS_GROUPS = [
+    { id: 'free', label: 'No sign-in needed' },
+    { id: 'signin', label: 'Sign-in required' }
+  ];
+
+  /**
+   * Split a list into the two access groups (free first), so the Services tab
+   * can render them as separate sections instead of one mixed list.
+   *
+   * @param {object[]} services already filtered + sorted
+   * @returns {{groups: {id: string, label: string, services: object[]}[], single: boolean}}
+   */
+  function groupServicesByAccess(services) {
+    const list = Array.isArray(services) ? services.filter(Boolean) : [];
+    const free = list.filter((service) => !requiresLogin(service));
+    const signin = list.filter((service) => requiresLogin(service));
+
+    const groups = [];
+    if (free.length > 0) groups.push({ ...ACCESS_GROUPS[0], services: free });
+    if (signin.length > 0) groups.push({ ...ACCESS_GROUPS[1], services: signin });
+
+    return { groups, single: groups.length <= 1 };
+  }
+
   const LOGIN_RANK = { 'logged-in': 0, challenge: 1, 'logged-out': 2, unknown: 3 };
 
   function normalizeServiceFilters(raw) {
@@ -407,7 +431,9 @@
     SERVICE_STATUS_FILTERS,
     SERVICE_LOGIN_FILTERS,
     SERVICE_ACCESS_FILTERS,
+    ACCESS_GROUPS,
     requiresLogin,
+    groupServicesByAccess,
     normalizeServiceFilters,
     applyServiceFilters,
     serviceTypes,

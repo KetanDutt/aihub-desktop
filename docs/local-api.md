@@ -241,6 +241,7 @@ a desktop shell on screen.
 | How | Command |
 |-----|---------|
 | Windows, one click | **`RUN-SERVER.bat`** (repo root) or `scripts\windows\RunServer.bat` |
+| Windows, PowerShell | `RUN-SERVER.ps1 -Port 8081 -PrintKey` |
 | Any OS | `npm run serve` |
 | Pick a port | `npm run serve -- --port 8081` |
 | Echo the key | `npm run serve -- --print-key` |

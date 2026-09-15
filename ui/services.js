@@ -422,10 +422,41 @@ window.AiHub = window.AiHub || {};
       return;
     }
 
-    for (const service of result.services) {
-      list.appendChild(serviceRow(service, enabledIds, cookieCounts[service.id] || 0));
+    // "Free first" also means *visibly* separated: the two groups get their own
+    // headings instead of one mixed list.
+    const grouped =
+      filters.sort === 'access' ? window.AiHubUtils.groupServicesByAccess(result.services) : null;
+
+    if (grouped && !grouped.single) {
+      for (const group of grouped.groups) {
+        list.appendChild(serviceGroupHeader(group));
+        for (const service of group.services) {
+          list.appendChild(serviceRow(service, enabledIds, cookieCounts[service.id] || 0));
+        }
+      }
+    } else {
+      for (const service of result.services) {
+        list.appendChild(serviceRow(service, enabledIds, cookieCounts[service.id] || 0));
+      }
     }
   };
+
+  /** Section heading for one access group (`No sign-in needed` / `Sign-in required`). */
+  function serviceGroupHeader(group) {
+    const header = document.createElement('div');
+    header.className = `service-group-header is-${group.id}`;
+
+    const title = document.createElement('span');
+    title.className = 'service-group-title';
+    title.textContent = group.label;
+
+    const count = document.createElement('span');
+    count.className = 'service-group-count';
+    count.textContent = String((group.services || []).length);
+
+    header.append(title, count);
+    return header;
+  }
 
   /** One row of the Services tab: identity, session state and the toggle. */
   function serviceRow(service, enabledIds, cookieCount) {
