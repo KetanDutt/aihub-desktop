@@ -6,10 +6,6 @@
 window.AiHub = window.AiHub || {};
 
 (function (app) {
-  const PLUS_SVG =
-    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" ' +
-    'stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
-
   const LOGIN_LABELS = {
     'logged-in': 'Signed in',
     'logged-out': 'Signed out',
@@ -24,7 +20,8 @@ window.AiHub = window.AiHub || {};
 
     const img = document.createElement('img');
     img.alt = '';
-    const cached = app.getFavicon(service.id);
+    // Catalogue icon first (already a data URL, no fetch), then the runtime cache.
+    const cached = (app.catalogIcon && app.catalogIcon(service.id)) || app.getFavicon(service.id);
     if (cached) img.src = cached;
     else img.classList.add('hidden');
 
@@ -69,23 +66,99 @@ window.AiHub = window.AiHub || {};
     return chip;
   }
 
-  function openService(service) {
-    app.createTab({ serviceId: service.id, url: service.url, title: service.name });
+  function openService(service, { url } = {}) {
+    // The audited homepage is the post-redirect landing page (e.g. /new, /app),
+    // so a tab opens straight on the chat surface instead of bouncing.
+    const target = url || service.homepage || service.url;
+    app.createTab({ serviceId: service.id, url: target, title: service.name });
     if (app.elements.sidebar) app.elements.sidebar.classList.add('hidden');
     app.renderEnabledServices();
   }
 
-  function emptyState(message, actionLabel) {
+  /** Enable/disable a service and repaint every list that shows it. */
+  app.toggleService = async function toggleService(serviceId) {
+    const service = app.serviceById(serviceId);
+    if (!service) return;
+    try {
+      const enabled = await window.electronAPI.toggleService(serviceId);
+      app.state.config.enabledServices = enabled;
+      app.renderEnabledServices();
+      app.renderAllServices();
+      app.toast(`${service.name} ${enabled.includes(serviceId) ? 'enabled' : 'disabled'}`, 'success');
+    } catch (error) {
+      app.toast('Unable to update this service', 'error');
+    }
+  };
+
+  /**
+   * Details menu for a catalogue entry: what the audit knows about this
+   * service — exact homepage, sign-in requirement, login page, API adapter —
+   * plus the actions that follow from it.
+   */
+  app.serviceDetailsMenu = function serviceDetailsMenu(x, y, serviceId) {
+    const service = app.serviceById(serviceId);
+    if (!service) return;
+
+    const record = app.loginStateOf(service.id);
+    const needsLogin = window.AiHubUtils.requiresLogin(service);
+    const homepage = service.homepage || service.url;
+    const openIds = app.openServiceIds();
+
+    const items = [
+      { type: 'header', label: service.name },
+      { type: 'header', label: service.type || 'AI Service' },
+      { type: 'header', label: homepage },
+      {
+        type: 'header',
+        label: needsLogin ? `Sign-in required · ${LOGIN_LABELS[record.state] || record.state}` : 'Works without an account'
+      }
+    ];
+
+    if (service.hasApiAdapter) items.push({ type: 'header', label: 'Local API can drive this service' });
+
+    items.push(
+      { type: 'separator' },
+      { label: openIds.has(service.id) ? 'Open another tab' : 'Open', onClick: () => openService(service) }
+    );
+
+    if (needsLogin && service.loginUrl) {
+      items.push({
+        label: record.state === 'logged-in' ? 'Open the sign-in page' : 'Sign in…',
+        onClick: () => openService(service, { url: service.loginUrl })
+      });
+    }
+
+    items.push(
+      { label: 'Open in browser', onClick: () => window.electronAPI.openExternal(homepage) },
+      {
+        label: 'Copy homepage URL',
+        onClick: async () => {
+          try {
+            await navigator.clipboard.writeText(homepage);
+            window.AiHubUtils.showStatus('Homepage URL copied', 'success');
+          } catch (e) {
+            window.AiHubUtils.showStatus('Unable to copy URL', 'error');
+          }
+        }
+      },
+      { type: 'separator' },
+      {
+        label: (app.state.config.enabledServices || []).includes(service.id) ? 'Disable' : 'Enable',
+        onClick: () => app.toggleService(service.id)
+      }
+    );
+
+    app.contextMenu(x, y, items);
+  };
+
+  function emptyState(message, actionLabel, iconName = 'search') {
     const wrap = document.createElement('div');
     wrap.className = 'empty-state';
 
     const icon = document.createElement('span');
     icon.className = 'empty-state-icon';
     icon.setAttribute('aria-hidden', 'true');
-    icon.innerHTML =
-      '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" ' +
-      'stroke-linecap="round" stroke-linejoin="round">' +
-      '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>';
+    icon.appendChild(app.icon(iconName, 18));
     wrap.appendChild(icon);
 
     const text = document.createElement('p');
@@ -103,6 +176,50 @@ window.AiHub = window.AiHub || {};
     return wrap;
   }
 
+  /**
+   * Structural placeholder shown while the catalogue is still loading.
+   *
+   * The shape deliberately mirrors a real `.service-item` (avatar + two text
+   * lines) so the swap to live content causes no layout jump.
+   *
+   * @param {number} rows
+   * @returns {DocumentFragment}
+   */
+  function skeletonList(rows = 5) {
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < rows; i += 1) {
+      const row = document.createElement('div');
+      row.className = 'skeleton-row';
+      row.setAttribute('aria-hidden', 'true');
+
+      const avatar = document.createElement('span');
+      avatar.className = 'skeleton skeleton-avatar';
+
+      const lines = document.createElement('span');
+      lines.className = 'skeleton-lines';
+      const title = document.createElement('span');
+      title.className = 'skeleton skeleton-line';
+      const meta = document.createElement('span');
+      meta.className = 'skeleton skeleton-line short';
+      lines.append(title, meta);
+
+      row.append(avatar, lines);
+      frag.appendChild(row);
+    }
+    return frag;
+  }
+
+  /**
+   * Paint loading placeholders into the service lists.
+   * Called once before the catalogue resolves; the first real render clears it.
+   */
+  app.showServiceSkeletons = function showServiceSkeletons() {
+    const list = app.elements && app.elements.servicesList;
+    if (!list || list.childElementCount > 0) return;
+    list.setAttribute('aria-busy', 'true');
+    list.appendChild(skeletonList(5));
+  };
+
   // -- Sidebar ---------------------------------------------------------------
 
   app.renderEnabledServices = function renderEnabledServices() {
@@ -112,6 +229,8 @@ window.AiHub = window.AiHub || {};
     const query = app.elements.serviceSearch ? app.elements.serviceSearch.value : '';
     const services = app.filterServices(app.enabledServices(), query);
 
+    // Real content replaces any loading placeholders.
+    list.removeAttribute('aria-busy');
     list.innerHTML = '';
 
     if (app.state.services.length === 0) {
@@ -163,7 +282,7 @@ window.AiHub = window.AiHub || {};
 
       const add = document.createElement('span');
       add.className = 'service-card-add';
-      add.innerHTML = PLUS_SVG;
+      add.replaceChildren(app.icon('plus', 14));
       header.appendChild(add);
 
       const body = document.createElement('div');
@@ -183,6 +302,10 @@ window.AiHub = window.AiHub || {};
 
       card.append(header, body);
       card.addEventListener('click', () => openService(service));
+      card.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        app.serviceDetailsMenu(event.clientX, event.clientY, service.id);
+      });
       list.appendChild(card);
     }
 
@@ -225,6 +348,10 @@ window.AiHub = window.AiHub || {};
       item.appendChild(label);
 
       item.addEventListener('click', () => openService(service));
+      item.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        app.serviceDetailsMenu(event.clientX, event.clientY, service.id);
+      });
       grid.appendChild(item);
     }
   };
@@ -494,6 +621,11 @@ window.AiHub = window.AiHub || {};
 
     info.append(name, meta);
     row.appendChild(info);
+
+    row.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      app.serviceDetailsMenu(event.clientX, event.clientY, service.id);
+    });
 
     const actions = document.createElement('div');
     actions.className = 'service-item-actions';

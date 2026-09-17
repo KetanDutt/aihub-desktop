@@ -41,30 +41,21 @@ window.AiHub = window.AiHub || {};
     prevBtn.className = 'btn btn-icon';
     prevBtn.title = 'Previous match';
     prevBtn.setAttribute('aria-label', 'Previous match');
-    prevBtn.innerHTML =
-      '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" ' +
-      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<polyline points="18 15 12 9 6 15"></polyline></svg>';
+    prevBtn.appendChild(app.icon('chevron-up', 14));
 
     const nextBtn = document.createElement('button');
     nextBtn.type = 'button';
     nextBtn.className = 'btn btn-icon';
     nextBtn.title = 'Next match';
     nextBtn.setAttribute('aria-label', 'Next match');
-    nextBtn.innerHTML =
-      '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" ' +
-      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<polyline points="6 9 12 15 18 9"></polyline></svg>';
+    nextBtn.appendChild(app.icon('chevron-down', 14));
 
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
     closeBtn.className = 'btn btn-icon';
     closeBtn.title = 'Close (Esc)';
     closeBtn.setAttribute('aria-label', 'Close find bar');
-    closeBtn.innerHTML =
-      '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" ' +
-      'stroke-linecap="round" aria-hidden="true">' +
-      '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+    closeBtn.appendChild(app.icon('close', 14));
 
     bar.append(input, counter, prevBtn, nextBtn, closeBtn);
 

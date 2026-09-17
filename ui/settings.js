@@ -19,6 +19,12 @@ window.AiHub = window.AiHub || {};
     if (tabName === 'api') app.refreshApi();
   };
 
+  /** Is the settings drawer currently on screen? */
+  app.isSettingsOpen = function isSettingsOpen() {
+    const panel = app.elements && app.elements.settingsPanel;
+    return Boolean(panel && !panel.classList.contains('hidden'));
+  };
+
   app.closeSettings = function closeSettings() {
     const panel = app.elements.settingsPanel;
     if (!panel) return;
@@ -336,6 +342,70 @@ window.AiHub = window.AiHub || {};
           }
         } catch (error) {
           app.toast('Unable to clear session data', 'error');
+        }
+      });
+    }
+
+    if (el.btnExportSettings) {
+      el.btnExportSettings.addEventListener('click', async () => {
+        try {
+          const result = await window.electronAPI.exportSettings();
+          if (result && result.success) app.toast(`Settings exported (${result.keys} values)`, 'success');
+          else if (result && !result.cancelled) app.toast(result.error || 'Export failed', 'error');
+        } catch (error) {
+          app.toast('Unable to export settings', 'error');
+        }
+      });
+    }
+
+    if (el.btnImportSettings) {
+      el.btnImportSettings.addEventListener('click', async () => {
+        try {
+          const result = await window.electronAPI.importSettings();
+          if (!result || result.cancelled) return;
+          if (!result.success) {
+            app.toast(result.error || 'Import failed', 'error');
+            return;
+          }
+          // Adopt the imported values everywhere without a restart.
+          app.state.config = result.config;
+          app.state.limit = result.config.maxActiveServices || app.state.limit;
+          app.loadSettingsIntoUI();
+          app.renderEnabledServices();
+          app.renderAllServices();
+          app.toast(`Imported ${result.applied.length} setting(s)`, 'success');
+        } catch (error) {
+          app.toast('Unable to import settings', 'error');
+        }
+      });
+    }
+
+    if (el.btnResetSettings) {
+      el.btnResetSettings.addEventListener('click', async () => {
+        const ok = await app.confirm({
+          title: 'Reset all settings?',
+          message:
+            'Every preference goes back to its default, including your enabled services. ' +
+            'Cookies and signed-in sessions are not touched.',
+          confirmLabel: 'Reset settings',
+          danger: true
+        });
+        if (!ok) return;
+
+        try {
+          const result = await window.electronAPI.resetSettings();
+          if (!result || !result.success) {
+            app.toast((result && result.error) || 'Reset failed', 'error');
+            return;
+          }
+          app.state.config = result.config;
+          app.state.limit = result.config.maxActiveServices || app.state.limit;
+          app.loadSettingsIntoUI();
+          app.renderEnabledServices();
+          app.renderAllServices();
+          app.toast('Settings reset to defaults', 'success');
+        } catch (error) {
+          app.toast('Unable to reset settings', 'error');
         }
       });
     }

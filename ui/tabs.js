@@ -6,29 +6,26 @@
 window.AiHub = window.AiHub || {};
 
 (function (app) {
-  const SPINNER_SVG =
-    '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" ' +
-    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-    '<line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>' +
-    '<line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>' +
-    '<line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>' +
-    '<line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>';
-
-  const CLOSE_SVG =
-    '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" ' +
-    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-    '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-
   // -- Favicon loading -------------------------------------------------------
 
   const faviconCache = new Map(); // serviceId -> dataUrl|null
 
   async function loadFavicon(serviceId, url) {
     if (faviconCache.has(serviceId)) return faviconCache.get(serviceId);
+
+    // The audited catalogue ships an icon for every known service, so seed the
+    // strip with it synchronously before any async lookup happens.
+    const preloaded = app.catalogIcon ? app.catalogIcon(serviceId) : null;
+    if (preloaded) {
+      faviconCache.set(serviceId, preloaded);
+      applyFavicon(serviceId, preloaded);
+      return preloaded;
+    }
+
     faviconCache.set(serviceId, null);
 
     try {
-      const result = await window.electronAPI.getFavicon(url);
+      const result = await window.electronAPI.getFavicon(url, serviceId);
       const dataUrl = (result && result.dataUrl) || null;
       faviconCache.set(serviceId, dataUrl);
       applyFavicon(serviceId, dataUrl);
@@ -105,7 +102,7 @@ window.AiHub = window.AiHub || {};
 
     const loading = document.createElement('span');
     loading.className = 'tab-loading spin hidden';
-    loading.innerHTML = SPINNER_SVG;
+    loading.replaceChildren(app.icon('spinner', 12));
 
     const hibernatedBadge = document.createElement('span');
     hibernatedBadge.className = 'tab-badge hidden';
@@ -114,7 +111,7 @@ window.AiHub = window.AiHub || {};
 
     const closeBtn = document.createElement('button');
     closeBtn.className = 'btn-close-tab';
-    closeBtn.innerHTML = CLOSE_SVG;
+    closeBtn.replaceChildren(app.icon('close', 12));
     closeBtn.setAttribute('aria-label', `Close ${tab.title}`);
     closeBtn.setAttribute('tabindex', '-1');
 
@@ -186,9 +183,28 @@ window.AiHub = window.AiHub || {};
     app.contextMenu(x, y, [
       { type: 'header', label: tab.title },
       {
-        label: 'Reload',
-        onClick: () => window.electronAPI.navReload(id)
+        label: 'Back',
+        disabled: !tab.canGoBack,
+        onClick: () => window.electronAPI.navGoBack(id)
       },
+      {
+        label: 'Forward',
+        disabled: !tab.canGoForward,
+        onClick: () => window.electronAPI.navGoForward(id)
+      },
+      {
+        label: tab.loading ? 'Stop loading' : 'Reload',
+        onClick: () => (tab.loading ? window.electronAPI.navStop(id) : window.electronAPI.navReload(id))
+      },
+      {
+        label: 'Reload, ignoring the cache',
+        onClick: () => window.electronAPI.navReloadHard(id)
+      },
+      {
+        label: 'Home',
+        onClick: () => window.electronAPI.navHome(id)
+      },
+      { type: 'separator' },
       {
         label: tab.hibernated ? 'Wake up' : 'Free memory (hibernate)',
         onClick: async () => {
@@ -253,6 +269,11 @@ window.AiHub = window.AiHub || {};
       },
       { type: 'separator' },
       {
+        label: 'Reopen closed tab',
+        disabled: app.closedTabCount() === 0,
+        onClick: () => app.reopenClosedTab()
+      },
+      {
         label: 'Close other tabs',
         disabled: app.state.tabs.length < 2,
         onClick: () => window.electronAPI.closeOtherTabs(id)
@@ -285,12 +306,34 @@ window.AiHub = window.AiHub || {};
       el.setAttribute('aria-selected', isActive ? 'true' : 'false');
     });
 
-    const active = app.getActiveTab();
-    if (app.elements.btnNavBack) app.elements.btnNavBack.disabled = !active || !active.canGoBack;
-    if (app.elements.btnNavForward) app.elements.btnNavForward.disabled = !active || !active.canGoForward;
+    app.paintNavControls();
 
     if (app.positionTabIndicator) app.positionTabIndicator();
   }
+
+  /**
+   * Sync the browser controls with the active tab: back/forward availability,
+   * a Home target, and reload swapping to Stop while a page is loading.
+   */
+  app.paintNavControls = function paintNavControls() {
+    const el = app.elements || {};
+    const active = app.getActiveTab();
+    const loading = Boolean(active && active.loading);
+
+    if (el.btnNavBack) el.btnNavBack.disabled = !active || !active.canGoBack;
+    if (el.btnNavForward) el.btnNavForward.disabled = !active || !active.canGoForward;
+    if (el.btnNavHome) el.btnNavHome.disabled = !active;
+
+    // Only one of reload/stop is visible at a time, the way a browser does it.
+    if (el.btnNavReload) {
+      el.btnNavReload.classList.toggle('hidden', loading);
+      el.btnNavReload.disabled = !active;
+    }
+    if (el.btnNavStop) {
+      el.btnNavStop.classList.toggle('hidden', !loading);
+      el.btnNavStop.disabled = !loading;
+    }
+  };
 
   /** Apply a `tab-state` payload from the main process. */
   function applyTabState(payload) {
@@ -319,6 +362,9 @@ window.AiHub = window.AiHub || {};
     if (payload.active) {
       app.state.currentTabId = payload.tabId;
       paintActiveTab();
+    } else if (payload.tabId === app.state.currentTabId) {
+      // Loading/navigation state of the tab already in front.
+      app.paintNavControls();
     }
 
     if (payload.crashed) {
@@ -440,9 +486,26 @@ window.AiHub = window.AiHub || {};
     app.switchToTab(app.state.tabs[next].id);
   };
 
+  /**
+   * Recently closed tabs, newest last — the stack behind Ctrl+Shift+T.
+   * Bounded so a long session cannot grow it without limit.
+   */
+  const closedTabs = [];
+  const MAX_CLOSED_TABS = 10;
+
   app.closeTab = async function closeTab(id) {
     const tab = app.getTab(id);
     if (!tab) return;
+
+    // Remember enough to bring it back exactly as it was.
+    closedTabs.push({
+      serviceId: tab.serviceId,
+      url: tab.url,
+      title: tab.title,
+      zoomFactor: tab.zoomFactor || 1,
+      muted: Boolean(tab.muted)
+    });
+    while (closedTabs.length > MAX_CLOSED_TABS) closedTabs.shift();
 
     app.removeTab(id);
     const el = tabNode(id);
@@ -469,6 +532,37 @@ window.AiHub = window.AiHub || {};
     paintActiveTab();
   };
 
+  /**
+   * Reopen the most recently closed tab (Ctrl+Shift+T), restoring its URL,
+   * zoom and mute state. Skips entries whose service has since disappeared
+   * from the catalogue.
+   */
+  app.reopenClosedTab = async function reopenClosedTab() {
+    while (closedTabs.length > 0) {
+      const record = closedTabs.pop();
+      if (!app.serviceById(record.serviceId)) continue;
+      const tab = await app.createTab({
+        serviceId: record.serviceId,
+        url: record.url,
+        title: record.title,
+        zoomFactor: record.zoomFactor,
+        muted: record.muted
+      });
+      if (tab) {
+        app.hideWelcome();
+        return tab;
+      }
+      return null; // creation refused (tab limit): keep the rest of the stack
+    }
+    app.toast('No recently closed tab to reopen', 'info');
+    return null;
+  };
+
+  /** How many tabs can currently be reopened (used to enable/disable UI). */
+  app.closedTabCount = function closedTabCount() {
+    return closedTabs.length;
+  };
+
   app.closeOtherTabs = function closeOtherTabs(id) {
     try {
       window.electronAPI.closeOtherTabs(id);
@@ -492,8 +586,15 @@ window.AiHub = window.AiHub || {};
   app.updateTabCount = function updateTabCount() {
     const el = app.elements && app.elements.tabCount;
     if (!el) return;
-    el.textContent = `${app.state.tabs.length}/${app.state.limit}`;
-    el.classList.toggle('at-limit', app.state.tabs.length >= app.state.limit);
+    const open = app.state.tabs.length;
+    const limit = app.state.limit;
+    el.textContent = `${open}/${limit}`;
+    // "3/3" is meaningless read aloud; spell it out for assistive tech.
+    el.setAttribute(
+      'aria-label',
+      `${open} of ${limit} tabs open${open >= limit ? ' — limit reached' : ''}`
+    );
+    el.classList.toggle('at-limit', open >= limit);
   };
 
   app.showWelcome = function showWelcome() {
@@ -555,13 +656,34 @@ window.AiHub = window.AiHub || {};
     }
 
     if (api.onTabBlocked) {
+      // A single page can trip the filter dozens of times (trackers, pixels,
+      // third-party fonts). One toast per hit buried the screen and kept the
+      // renderer busy, so hosts are coalesced into one summary toast instead.
+      let blockedHosts = new Set();
+      let blockedToastTimer = null;
+
       api.onTabBlocked(({ hostname }) => {
         app.state.blocking.blocked = (app.state.blocking.blocked || 0) + 1;
         window.AiHubUtils.updateBlockingUI({
           enabled: app.state.blocking.enabled,
           blocked: app.state.blocking.blocked
         });
-        app.toast(`Blocked a request to ${hostname}`, 'info');
+
+        if (hostname) blockedHosts.add(hostname);
+        if (blockedToastTimer) return;
+
+        blockedToastTimer = setTimeout(() => {
+          blockedToastTimer = null;
+          const hosts = [...blockedHosts];
+          blockedHosts = new Set();
+          if (hosts.length === 0) return;
+          app.toast(
+            hosts.length === 1
+              ? `Blocked a request to ${hosts[0]}`
+              : `Blocked requests to ${hosts.length} domains (${hosts.slice(0, 2).join(', ')}…)`,
+            'info'
+          );
+        }, 1200);
       });
     }
   };

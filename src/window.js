@@ -28,6 +28,7 @@ const security = require('./security');
 const stealth = require('./stealth');
 const sessionStore = require('./sessionstore');
 const loginMonitor = require('./logins');
+const catalog = require('./catalog');
 const { TabManager } = require('./tabs');
 const {
   LAYOUT,
@@ -509,12 +510,16 @@ function createViewForTab(tab) {
   const syncNavigation = () => {
     if (contents.isDestroyed()) return;
     const url = contents.getURL();
+    const nav = history(contents);
     tabs.update(tab.id, {
       url,
-      canGoBack: contents.canGoBack(),
-      canGoForward: contents.canGoForward()
+      canGoBack: nav.canGoBack(),
+      canGoForward: nav.canGoForward()
     });
-    notifyTabState(tab);
+    // Send the *updated* record, not the stale closure variable: `tab` is the
+    // object captured when the view was created, so notifying with it skipped
+    // the new url/canGoBack values whenever the record had been replaced.
+    notifyTabState(tabs.get(tab.id) || tab);
 
     // A bot challenge is waited out with jittered backoff, and it must never be
     // misread as a signed-out session.
@@ -824,18 +829,92 @@ function withContents(tabId, fn, fallback = false) {
   }
 }
 
+/**
+ * Navigation history accessor.
+ *
+ * Electron 30 moved history to `contents.navigationHistory` and deprecated the
+ * flat `canGoBack()` / `goBack()` methods. Prefer the new API, fall back to the
+ * old one so the app keeps working on older runtimes.
+ */
+function history(contents) {
+  const nav = contents.navigationHistory;
+  if (nav && typeof nav.canGoBack === 'function') return nav;
+  return {
+    canGoBack: () => contents.canGoBack(),
+    canGoForward: () => contents.canGoForward(),
+    goBack: () => contents.goBack(),
+    goForward: () => contents.goForward()
+  };
+}
+
 function navGoBack(tabId) {
-  return Boolean(withContents(tabId, (contents) => contents.canGoBack() && (contents.goBack(), true)));
+  return Boolean(
+    withContents(tabId, (contents) => {
+      const nav = history(contents);
+      return nav.canGoBack() && (nav.goBack(), true);
+    })
+  );
 }
 
 function navGoForward(tabId) {
-  return Boolean(withContents(tabId, (contents) => contents.canGoForward() && (contents.goForward(), true)));
+  return Boolean(
+    withContents(tabId, (contents) => {
+      const nav = history(contents);
+      return nav.canGoForward() && (nav.goForward(), true);
+    })
+  );
 }
 
 function navReload(tabId) {
   const tab = tabs.get(tabId);
   if (tab && tab.hibernated) return activateTab(tabId);
   return Boolean(withContents(tabId, (contents) => (contents.reload(), true)));
+}
+
+/** Reload bypassing the HTTP cache (Ctrl+Shift+R). */
+function navReloadHard(tabId) {
+  const tab = tabs.get(tabId);
+  if (tab && tab.hibernated) return activateTab(tabId);
+  return Boolean(withContents(tabId, (contents) => (contents.reloadIgnoringCache(), true)));
+}
+
+/** Stop a load in progress. */
+function navStop(tabId) {
+  const stopped = Boolean(
+    withContents(tabId, (contents) => {
+      contents.stop();
+      return true;
+    })
+  );
+  if (stopped) {
+    // `stop()` does not always emit did-stop-loading for an aborted navigation,
+    // so settle the spinner explicitly.
+    tabs.update(tabId, { loading: false });
+    notifyTabState(tabs.get(tabId));
+  }
+  return stopped;
+}
+
+/**
+ * Send a tab back to its service home page.
+ * Uses the audited catalogue homepage when there is one, so "Home" lands on the
+ * chat surface rather than a marketing page.
+ */
+function navHome(tabId) {
+  const tab = tabs.get(tabId);
+  if (!tab) return false;
+
+  const details = catalog.detailsFor(tab.serviceId);
+  const target = (details && details.homepage) || tab.homeUrl || tab.url;
+  if (!target) return false;
+
+  if (tab.hibernated || !views.has(tabId)) activateTab(tabId);
+  return Boolean(
+    withContents(tabId, (contents) => {
+      contents.loadURL(target);
+      return true;
+    })
+  );
 }
 
 function setZoom(tabId, factor) {
@@ -1078,6 +1157,9 @@ module.exports = {
   navGoBack,
   navGoForward,
   navReload,
+  navReloadHard,
+  navStop,
+  navHome,
   setZoom,
   setMuted,
   findInPage,

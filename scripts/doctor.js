@@ -117,6 +117,34 @@ function fail(label, detail) {
   }
 })();
 
+// -- Audited menu catalogue --------------------------------------------------
+(function checkMenuCatalogue() {
+  const file = path.join(root, 'data', 'catalog.json');
+  if (!fs.existsSync(file)) {
+    warn('Menu catalogue', 'data/catalog.json missing — run `npm run services:audit`');
+    return;
+  }
+
+  let catalog;
+  try {
+    catalog = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (error) {
+    fail('Menu catalogue', error.message);
+    return;
+  }
+
+  const entries = catalog.services || [];
+  const missingIcons = entries.filter((entry) => !entry.icon || !fs.existsSync(path.join(root, entry.icon)));
+
+  if (missingIcons.length > 0) {
+    warn('Menu catalogue', `${missingIcons.length} service(s) without a cached icon — run \`npm run services:audit\``);
+    return;
+  }
+
+  const live = entries.filter((entry) => entry.iconSource === 'favicon').length;
+  ok('Menu catalogue', `${entries.length} services, ${entries.length} icons cached (${live} real favicons)`);
+})();
+
 // -- Icons ------------------------------------------------------------------
 (function checkIcons() {
   const needed = process.platform === 'win32' ? 'icon.ico' : 'icon.png';

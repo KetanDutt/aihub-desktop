@@ -177,6 +177,14 @@ function createHiddenWindow(serviceId) {
   // Same guards as a visible tab: the hidden window may only move inside its
   // service, and any pop-up is refused outright.
   const allowed = allowedHostsFor(serviceId);
+
+  // Register this window with the request filter under the *same* allow-list.
+  // Without it the webContents is unknown to `blocking`, and `strictBlocking`
+  // (fail-closed for unattributed requests) would reject every request the
+  // hidden window makes — silently breaking the whole local API.
+  const webContentsId = win.webContents.id;
+  blocking.registerTabDomains(webContentsId, allowed);
+  win.webContents.on('destroyed', () => blocking.removeTabDomains(webContentsId));
   win.webContents.on('will-navigate', (event, url) => {
     const host = normalizeHostname(url);
     if (!blocking.isDomainAllowed(host, allowed, true, allowed)) event.preventDefault();

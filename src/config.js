@@ -488,6 +488,60 @@ function toggleService(serviceId) {
   return enabledServices;
 }
 
+/**
+ * Settings as a portable, shareable document.
+ *
+ * Only renderer-writable keys are included: internal state (`openTabs`,
+ * `sessionStates`) is machine-specific, and `apiToken` is a live credential
+ * that must never leave the machine in a plain JSON file.
+ *
+ * @returns {{schemaVersion: number, exportedAt: string, settings: object}}
+ */
+function exportSettings() {
+  const current = getConfig();
+  const settings = {};
+  for (const key of WRITABLE_KEYS) {
+    if (key === 'apiToken') continue;
+    if (current[key] !== undefined) settings[key] = current[key];
+  }
+  return {
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    settings
+  };
+}
+
+/**
+ * Apply a previously exported document.
+ *
+ * The payload is untrusted (it came from a file the user picked), so it goes
+ * through the same `sanitizeConfig()` as any renderer write: unknown keys are
+ * dropped and every value is coerced and clamped.
+ *
+ * @param {object} payload
+ * @returns {{applied: string[], config: object}}
+ */
+function importSettings(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('Invalid settings file');
+  }
+
+  const incoming = payload.settings && typeof payload.settings === 'object' ? payload.settings : payload;
+  if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
+    throw new Error('Invalid settings file');
+  }
+
+  const requested = Object.keys(incoming).filter((key) => WRITABLE_KEYS.has(key) && key !== 'apiToken');
+  if (requested.length === 0) throw new Error('No recognised settings in this file');
+
+  // Merge over the live config so a partial export stays valid, then sanitise.
+  const merged = { ...getConfig(), ...Object.fromEntries(requested.map((key) => [key, incoming[key]])) };
+  const clean = sanitizeConfig(merged);
+  store.set(clean);
+
+  return { applied: requested, config: getPublicConfig() };
+}
+
 /** Reset everything back to factory defaults. */
 function resetConfig() {
   store.set({ ...DEFAULTS });
@@ -507,6 +561,8 @@ module.exports = {
   sanitizeConfig,
   updateConfigItem,
   toggleService,
+  exportSettings,
+  importSettings,
   resetConfig,
   validateProxyUrl,
   validateAccelerator

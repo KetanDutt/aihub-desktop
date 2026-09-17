@@ -4,6 +4,98 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Audited service catalogue with cached icons.** `scripts/audit-services.js`
+  (`npm run services:audit`) "runs" every catalogue entry once and writes
+  `data/catalog.json` plus `assets/icons/<id>.*`: the exact homepage, the
+  sign-in page, whether an account is required, the allowed auth domains,
+  whether a login fingerprint and an API adapter exist, and an icon. Both ship
+  with the app, so the tab strip and the service picker paint complete and
+  instantly — offline, on a first launch, with no per-service network request.
+  The audit is offline-safe by default (deterministic brand-colour monograms);
+  `--online` refreshes real favicons and post-redirect homepages, and `--check`
+  fails CI when the catalogue is stale.
+- **Service details menu.** Right-click a service card, a quick-start tile or a
+  Services-tab row for what the audit knows: homepage, type, sign-in
+  requirement and current session state, whether the local API can drive it,
+  plus open, open the sign-in page, open in browser, copy URL and
+  enable/disable.
+- **Per-tab browser controls.** Stop and Home join Back/Forward/Reload; Reload
+  swaps to Stop while a page is loading, and Home returns the tab to its
+  audited service homepage. New shortcuts: `Ctrl+Shift+R` (reload ignoring the
+  cache, also Shift-click on the reload button), `Esc` (stop loading),
+  `Alt+←` / `Alt+→` (back / forward) and `Alt+Home`. The tab context menu gains
+  back, forward, stop, reload-ignoring-cache and home.
+- **One-click build scripts.** `npm run one-click-build` (plus `BUILD.bat` and
+  `BUILD.sh` at the repository root) checks Node, installs dependencies and the
+  Electron runtime, regenerates the service catalogue, runs lint + tests and
+  builds the installer, listing the artefacts and their sizes. Flags: `--all`,
+  `--win` / `--mac` / `--linux`, `--dir`, `--fast`, `--publish`.
+  `scripts/windows/Build.ps1` now delegates to it.
+
+- **Shared icon system** (`ui/icons.js`). One geometric family on a 24px grid
+  with a single stroke weight, built with `createElementNS`. Replaces the text
+  characters that stood in for toast icons (`i`, `✓`, `×`) and the hand-rolled
+  SVG strings that had drifted apart in size and weight.
+- **Skeleton loading states** for the service sidebar, shaped like the rows they
+  replace so the first paint has structure and content lands without a jump.
+- **Settings backup.** Export your preferences and enabled services to a JSON
+  file, import them on another machine, or reset everything to defaults
+  (**Settings ▸ Privacy ▸ Backup**). The export deliberately excludes the local
+  API key, cookies and machine-specific state, and an imported file is
+  sanitised like any other untrusted input.
+- **Reopen closed tab** (`Ctrl+Shift+T`, also in the tab context menu), which
+  restores the tab's URL, zoom and mute state. The last 10 are remembered.
+
+### Fixed
+
+- **`strictBlocking` silently disabled the local API.** The API's hidden windows
+  never registered an allow-list with the request filter, so under strict mode —
+  which is fail-closed for unattributed requests — every request they made was
+  rejected. They now register the same allow-list a visible tab gets, so they
+  are filtered rather than trusted.
+- **Headless server exited 0 on failure.** `app.quit(1)` ignores its argument;
+  a server that failed to start reported success to systemd, Docker and CI. Now
+  uses `app.exit(1)`.
+- **Favicon misses were cached forever.** A single failed lookup (offline at
+  launch, a flaky CDN) meant the icon never returned until restart. Misses now
+  expire after 6 hours.
+- **Stale tab state after navigation.** `did-navigate` notified the renderer
+  with the tab record captured at view creation, so a replaced record sent the
+  old URL and back/forward flags.
+- **Toast storm on blocked requests.** A tracker-heavy page produced one toast
+  per blocked request; hosts are now coalesced into one summary toast.
+- `prefers-reduced-motion` now zeroes `transition-delay` as well as duration.
+  Staged reveals would otherwise withhold content permanently instead of simply
+  appearing without animation.
+- Accessibility: the status bar, blocking indicator and tab counter announce
+  changes (`role="status"`, meaningful `aria-label`s), and the shortcuts dialog
+  now moves focus into itself and restores it on close.
+
+### Changed
+
+- **Design-system polish.** Every remaining raw pixel radius is now a token
+  (`--r-1…--r-6` cover nested geometry), modal content fades in a beat after the
+  surface, and toast badges tint to match their meaning.
+- **Intentional mobile behaviour.** Back/forward/reload are no longer hidden at
+  ≤640px — they were `display: none`, which left no way to navigate; only Home
+  drops, since the sidebar covers it. Touch targets grow to 40px on coarse
+  pointers, hover transforms are suppressed there, and `--blur-*` steps down on
+  small screens so mobile GPUs keep up without losing the material.
+- Migrated off the navigation APIs deprecated in Electron 30
+  (`canGoBack`/`goBack` → `contents.navigationHistory`), with a fallback for
+  older runtimes.
+- Login-state events no longer rebuild the settings catalogue when the settings
+  drawer is closed — repaints are scoped to what is actually on screen.
+- `get-services` returns the service list enriched with catalogue data
+  (homepage, login URL, auth domains, icon), and `get-favicon` serves the
+  cached icon before falling back to the live fetcher.
+- New IPC channels: `get-service-details`, `nav-reload-hard`, `nav-stop`,
+  `nav-home`.
+
 ## [1.5.0] - 2026-09-15
 
 ### Added

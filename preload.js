@@ -32,7 +32,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getRules: () => ipcRenderer.invoke('get-rules'),
   updateRemoteData: () => ipcRenderer.invoke('update-remote-data'),
   toggleService: (serviceId) => ipcRenderer.invoke('toggle-service', serviceId),
-  getFavicon: (url) => ipcRenderer.invoke('get-favicon', url),
+  getFavicon: (url, serviceId) => ipcRenderer.invoke('get-favicon', url, serviceId),
+  getServiceDetails: (serviceId) => ipcRenderer.invoke('get-service-details', serviceId),
 
   // -- Tabs ------------------------------------------------------------------
   createTab: (tab) => ipcRenderer.invoke('create-tab', tab),
@@ -50,6 +51,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   navGoBack: (tabId) => ipcRenderer.send('nav-go-back', tabId),
   navGoForward: (tabId) => ipcRenderer.send('nav-go-forward', tabId),
   navReload: (tabId) => ipcRenderer.send('nav-reload', tabId),
+  navReloadHard: (tabId) => ipcRenderer.send('nav-reload-hard', tabId),
+  navStop: (tabId) => ipcRenderer.send('nav-stop', tabId),
+  navHome: (tabId) => ipcRenderer.send('nav-home', tabId),
   setZoom: (tabId, factor) => ipcRenderer.invoke('set-zoom', tabId, factor),
   setMuted: (tabId, muted) => ipcRenderer.invoke('set-muted', tabId, muted),
   findInPage: (tabId, text, options) => ipcRenderer.invoke('find-in-page', tabId, text, options),
@@ -58,6 +62,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // -- Session / privacy -----------------------------------------------------
   clearSessionData: (options) => ipcRenderer.invoke('clear-session-data', options),
+  exportSettings: () => ipcRenderer.invoke('export-settings'),
+  importSettings: () => ipcRenderer.invoke('import-settings'),
+  resetSettings: () => ipcRenderer.invoke('reset-settings'),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   getBlockingStats: () => ipcRenderer.invoke('get-blocking-stats'),
 

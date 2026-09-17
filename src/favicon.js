@@ -20,6 +20,19 @@ const { LIMITS, STALE_DATA_MS } = require('./constants');
 
 const memoryCache = new Map(); // origin -> dataUrl
 const inflight = new Map(); // origin -> Promise<dataUrl|null>
+/** origin -> timestamp of a failed lookup (see NEGATIVE_TTL_MS). */
+const negativeCache = new Map();
+
+/**
+ * How long a *miss* is remembered.
+ *
+ * Misses used to be cached forever in the same map as hits, so a favicon that
+ * failed once (offline at startup, a flaky CDN, a rate limit) never reappeared
+ * until the app was restarted. Keeping them separate, and expiring them, means
+ * a transient failure heals on its own while a genuinely icon-less site is
+ * still not re-fetched on every render.
+ */
+const NEGATIVE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 const MIME_BY_EXT = {
   '.ico': 'image/x-icon',
@@ -155,6 +168,12 @@ async function resolveFavicon(url) {
     return cached;
   }
 
+  const failedAt = negativeCache.get(origin);
+  if (failedAt !== undefined) {
+    if (Date.now() - failedAt < NEGATIVE_TTL_MS) return null;
+    negativeCache.delete(origin); // expired: allow one more attempt
+  }
+
   if (inflight.has(origin)) return inflight.get(origin);
 
   const task = (async () => {
@@ -178,9 +197,9 @@ async function resolveFavicon(url) {
       }
     }
 
-    // Negative caching: remember the miss so we do not retry on every render.
-    memoryCache.set(origin, null);
-    evictIfNeeded();
+    // Negative caching: remember the miss so we do not retry on every render,
+    // but only for NEGATIVE_TTL_MS so a transient failure recovers by itself.
+    negativeCache.set(origin, Date.now());
     return null;
   })();
 
@@ -205,6 +224,7 @@ async function getFavicon(url) {
 /** Drop every cached favicon (used by "Clear session data"). */
 async function clearCache() {
   memoryCache.clear();
+  negativeCache.clear();
   try {
     const dir = paths.faviconCacheDir();
     if (fs.existsSync(dir)) {
@@ -220,6 +240,7 @@ async function clearCache() {
 /** Test helper. */
 function _resetForTests() {
   memoryCache.clear();
+  negativeCache.clear();
   inflight.clear();
 }
 

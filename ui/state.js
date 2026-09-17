@@ -82,6 +82,8 @@ window.AiHub = window.AiHub || {};
     'btn-nav-back',
     'btn-nav-forward',
     'btn-nav-reload',
+    'btn-nav-stop',
+    'btn-nav-home',
     'btn-add-tab',
     'sidebar',
     'btn-close-sidebar',
@@ -97,6 +99,9 @@ window.AiHub = window.AiHub || {};
     'btn-update',
     'btn-update-privacy',
     'btn-clear-session',
+    'btn-export-settings',
+    'btn-import-settings',
+    'btn-reset-settings',
     'btn-hibernate',
     'btn-open-log',
     'btn-check-updates',
@@ -221,6 +226,22 @@ window.AiHub = window.AiHub || {};
 
   app.serviceById = function serviceById(serviceId) {
     return app.state.servicesById.get(serviceId) || null;
+  };
+
+  /**
+   * Icon cached by the service audit (`npm run services:audit`), already a data
+   * URL so it satisfies the shell CSP and needs no network round trip.
+   */
+  app.catalogIcon = function catalogIcon(serviceId) {
+    const service = app.serviceById(serviceId);
+    return (service && service.icon) || null;
+  };
+
+  /** Where a tab for this service should open (audited homepage wins). */
+  app.serviceHomepage = function serviceHomepage(serviceId) {
+    const service = app.serviceById(serviceId);
+    if (!service) return null;
+    return service.homepage || service.url;
   };
 
   app.openServiceIds = function openServiceIds() {

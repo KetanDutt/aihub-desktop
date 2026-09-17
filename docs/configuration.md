@@ -38,6 +38,31 @@ tries to write it.
 | `apiRateLimitPerMinute` | int 1–600 | `60` | Sliding-window request budget. |
 | `apiTimeoutSeconds` | int 5–900 | `180` | Per-request cap. |
 
+## Backup: export, import, reset
+
+**Settings ▸ Privacy ▸ Backup** writes the writable keys above to a JSON file
+you can move to another machine, read back, or keep as a known-good baseline.
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "exportedAt": "2026-09-17T09:00:00.000Z",
+  "settings": { "maxActiveServices": 5, "enabledServices": ["chatgpt", "claude"], … }
+}
+```
+
+What is deliberately *not* in the file:
+
+- `apiToken` — a live credential; it stays on the machine that generated it.
+- `openTabs`, `activeTabId`, `sessionStates`, `serviceUsage` — machine-specific
+  state that would be meaningless (or wrong) elsewhere.
+- Cookies and cached sessions. A settings file never signs you in anywhere.
+
+Import treats the file as untrusted: it goes through the same `sanitizeConfig()`
+as any renderer write, so unknown keys are dropped, values are coerced and
+clamped, and a file cannot inject a token or internal state. **Reset to
+defaults** restores every preference without touching cookies or sessions.
+
 ## Read-only state
 
 | Key | Meaning |

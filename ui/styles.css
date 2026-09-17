@@ -33,8 +33,14 @@
   --tracking-normal: -0.01em;
   --tracking-wide: 0.08em;
 
-  /* Radius */
-  --r-xs: 7px;
+  /* Radius — a full scale so nested geometry never needs a magic number.
+     Inner radii should be roughly (outer - padding) to keep corners concentric. */
+  --r-1: 4px;
+  --r-2: 5px;
+  --r-3: 6px;
+  --r-4: 7px;
+  --r-5: 8px;
+  --r-6: 9px;
   --r-sm: 10px;
   --r-md: 14px;
   --r-lg: 18px;
@@ -220,7 +226,7 @@ kbd {
   font-size: 10.5px;
   font-weight: 500;
   padding: 2px 6px;
-  border-radius: 6px;
+  border-radius: var(--r-3);
   background: var(--glass-2);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-edge), var(--shadow-1);
@@ -232,7 +238,7 @@ code {
   font-size: 12px;
   background: var(--field-bg);
   padding: 1px 6px;
-  border-radius: 5px;
+  border-radius: var(--r-2);
   border: 1px solid var(--glass-border);
 }
 
@@ -414,7 +420,7 @@ body.light-mode .app-bg-grain {
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 9px;
+  border-radius: var(--r-6);
   color: var(--on-accent);
   background: linear-gradient(145deg, var(--accent) 0%, var(--accent-2) 100%);
   box-shadow:
@@ -682,7 +688,7 @@ body.light-mode .app-bg-grain {
 .tab-favicon img {
   width: 16px;
   height: 16px;
-  border-radius: 4px;
+  border-radius: var(--r-1);
   object-fit: contain;
 }
 
@@ -692,7 +698,7 @@ body.light-mode .app-bg-grain {
   justify-content: center;
   width: 16px;
   height: 16px;
-  border-radius: 5px;
+  border-radius: var(--r-2);
   font-size: 8.5px;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -942,7 +948,7 @@ body.light-mode .app-bg-grain {
   bottom: 0;
   width: 2.5px;
   background: var(--accent, var(--accent));
-  border-radius: 0 2px 2px 0;
+  border-radius: 0 2px 2px 0; /* focus rail cap */
   opacity: 0.85;
 }
 .quick-start-item:hover {
@@ -998,7 +1004,7 @@ body.light-mode .app-bg-grain {
   height: 22px;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
+  border-radius: var(--r-4);
   background: var(--accent-soft);
   color: var(--accent);
   flex: 0 0 auto;
@@ -1025,12 +1031,12 @@ body.light-mode .app-bg-grain {
 .service-avatar.sm {
   width: 26px;
   height: 26px;
-  border-radius: 8px;
+  border-radius: var(--r-5);
 }
 .service-avatar.md {
   width: 34px;
   height: 34px;
-  border-radius: 10px;
+  border-radius: var(--r-sm);
 }
 .service-avatar img {
   width: 100%;
@@ -1643,6 +1649,17 @@ body:not(.light-mode) .toggle-slider::before {
   transform: translateY(0) scale(1);
 }
 
+/* Content settles a beat after the surface, so the dialog reads as an object
+   arriving with its contents rather than everything snapping in at once. */
+.modal > * {
+  opacity: 0;
+  transition: opacity var(--t-med) var(--ease-out) 70ms;
+}
+.modal-backdrop.visible .modal > *,
+#shortcuts-modal:not(.hidden) .modal > * {
+  opacity: 1;
+}
+
 .modal h3 {
   font-size: 17px;
   font-weight: 650;
@@ -1715,7 +1732,7 @@ body:not(.light-mode) .toggle-slider::before {
   width: 100%;
   padding: 8px 11px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--r-5);
   background: transparent;
   color: var(--text-1);
   font-size: var(--fs-small);
@@ -1784,18 +1801,29 @@ body:not(.light-mode) .toggle-slider::before {
   transform: translateY(0) scale(1);
 }
 .toast-icon {
-  flex: 0 0 18px;
-  width: 18px;
-  height: 18px;
-  margin-top: 1px;
-  border-radius: 50%;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  margin-top: 0;
+  border-radius: var(--r-pill);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
-  font-weight: 700;
   background: var(--accent-soft);
   color: var(--accent);
+}
+/* Tint the badge to match the toast's meaning. */
+.toast-success .toast-icon {
+  background: color-mix(in srgb, var(--ok) 16%, transparent);
+  color: var(--ok);
+}
+.toast-warning .toast-icon {
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+  color: var(--warn);
+}
+.toast-error .toast-icon {
+  background: color-mix(in srgb, var(--err) 16%, transparent);
+  color: var(--err);
 }
 .toast-success .toast-icon {
   background: color-mix(in srgb, var(--ok) 16%, transparent);
@@ -1831,7 +1859,7 @@ body:not(.light-mode) .toggle-slider::before {
 .empty-state-icon {
   width: 36px;
   height: 36px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1951,6 +1979,46 @@ body:not(.light-mode) .toggle-slider::before {
   to { background-position: -100% 0; }
 }
 
+/* A placeholder row mirrors .service-item's geometry so the swap to real
+   content is a crossfade, never a layout jump. */
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--r-md);
+}
+.skeleton-avatar {
+  flex: 0 0 var(--ctrl-sm);
+  width: var(--ctrl-sm);
+  height: var(--ctrl-sm);
+  border-radius: var(--r-sm);
+}
+.skeleton-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.skeleton-line { height: 9px; width: 72%; }
+.skeleton-line.short { height: 8px; width: 42%; opacity: 0.7; }
+
+/* Stagger the rows so the list reads as one surface settling, not five
+   independent pulses. */
+.skeleton-row:nth-child(2) .skeleton { animation-delay: 80ms; }
+.skeleton-row:nth-child(3) .skeleton { animation-delay: 160ms; }
+.skeleton-row:nth-child(4) .skeleton { animation-delay: 240ms; }
+.skeleton-row:nth-child(5) .skeleton { animation-delay: 320ms; }
+
+/* Shared icon family — consistent optical alignment wherever it appears. */
+.icon {
+  display: block;
+  flex: none;
+  /* Crisper strokes for geometry drawn on a 24px grid. */
+  shape-rendering: geometricPrecision;
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -1959,6 +2027,10 @@ body:not(.light-mode) .toggle-slider::before {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    /* Delays are motion too: without this, staged reveals (e.g. modal content)
+       would still be withheld even though the transition itself is gone. */
+    animation-delay: 0ms !important;
+    transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
   .app-bg-field { animation: none !important; }
@@ -1994,7 +2066,25 @@ body:not(.light-mode) .toggle-slider::before {
   }
   .header-title { padding: 0 var(--sp-3); }
   .tabs-container { padding: 0 6px; }
-  .nav-controls { display: none; }
+  /* Keep navigation usable on small screens: back/forward/reload are core
+     controls, so they stay. Home and the separator are the ones that go —
+     Home is reachable from the sidebar, the others are not. */
+  .nav-controls {
+    padding-left: 4px;
+    margin-left: 0;
+    border-left: none;
+    gap: 0;
+  }
+  #btn-nav-home { display: none; }
+
+  /* Comfortable touch targets without changing the visual weight. */
+  .btn-icon {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .tab {
+    min-height: 40px;
+  }
   .welcome-screen { padding: var(--sp-5) var(--sp-4); }
   .quick-start-services-grid {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -2013,6 +2103,33 @@ body:not(.light-mode) .toggle-slider::before {
   .toast {
     max-width: none;
     min-width: 0;
+  }
+}
+
+/* Coarse pointers: hover effects are meaningless and sticky on touch, and
+   larger hit areas matter more than density. */
+@media (hover: none) and (pointer: coarse) {
+  .btn:hover:not(:disabled),
+  .service-card:hover,
+  .quick-start-item:hover,
+  .service-item:hover {
+    transform: none;
+  }
+  .btn-icon {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+
+/* Blur is the most expensive part of this design and the least affordable on
+   mobile GPUs. Step it down rather than dropping the material entirely, so the
+   language survives but the compositor keeps up. */
+@media (max-width: 640px) {
+  :root {
+    --blur-1: blur(18px) saturate(140%);
+    --blur-2: blur(12px) saturate(132%);
+    --blur-3: blur(24px) saturate(150%);
+    --blur-veil: blur(8px) saturate(120%);
   }
 }
 
@@ -2325,7 +2442,7 @@ body.light-mode .code-block {
   font-family: var(--font-mono);
   font-size: 11.5px;
   padding: 4px 8px;
-  border-radius: var(--r-xs);
+  border-radius: var(--r-4);
 }
 
 .api-log-row:nth-child(odd) {

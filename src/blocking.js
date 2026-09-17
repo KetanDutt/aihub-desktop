@@ -98,6 +98,30 @@ function updateTabDomains(webContentsId, serviceId, rules) {
   return allowed;
 }
 
+/**
+ * Register a pre-built allow-list for a webContents.
+ *
+ * Used by the local API's hidden windows, which compute their allow-list from
+ * the same rules but do not go through `updateTabDomains`. Without this they
+ * would be "unknown" to the filter and `strictBlocking` would reject them.
+ *
+ * @param {number} webContentsId
+ * @param {Set<string>|string[]} domains
+ * @returns {Set<string>} the allow-list in effect
+ */
+function registerTabDomains(webContentsId, domains) {
+  const allowed = domains instanceof Set ? new Set(domains) : new Set();
+  if (Array.isArray(domains)) {
+    for (const domain of domains) {
+      const normalized = normalizeHostname(domain);
+      if (normalized) allowed.add(normalized);
+    }
+  }
+  tabDomainMap.set(webContentsId, allowed);
+  log.debug(`Allow-list registered for webContents ${webContentsId}: ${allowed.size} domains`);
+  return allowed;
+}
+
 /** Forget a tab's allow-list (called when a view is destroyed). */
 function removeTabDomains(webContentsId) {
   tabDomainMap.delete(webContentsId);
@@ -283,6 +307,7 @@ module.exports = {
   isDomainAllowed,
   buildAllowList,
   updateTabDomains,
+  registerTabDomains,
   removeTabDomains,
   registerTrustedWebContents,
   updateBlockingState,
