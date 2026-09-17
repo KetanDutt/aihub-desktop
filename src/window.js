@@ -28,6 +28,7 @@ const security = require('./security');
 const stealth = require('./stealth');
 const sessionStore = require('./sessionstore');
 const loginMonitor = require('./logins');
+const catalog = require('./catalog');
 const { TabManager } = require('./tabs');
 const {
   LAYOUT,
@@ -838,6 +839,52 @@ function navReload(tabId) {
   return Boolean(withContents(tabId, (contents) => (contents.reload(), true)));
 }
 
+/** Reload bypassing the HTTP cache (Ctrl+Shift+R). */
+function navReloadHard(tabId) {
+  const tab = tabs.get(tabId);
+  if (tab && tab.hibernated) return activateTab(tabId);
+  return Boolean(withContents(tabId, (contents) => (contents.reloadIgnoringCache(), true)));
+}
+
+/** Stop a load in progress. */
+function navStop(tabId) {
+  const stopped = Boolean(
+    withContents(tabId, (contents) => {
+      contents.stop();
+      return true;
+    })
+  );
+  if (stopped) {
+    // `stop()` does not always emit did-stop-loading for an aborted navigation,
+    // so settle the spinner explicitly.
+    tabs.update(tabId, { loading: false });
+    notifyTabState(tabs.get(tabId));
+  }
+  return stopped;
+}
+
+/**
+ * Send a tab back to its service home page.
+ * Uses the audited catalogue homepage when there is one, so "Home" lands on the
+ * chat surface rather than a marketing page.
+ */
+function navHome(tabId) {
+  const tab = tabs.get(tabId);
+  if (!tab) return false;
+
+  const details = catalog.detailsFor(tab.serviceId);
+  const target = (details && details.homepage) || tab.homeUrl || tab.url;
+  if (!target) return false;
+
+  if (tab.hibernated || !views.has(tabId)) activateTab(tabId);
+  return Boolean(
+    withContents(tabId, (contents) => {
+      contents.loadURL(target);
+      return true;
+    })
+  );
+}
+
 function setZoom(tabId, factor) {
   const clamped = clampFloat(factor, 0.3, 5, 1);
   tabs.update(tabId, { zoomFactor: clamped });
@@ -1078,6 +1125,9 @@ module.exports = {
   navGoBack,
   navGoForward,
   navReload,
+  navReloadHard,
+  navStop,
+  navHome,
   setZoom,
   setMuted,
   findInPage,

@@ -84,11 +84,23 @@
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
           </button>
-          <button id="btn-nav-reload" class="btn btn-icon" title="Reload (Ctrl+R)" aria-label="Reload">
+          <button id="btn-nav-reload" class="btn btn-icon" title="Reload (Ctrl+R) — hold Shift to bypass the cache" aria-label="Reload">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
               <path d="M3 3v5h5"></path>
+            </svg>
+          </button>
+          <button id="btn-nav-stop" class="btn btn-icon hidden" title="Stop loading (Esc)" aria-label="Stop loading">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+          <button id="btn-nav-home" class="btn btn-icon" title="Back to the service home page (Alt+Home)" aria-label="Home" disabled>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path>
             </svg>
           </button>
         </div>

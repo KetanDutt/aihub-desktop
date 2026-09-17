@@ -4,6 +4,46 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Audited service catalogue with cached icons.** `scripts/audit-services.js`
+  (`npm run services:audit`) "runs" every catalogue entry once and writes
+  `data/catalog.json` plus `assets/icons/<id>.*`: the exact homepage, the
+  sign-in page, whether an account is required, the allowed auth domains,
+  whether a login fingerprint and an API adapter exist, and an icon. Both ship
+  with the app, so the tab strip and the service picker paint complete and
+  instantly — offline, on a first launch, with no per-service network request.
+  The audit is offline-safe by default (deterministic brand-colour monograms);
+  `--online` refreshes real favicons and post-redirect homepages, and `--check`
+  fails CI when the catalogue is stale.
+- **Service details menu.** Right-click a service card, a quick-start tile or a
+  Services-tab row for what the audit knows: homepage, type, sign-in
+  requirement and current session state, whether the local API can drive it,
+  plus open, open the sign-in page, open in browser, copy URL and
+  enable/disable.
+- **Per-tab browser controls.** Stop and Home join Back/Forward/Reload; Reload
+  swaps to Stop while a page is loading, and Home returns the tab to its
+  audited service homepage. New shortcuts: `Ctrl+Shift+R` (reload ignoring the
+  cache, also Shift-click on the reload button), `Esc` (stop loading),
+  `Alt+←` / `Alt+→` (back / forward) and `Alt+Home`. The tab context menu gains
+  back, forward, stop, reload-ignoring-cache and home.
+- **One-click build scripts.** `npm run one-click-build` (plus `BUILD.bat` and
+  `BUILD.sh` at the repository root) checks Node, installs dependencies and the
+  Electron runtime, regenerates the service catalogue, runs lint + tests and
+  builds the installer, listing the artefacts and their sizes. Flags: `--all`,
+  `--win` / `--mac` / `--linux`, `--dir`, `--fast`, `--publish`.
+  `scripts/windows/Build.ps1` now delegates to it.
+
+### Changed
+
+- `get-services` returns the service list enriched with catalogue data
+  (homepage, login URL, auth domains, icon), and `get-favicon` serves the
+  cached icon before falling back to the live fetcher.
+- New IPC channels: `get-service-details`, `nav-reload-hard`, `nav-stop`,
+  `nav-home`.
+
 ## [1.5.0] - 2026-09-15
 
 ### Added

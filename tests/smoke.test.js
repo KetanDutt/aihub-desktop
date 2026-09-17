@@ -79,6 +79,9 @@ describe('module graph', () => {
     const favicon = require('../src/favicon');
     expect(typeof favicon.getFavicon).toBe('function');
 
+    const catalog = require('../src/catalog');
+    expect(typeof catalog.detailsFor).toBe('function');
+
     const updater = require('../src/updater');
     expect(typeof updater.setupAutoUpdater).toBe('function');
 
@@ -89,6 +92,12 @@ describe('module graph', () => {
       'closeTab',
       'reorderTabs',
       'setViewBounds',
+      'navGoBack',
+      'navGoForward',
+      'navReload',
+      'navReloadHard',
+      'navStop',
+      'navHome',
       'setZoom',
       'setMuted',
       'findInPage',

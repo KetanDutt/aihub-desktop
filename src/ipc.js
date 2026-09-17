@@ -15,6 +15,7 @@ const windowManager = require('./window');
 const blocking = require('./blocking');
 const security = require('./security');
 const favicon = require('./favicon');
+const catalog = require('./catalog');
 const updater = require('./updater');
 const sessionStore = require('./sessionstore');
 const loginMonitor = require('./logins');
@@ -189,7 +190,15 @@ function setupIpcHandlers() {
 
   ipcMain.handle(IPC.GET_SERVICES, async () => {
     const services = await dataStore.loadServices();
-    return services || { ai_services: [], serviceCount: 0, schemaVersion: 1 };
+    if (!services) return { ai_services: [], serviceCount: 0, schemaVersion: 1 };
+    // Merge in the audited catalogue: cached icons, exact homepages, login URLs
+    // and sign-in requirements, so the menus paint fully offline.
+    return { ...services, ai_services: catalog.enrich(services.ai_services), catalog: catalog.status() };
+  });
+
+  ipcMain.handle(IPC.GET_SERVICE_DETAILS, (event, serviceId) => {
+    const id = validServiceId(serviceId);
+    return id ? catalog.detailsFor(id) : null;
   });
 
   ipcMain.handle(IPC.GET_RULES, async () => dataStore.loadRules());
@@ -209,7 +218,16 @@ function setupIpcHandlers() {
     return configStore.toggleService(id);
   });
 
-  ipcMain.handle(IPC.GET_FAVICON, async (event, url) => favicon.getFavicon(url));
+  ipcMain.handle(IPC.GET_FAVICON, async (event, url, serviceId) => {
+    // Prefer the icon cached by the service audit: it is already on disk, so
+    // the tab strip never waits on (or leaks a request to) the live site.
+    const id = serviceId ? validServiceId(serviceId) : null;
+    if (id) {
+      const cached = catalog.iconDataUrl(id);
+      if (cached) return { dataUrl: cached, source: 'catalog' };
+    }
+    return favicon.getFavicon(url);
+  });
 
   ipcMain.handle(IPC.OPEN_EXTERNAL, async (event, url) =>
     security.openExternal(url, { parent: windowManager.getMainWindow() })
@@ -328,6 +346,9 @@ function setupIpcHandlers() {
   ipcMain.on(IPC.NAV_GO_BACK, (event, tabId) => validTabId(tabId) && windowManager.navGoBack(tabId));
   ipcMain.on(IPC.NAV_GO_FORWARD, (event, tabId) => validTabId(tabId) && windowManager.navGoForward(tabId));
   ipcMain.on(IPC.NAV_RELOAD, (event, tabId) => validTabId(tabId) && windowManager.navReload(tabId));
+  ipcMain.on(IPC.NAV_RELOAD_HARD, (event, tabId) => validTabId(tabId) && windowManager.navReloadHard(tabId));
+  ipcMain.on(IPC.NAV_STOP, (event, tabId) => validTabId(tabId) && windowManager.navStop(tabId));
+  ipcMain.on(IPC.NAV_HOME, (event, tabId) => validTabId(tabId) && windowManager.navHome(tabId));
 
   ipcMain.handle(IPC.SET_ZOOM, (event, tabId, factor) => {
     if (!validTabId(tabId)) return null;

@@ -28,6 +28,9 @@ jobs:
       - name: Environment doctor (non-fatal)
         run: npm run doctor || true
 
+      - name: Service catalogue is up to date
+        run: npm run services:check
+
       - name: Lint
         run: npm run lint
 

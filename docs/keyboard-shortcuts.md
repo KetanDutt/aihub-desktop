@@ -13,6 +13,10 @@ press `Ctrl+Tab` or click the tab strip to return to the chrome. On macOS use
 | `Ctrl+1` … `Ctrl+9` | Jump to tab *n* |
 | `Ctrl+W` | Close the active tab |
 | `Ctrl+R` / `F5` | Reload the active tab |
+| `Ctrl+Shift+R` | Reload, ignoring the cache |
+| `Esc` | Stop loading (when no dialog is open) |
+| `Alt+←` / `Alt+→` | Back / forward in the active tab |
+| `Alt+Home` | Back to the service home page |
 | `Ctrl+F` | Find in page (floating find bar) |
 | `Ctrl+M` | Mute / unmute the active tab |
 | `Ctrl+=` / `Ctrl+-` / `Ctrl+0` | Zoom in / out / reset (active tab) |
@@ -26,8 +30,12 @@ Global (OS-wide) shortcut, configurable in **Settings → General**:
 ## Mouse
 
 - Middle-click a tab to close it
-- Right-click a tab for reload, hibernate/wake, mute, find, zoom, copy URL,
-  open in browser, and close actions
+- Right-click a tab for back/forward, reload (plus reload ignoring the cache),
+  stop, home, hibernate/wake, mute, find, zoom, copy URL, open in browser and
+  close actions
+- Right-click a service card or row for its audited details — exact homepage,
+  whether it needs an account, its sign-in page, and enable/disable
+- Shift-click the reload button to bypass the cache
 - Drag tabs to reorder
 - Click a toast to dismiss it early
 

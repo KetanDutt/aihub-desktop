@@ -20,6 +20,10 @@ window.AiHub = window.AiHub || {};
     { keys: [`${MOD}+1…9`], description: 'Jump to tab n' },
     { keys: [`${MOD}+W`], description: 'Close the active tab' },
     { keys: [`${MOD}+R`, 'F5'], description: 'Reload the active tab' },
+    { keys: [`${MOD}+Shift+R`], description: 'Reload, ignoring the cache' },
+    { keys: ['Esc'], description: 'Stop loading the active tab' },
+    { keys: ['Alt+Home'], description: 'Back to the service home page' },
+    { keys: ['Alt+←', 'Alt+→'], description: 'Back / forward' },
     { keys: [`${MOD}+F`], description: 'Find in page' },
     { keys: [`${MOD}+M`], description: 'Mute / unmute the active tab' },
     { keys: [`${MOD}+=`, `${MOD}+-`, `${MOD}+0`], description: 'Zoom in, out, reset' },
@@ -74,6 +78,25 @@ window.AiHub = window.AiHub || {};
       const mod = IS_MAC ? event.metaKey : event.ctrlKey;
       const key = event.key;
 
+      // Alt-based navigation mirrors a browser: Alt+arrows, Alt+Home.
+      if (event.altKey && !mod) {
+        if (key === 'ArrowLeft') {
+          event.preventDefault();
+          if (app.state.currentTabId) window.electronAPI.navGoBack(app.state.currentTabId);
+          return;
+        }
+        if (key === 'ArrowRight') {
+          event.preventDefault();
+          if (app.state.currentTabId) window.electronAPI.navGoForward(app.state.currentTabId);
+          return;
+        }
+        if (key === 'Home') {
+          event.preventDefault();
+          if (app.state.currentTabId) window.electronAPI.navHome(app.state.currentTabId);
+          return;
+        }
+      }
+
       // Escape always closes the top-most overlay.
       if (key === 'Escape') {
         if (app.isFindBarOpen && app.isFindBarOpen()) {
@@ -86,6 +109,10 @@ window.AiHub = window.AiHub || {};
         }
         app.toggleShortcutsModal(false);
         app.closeContextMenu();
+
+        // Nothing left to dismiss: Esc stops a load in progress, like a browser.
+        const active = app.getActiveTab();
+        if (active && active.loading) window.electronAPI.navStop(active.id);
         return;
       }
 
@@ -131,7 +158,9 @@ window.AiHub = window.AiHub || {};
 
       if (lower === 'r') {
         event.preventDefault();
-        if (app.state.currentTabId) window.electronAPI.navReload(app.state.currentTabId);
+        if (!app.state.currentTabId) return;
+        if (event.shiftKey) window.electronAPI.navReloadHard(app.state.currentTabId);
+        else window.electronAPI.navReload(app.state.currentTabId);
         return;
       }
 

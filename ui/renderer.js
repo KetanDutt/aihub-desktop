@@ -190,9 +190,24 @@ window.AiHub = window.AiHub || {};
     const back = app.elements.btnNavBack;
     const forward = app.elements.btnNavForward;
     const reload = app.elements.btnNavReload;
-    if (back) back.addEventListener('click', () => app.state.currentTabId && window.electronAPI.navGoBack(app.state.currentTabId));
-    if (forward) forward.addEventListener('click', () => app.state.currentTabId && window.electronAPI.navGoForward(app.state.currentTabId));
-    if (reload) reload.addEventListener('click', () => app.state.currentTabId && window.electronAPI.navReload(app.state.currentTabId));
+    const stop = app.elements.btnNavStop;
+    const home = app.elements.btnNavHome;
+    const withActiveTab = (fn) => () => {
+      if (app.state.currentTabId) fn(app.state.currentTabId);
+    };
+
+    if (back) back.addEventListener('click', withActiveTab((id) => window.electronAPI.navGoBack(id)));
+    if (forward) forward.addEventListener('click', withActiveTab((id) => window.electronAPI.navGoForward(id)));
+    if (reload) {
+      reload.addEventListener('click', (event) => {
+        if (!app.state.currentTabId) return;
+        // Shift-click is the usual "reload, ignoring the cache" gesture.
+        if (event.shiftKey) window.electronAPI.navReloadHard(app.state.currentTabId);
+        else window.electronAPI.navReload(app.state.currentTabId);
+      });
+    }
+    if (stop) stop.addEventListener('click', withActiveTab((id) => window.electronAPI.navStop(id)));
+    if (home) home.addEventListener('click', withActiveTab((id) => window.electronAPI.navHome(id)));
 
     // A click anywhere dismisses an open context menu.
     document.addEventListener('click', () => app.closeContextMenu());

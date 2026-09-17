@@ -36,7 +36,12 @@ const SERVICE = {
   url: 'https://chatgpt.com/',
   type: 'Conversational AI',
   privacy: 'Test',
-  color: '10a37f'
+  color: '10a37f',
+  homepage: 'https://chatgpt.com/',
+  loginUrl: 'https://chatgpt.com/auth/login',
+  requiresLogin: true,
+  icon: 'data:image/svg+xml;base64,PHN2Zy8+',
+  hasApiAdapter: true
 };
 
 const BASE_CONFIG = {
@@ -105,6 +110,7 @@ function installElectronApiStub() {
     updateRemoteData: jest.fn().mockResolvedValue({ success: true, services: 1, rules: 1 }),
     toggleService: jest.fn().mockResolvedValue(['chatgpt']),
     getFavicon: jest.fn().mockResolvedValue({ dataUrl: null }),
+    getServiceDetails: jest.fn().mockResolvedValue(null),
     createTab: jest.fn().mockResolvedValue({ success: true, tabId: 'chatgpt-1' }),
     closeTab: jest.fn(),
     closeOtherTabs: jest.fn(),
@@ -118,6 +124,9 @@ function installElectronApiStub() {
     navGoBack: jest.fn(),
     navGoForward: jest.fn(),
     navReload: jest.fn(),
+    navReloadHard: jest.fn(),
+    navStop: jest.fn(),
+    navHome: jest.fn(),
     setZoom: jest.fn().mockResolvedValue(1),
     setMuted: jest.fn().mockResolvedValue(true),
     findInPage: jest.fn().mockResolvedValue({ requestId: 1 }),
@@ -285,5 +294,117 @@ describe('shell renderer', () => {
 
     window.AiHub.closeFindBar();
     expect(window.AiHub.isFindBarOpen()).toBe(false);
+  });
+
+  it('drives the per-tab browser controls and swaps reload for stop while loading', async () => {
+    const api = installElectronApiStub();
+    loadShell();
+    await flush();
+
+    const tab = await window.AiHub.createTab({ serviceId: 'chatgpt', url: SERVICE.url, title: 'ChatGPT' });
+    window.AiHub.applyTabState({
+      tabId: tab.id,
+      loading: false,
+      canGoBack: true,
+      canGoForward: false,
+      active: true
+    });
+
+    const back = document.getElementById('btn-nav-back');
+    const forward = document.getElementById('btn-nav-forward');
+    const reload = document.getElementById('btn-nav-reload');
+    const stop = document.getElementById('btn-nav-stop');
+    const home = document.getElementById('btn-nav-home');
+
+    expect(back.disabled).toBe(false);
+    expect(forward.disabled).toBe(true);
+    expect(home.disabled).toBe(false);
+    expect(stop.classList.contains('hidden')).toBe(true);
+
+    back.click();
+    expect(api.navGoBack).toHaveBeenCalledWith(tab.id);
+
+    reload.click();
+    expect(api.navReload).toHaveBeenCalledWith(tab.id);
+
+    // Shift-click is the "ignore the cache" gesture.
+    reload.dispatchEvent(new window.MouseEvent('click', { bubbles: true, shiftKey: true }));
+    expect(api.navReloadHard).toHaveBeenCalledWith(tab.id);
+
+    home.click();
+    expect(api.navHome).toHaveBeenCalledWith(tab.id);
+
+    // While loading, Stop replaces Reload.
+    window.AiHub.applyTabState({ tabId: tab.id, loading: true, active: true });
+    expect(reload.classList.contains('hidden')).toBe(true);
+    expect(stop.classList.contains('hidden')).toBe(false);
+
+    stop.click();
+    expect(api.navStop).toHaveBeenCalledWith(tab.id);
+
+    window.AiHub.applyTabState({ tabId: tab.id, loading: false, active: true });
+    expect(stop.classList.contains('hidden')).toBe(true);
+    expect(reload.classList.contains('hidden')).toBe(false);
+  });
+
+  it('offers per-tab navigation actions in the tab context menu', async () => {
+    const api = installElectronApiStub();
+    loadShell();
+    await flush();
+
+    const tab = await window.AiHub.createTab({ serviceId: 'chatgpt', url: SERVICE.url, title: 'ChatGPT' });
+    // Settle the tab so the menu offers Reload rather than Stop.
+    window.AiHub.applyTabState({ tabId: tab.id, loading: false, active: true });
+
+    const node = document.querySelector(`.tab-item[data-id="${tab.id}"]`);
+    node.dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, clientX: 10, clientY: 10 }));
+
+    const labels = Array.from(document.querySelectorAll('.context-menu .context-item')).map((el) => el.textContent);
+    expect(labels).toEqual(expect.arrayContaining(['Back', 'Forward', 'Reload', 'Reload, ignoring the cache', 'Home']));
+
+    const homeItem = Array.from(document.querySelectorAll('.context-menu .context-item')).find(
+      (el) => el.textContent === 'Home'
+    );
+    homeItem.click();
+    expect(api.navHome).toHaveBeenCalledWith(tab.id);
+  });
+
+  it('shows audited service details in the service context menu', async () => {
+    const api = installElectronApiStub();
+    loadShell();
+    await flush();
+
+    const card = document.querySelector('.service-card');
+    card.dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, clientX: 5, clientY: 5 }));
+
+    const menu = document.querySelector('.context-menu');
+    const headers = Array.from(menu.querySelectorAll('.context-header')).map((el) => el.textContent);
+    // Homepage, sign-in requirement and adapter availability come from the catalogue.
+    expect(headers).toEqual(expect.arrayContaining(['ChatGPT', 'https://chatgpt.com/']));
+    expect(headers.some((text) => text.startsWith('Sign-in required'))).toBe(true);
+    expect(headers).toContain('Local API can drive this service');
+
+    // The stub reports an active session, so the entry reads "Open the sign-in page".
+    const signIn = Array.from(menu.querySelectorAll('.context-item')).find(
+      (el) => el.textContent === 'Open the sign-in page' || el.textContent === 'Sign in…'
+    );
+    expect(signIn).toBeTruthy();
+    signIn.click();
+    expect(api.createTab).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'https://chatgpt.com/auth/login', serviceId: 'chatgpt' })
+    );
+  });
+
+  it('uses the catalogue icon for tabs instead of fetching a favicon', async () => {
+    const api = installElectronApiStub();
+    loadShell();
+    await flush();
+
+    await window.AiHub.createTab({ serviceId: 'chatgpt', url: SERVICE.url, title: 'ChatGPT' });
+    await flush(50);
+
+    expect(api.getFavicon).not.toHaveBeenCalled();
+    const img = document.querySelector('.tab-item .tab-favicon img');
+    expect(img.src).toBe(SERVICE.icon);
   });
 });

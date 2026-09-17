@@ -25,10 +25,20 @@ window.AiHub = window.AiHub || {};
 
   async function loadFavicon(serviceId, url) {
     if (faviconCache.has(serviceId)) return faviconCache.get(serviceId);
+
+    // The audited catalogue ships an icon for every known service, so seed the
+    // strip with it synchronously before any async lookup happens.
+    const preloaded = app.catalogIcon ? app.catalogIcon(serviceId) : null;
+    if (preloaded) {
+      faviconCache.set(serviceId, preloaded);
+      applyFavicon(serviceId, preloaded);
+      return preloaded;
+    }
+
     faviconCache.set(serviceId, null);
 
     try {
-      const result = await window.electronAPI.getFavicon(url);
+      const result = await window.electronAPI.getFavicon(url, serviceId);
       const dataUrl = (result && result.dataUrl) || null;
       faviconCache.set(serviceId, dataUrl);
       applyFavicon(serviceId, dataUrl);
@@ -186,9 +196,28 @@ window.AiHub = window.AiHub || {};
     app.contextMenu(x, y, [
       { type: 'header', label: tab.title },
       {
-        label: 'Reload',
-        onClick: () => window.electronAPI.navReload(id)
+        label: 'Back',
+        disabled: !tab.canGoBack,
+        onClick: () => window.electronAPI.navGoBack(id)
       },
+      {
+        label: 'Forward',
+        disabled: !tab.canGoForward,
+        onClick: () => window.electronAPI.navGoForward(id)
+      },
+      {
+        label: tab.loading ? 'Stop loading' : 'Reload',
+        onClick: () => (tab.loading ? window.electronAPI.navStop(id) : window.electronAPI.navReload(id))
+      },
+      {
+        label: 'Reload, ignoring the cache',
+        onClick: () => window.electronAPI.navReloadHard(id)
+      },
+      {
+        label: 'Home',
+        onClick: () => window.electronAPI.navHome(id)
+      },
+      { type: 'separator' },
       {
         label: tab.hibernated ? 'Wake up' : 'Free memory (hibernate)',
         onClick: async () => {
@@ -285,12 +314,34 @@ window.AiHub = window.AiHub || {};
       el.setAttribute('aria-selected', isActive ? 'true' : 'false');
     });
 
-    const active = app.getActiveTab();
-    if (app.elements.btnNavBack) app.elements.btnNavBack.disabled = !active || !active.canGoBack;
-    if (app.elements.btnNavForward) app.elements.btnNavForward.disabled = !active || !active.canGoForward;
+    app.paintNavControls();
 
     if (app.positionTabIndicator) app.positionTabIndicator();
   }
+
+  /**
+   * Sync the browser controls with the active tab: back/forward availability,
+   * a Home target, and reload swapping to Stop while a page is loading.
+   */
+  app.paintNavControls = function paintNavControls() {
+    const el = app.elements || {};
+    const active = app.getActiveTab();
+    const loading = Boolean(active && active.loading);
+
+    if (el.btnNavBack) el.btnNavBack.disabled = !active || !active.canGoBack;
+    if (el.btnNavForward) el.btnNavForward.disabled = !active || !active.canGoForward;
+    if (el.btnNavHome) el.btnNavHome.disabled = !active;
+
+    // Only one of reload/stop is visible at a time, the way a browser does it.
+    if (el.btnNavReload) {
+      el.btnNavReload.classList.toggle('hidden', loading);
+      el.btnNavReload.disabled = !active;
+    }
+    if (el.btnNavStop) {
+      el.btnNavStop.classList.toggle('hidden', !loading);
+      el.btnNavStop.disabled = !loading;
+    }
+  };
 
   /** Apply a `tab-state` payload from the main process. */
   function applyTabState(payload) {
@@ -319,6 +370,9 @@ window.AiHub = window.AiHub || {};
     if (payload.active) {
       app.state.currentTabId = payload.tabId;
       paintActiveTab();
+    } else if (payload.tabId === app.state.currentTabId) {
+      // Loading/navigation state of the tab already in front.
+      app.paintNavControls();
     }
 
     if (payload.crashed) {

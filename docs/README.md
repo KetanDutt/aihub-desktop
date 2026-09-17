@@ -14,6 +14,7 @@ domain allow-list in front of every network request.
 | [Sessions & anti-bot](sessions.md) | Login detection, cookie caching, re-login on open, fingerprint hardening. |
 | [Local API](local-api.md) | The OpenAI-compatible endpoint on loopback: endpoints, keys, models, content types, headless mode, adapters. |
 | [Keyboard shortcuts](keyboard-shortcuts.md) | The full reference shown by the `?` dialog. |
+| [Service catalogue](service-catalogue.md) | The audited menu catalogue: cached icons, homepages, login requirements, and how to regenerate them. |
 | [Development](development.md) | Setup, scripts, tests, benchmarks, linting, icon regeneration. |
 | [Packaging](packaging.md) | electron-builder targets, auto-update, deep links, one-click Windows scripts. |
 | [Troubleshooting](troubleshooting.md) | Common problems and how to read the log. |

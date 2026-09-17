@@ -84,6 +84,7 @@ read the log.
 |--------|--------|
 | **`RUN.bat`** (repo root) | **All-in-one**: deps + launch |
 | **`RUN-SERVER.bat`** (repo root) | **API only**: deps + start the local API server, no window |
+| **`BUILD.bat`** (repo root) | **One-click build**: deps + catalogue + checks + installer in `dist\` |
 | `scripts/windows/Setup.bat` | Install Node.js + dependencies only |
 | `scripts/windows/Run.bat` | Launch (installs deps if needed) |
 | `scripts/windows/RunServer.bat` | Start the API server only (headless); `RunServer.bat --port 8081` |
@@ -98,6 +99,7 @@ See [scripts/windows/README.md](scripts/windows/README.md).
 
 ```bash
 npm run one-click     # check/install deps, then launch
+./BUILD.sh            # one-click build: installer for this OS into dist/
 npm run serve         # API server only, no window (-- --port 8081 to choose one)
 # or manually:
 npm install
@@ -113,6 +115,9 @@ npm test              # unit + smoke tests
 npm run check         # lint + tests (CI)
 npm run benchmark     # performance micro-benchmarks
 npm run build:win     # package (also :mac / :linux)
+npm run one-click-build   # guided build: deps + catalogue + checks + installer
+npm run build:all         # every target this host can produce
+npm run services:audit    # refresh the menu catalogue + cached icons (offline)
 ```
 
 ## Local OpenAI-compatible API
@@ -151,6 +156,9 @@ Press `?` in the app for the full list. Highlights:
 | `Ctrl+T` | Open the service picker |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab |
 | `Ctrl+W` | Close the active tab |
+| `Ctrl+R` / `Ctrl+Shift+R` | Reload / reload ignoring the cache |
+| `Esc` | Stop loading the active tab |
+| `Alt+←` / `Alt+→` / `Alt+Home` | Back / forward / service home page |
 | `Ctrl+F` | Find in page |
 | `Ctrl+M` | Mute / unmute the active tab |
 | `Ctrl+=` / `-` / `0` | Zoom in / out / reset |

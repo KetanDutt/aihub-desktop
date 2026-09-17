@@ -24,6 +24,10 @@ Tests live in `tests/`. Main-process code is unit-tested under an Electron stub
   require-able without a display (tests and benchmarks import them directly).
 - New user settings must be added to the `electron-store` schema, the
   `WRITABLE_KEYS` whitelist and `sanitizeConfig()` in `src/config.js`.
+- After changing `data/services.json` (or a login profile / adapter), run
+  `npm run services:audit` and commit the regenerated `data/catalog.json` and
+  `assets/icons/`; CI runs `npm run services:check` and fails when they drift.
+  Never hand-edit those two — they are generated.
 - Service/rule edits go in `data/services.json` + `data/rules.json` (ids are
   `slugify(name)`); a test verifies the two stay consistent. The same rule covers
   `data/logins.json` (login fingerprints) and `data/adapters.json` (chat
@@ -42,8 +46,10 @@ Tests live in `tests/`. Main-process code is unit-tested under an Electron stub
 - `main.js` entry/lifecycle; `preload.js` contextBridge.
 - `src/` main process (see `docs/architecture.md`).
 - `ui/` shell renderer (plain JS, no bundler).
-- `scripts/` doctor/clean/icons/one-click-run + Windows helpers; root `RUN.bat`
-  is the Windows all-in-one launcher.
+- `scripts/` doctor/clean/icons/one-click-run/one-click-build/audit-services +
+  Windows helpers; root `RUN.bat` launches, `BUILD.bat`/`BUILD.sh` build.
+- `src/catalog.js` reads the generated catalogue + cached icons; like the other
+  pure modules it must stay free of Electron and of network access.
 - Use `clampFloat` (not `clampNumber`) for fractional values such as zoom.
 - IPC channel names live only in `src/constants.js#IPC`; keep preload and
   renderer in sync when adding channels.
