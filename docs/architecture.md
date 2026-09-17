@@ -24,7 +24,8 @@ settings, status bar) and one **`WebContentsView` per open service tab**.
           src/security.js  permissions, navigation guards, external links
           src/data.js    service catalogue + rules (remote + bundled)
           src/config.js  electron-store backed settings + sanitisation
-          src/favicon.js favicon resolver (main-process fetch + cache)
+          src/favicon.js favicon resolver (main-process fetch + TTL'd cache)
+          src/catalog.js audited menu catalogue + cached icons (pure, offline)
           src/updater.js electron-updater wiring
           src/loginstate.js login classification (pure: cookies + URL + DOM hints)
           src/logins.js   login monitor: tab watchers, re-login on open, keep-alive

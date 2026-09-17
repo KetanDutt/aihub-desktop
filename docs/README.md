@@ -17,6 +17,7 @@ domain allow-list in front of every network request.
 | [Service catalogue](service-catalogue.md) | The audited menu catalogue: cached icons, homepages, login requirements, and how to regenerate them. |
 | [Development](development.md) | Setup, scripts, tests, benchmarks, linting, icon regeneration. |
 | [Packaging](packaging.md) | electron-builder targets, auto-update, deep links, one-click Windows scripts. |
+| [Production readiness](production-readiness.md) | Release checklist, enforced invariants, fixed defects and known limitations. |
 | [Troubleshooting](troubleshooting.md) | Common problems and how to read the log. |
 | [Roadmap](roadmap.md) | Suggested future improvements and their trade-offs. |
 

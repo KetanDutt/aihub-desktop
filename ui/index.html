@@ -38,7 +38,8 @@
         </div>
 
         <div class="header-controls">
-          <span id="tab-count" class="tab-count" title="Open tabs / limit">0/3</span>
+          <span id="tab-count" class="tab-count" title="Open tabs / limit"
+                role="status" aria-label="0 of 3 tabs open">0/3</span>
           <button id="btn-update" class="btn btn-icon" title="Update the service catalogue" aria-label="Update the service catalogue">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -540,6 +541,19 @@
               <button id="btn-hibernate" class="btn btn-secondary btn-small">Hibernate idle tabs now</button>
               <small class="setting-hint">Frees the renderer processes of background tabs immediately.</small>
             </section>
+
+            <section class="setting-group">
+              <h3 class="setting-section-title">Backup</h3>
+              <div class="button-row">
+                <button id="btn-export-settings" class="btn btn-secondary btn-small">Export settings…</button>
+                <button id="btn-import-settings" class="btn btn-secondary btn-small">Import settings…</button>
+                <button id="btn-reset-settings" class="btn btn-danger btn-small">Reset to defaults</button>
+              </div>
+              <small class="setting-hint">
+                Exports your preferences and enabled services as a JSON file you can move to another machine.
+                Sessions, cookies and the local API key are never included.
+              </small>
+            </section>
           </div>
 
           <!-- ---------- About ---------- -->
@@ -585,7 +599,7 @@
 
     <!-- ===================== Status bar ===================== -->
     <footer class="status-bar">
-      <div id="status-message" class="status-message">
+      <div id="status-message" class="status-message" role="status" aria-live="polite" aria-atomic="true">
         <span id="loading-indicator" class="loading-indicator hidden spin" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round">
@@ -597,7 +611,7 @@
         </span>
         <span id="status-text">Ready</span>
       </div>
-      <div class="blocking-status">
+      <div class="blocking-status" role="status" aria-live="polite">
         <span id="blocking-indicator" class="indicator active" aria-hidden="true"></span>
         <span id="blocking-text">Blocking active</span>
       </div>

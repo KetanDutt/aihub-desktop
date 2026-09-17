@@ -21,15 +21,28 @@ window.AiHub = window.AiHub || {};
 
   let renderTimer = null;
 
-  /** Coalesce a burst of `login-state` events into one repaint. */
+  /**
+   * Coalesce a burst of `login-state` events into one repaint.
+   *
+   * Only the lists that are actually on screen are rebuilt. Login events arrive
+   * for every service on every cookie change, and each repaint used to rebuild
+   * the whole settings catalogue (20+ rows, each with an avatar and chips) even
+   * when the settings drawer was closed — pure waste on the UI thread.
+   */
   function scheduleRender() {
     if (renderTimer) clearTimeout(renderTimer);
     renderTimer = setTimeout(() => {
       renderTimer = null;
-      app.renderSessionList();
-      app.renderSessionSummary();
-      if (app.renderAllServices) app.renderAllServices();
-      if (app.renderEnabledServices) app.renderEnabledServices();
+      const settingsOpen = app.isSettingsOpen ? app.isSettingsOpen() : true;
+      if (settingsOpen) {
+        app.renderSessionList();
+        app.renderSessionSummary();
+        if (app.renderAllServices) app.renderAllServices();
+      }
+      // The sidebar shows login dots, so it repaints whenever it is open.
+      const sidebarOpen =
+        app.elements && app.elements.sidebar && !app.elements.sidebar.classList.contains('hidden');
+      if (sidebarOpen && app.renderEnabledServices) app.renderEnabledServices();
     }, 350);
   }
 

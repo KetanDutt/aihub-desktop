@@ -6,7 +6,8 @@
  * enforced in the main process (the renderer's own check is only UX).
  */
 
-const { ipcMain, app, session } = require('electron');
+const { ipcMain, app, session, dialog } = require('electron');
+const fsPromises = require('fs').promises;
 
 const log = require('electron-log');
 const configStore = require('./config');
@@ -150,6 +151,77 @@ function setupIpcHandlers() {
       return { success: true, config: configStore.getPublicConfig(), notices };
     } catch (error) {
       log.warn('Rejected config update:', error.message);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // -- Settings backup -------------------------------------------------------
+
+  ipcMain.handle(IPC.EXPORT_SETTINGS, async () => {
+    const win = windowManager.getMainWindow();
+    try {
+      const payload = configStore.exportSettings();
+      const stamp = new Date().toISOString().slice(0, 10);
+      const { canceled, filePath } = await dialog.showSaveDialog(win, {
+        title: 'Export settings',
+        defaultPath: `aihub-settings-${stamp}.json`,
+        filters: [{ name: 'JSON', extensions: ['json'] }]
+      });
+      if (canceled || !filePath) return { success: false, cancelled: true };
+
+      await fsPromises.writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+      log.info(`Settings exported to ${filePath}`);
+      return { success: true, filePath, keys: Object.keys(payload.settings).length };
+    } catch (error) {
+      log.warn('Settings export failed:', error.message);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle(IPC.IMPORT_SETTINGS, async () => {
+    const win = windowManager.getMainWindow();
+    try {
+      const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+        title: 'Import settings',
+        properties: ['openFile'],
+        filters: [{ name: 'JSON', extensions: ['json'] }]
+      });
+      if (canceled || !filePaths || filePaths.length === 0) return { success: false, cancelled: true };
+
+      const file = filePaths[0];
+      const stat = await fsPromises.stat(file);
+      // A settings document is tiny; anything larger is not one.
+      if (stat.size > 512 * 1024) throw new Error('That file is too large to be a settings export');
+
+      const parsed = JSON.parse(await fsPromises.readFile(file, 'utf8'));
+      const result = configStore.importSettings(parsed);
+
+      // Everything that follows from a config change, exactly as a normal save.
+      const config = configStore.getConfig();
+      refreshBlocking();
+      windowManager.setTabLimit(config.maxActiveServices);
+      windowManager.registerGlobalShortcut(config.globalShortcut);
+      applyLoginItemSetting(config.launchAtLogin);
+
+      log.info(`Settings imported from ${file} (${result.applied.length} keys)`);
+      return { success: true, applied: result.applied, config: result.config };
+    } catch (error) {
+      log.warn('Settings import failed:', error.message);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle(IPC.RESET_SETTINGS, async () => {
+    try {
+      configStore.resetConfig();
+      const config = configStore.getConfig();
+      refreshBlocking();
+      windowManager.setTabLimit(config.maxActiveServices);
+      windowManager.registerGlobalShortcut(config.globalShortcut);
+      applyLoginItemSetting(config.launchAtLogin);
+      log.info('Settings reset to defaults');
+      return { success: true, config: configStore.getPublicConfig() };
+    } catch (error) {
       return { success: false, error: error.message };
     }
   });

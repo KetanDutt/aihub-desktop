@@ -510,12 +510,16 @@ function createViewForTab(tab) {
   const syncNavigation = () => {
     if (contents.isDestroyed()) return;
     const url = contents.getURL();
+    const nav = history(contents);
     tabs.update(tab.id, {
       url,
-      canGoBack: contents.canGoBack(),
-      canGoForward: contents.canGoForward()
+      canGoBack: nav.canGoBack(),
+      canGoForward: nav.canGoForward()
     });
-    notifyTabState(tab);
+    // Send the *updated* record, not the stale closure variable: `tab` is the
+    // object captured when the view was created, so notifying with it skipped
+    // the new url/canGoBack values whenever the record had been replaced.
+    notifyTabState(tabs.get(tab.id) || tab);
 
     // A bot challenge is waited out with jittered backoff, and it must never be
     // misread as a signed-out session.
@@ -825,12 +829,40 @@ function withContents(tabId, fn, fallback = false) {
   }
 }
 
+/**
+ * Navigation history accessor.
+ *
+ * Electron 30 moved history to `contents.navigationHistory` and deprecated the
+ * flat `canGoBack()` / `goBack()` methods. Prefer the new API, fall back to the
+ * old one so the app keeps working on older runtimes.
+ */
+function history(contents) {
+  const nav = contents.navigationHistory;
+  if (nav && typeof nav.canGoBack === 'function') return nav;
+  return {
+    canGoBack: () => contents.canGoBack(),
+    canGoForward: () => contents.canGoForward(),
+    goBack: () => contents.goBack(),
+    goForward: () => contents.goForward()
+  };
+}
+
 function navGoBack(tabId) {
-  return Boolean(withContents(tabId, (contents) => contents.canGoBack() && (contents.goBack(), true)));
+  return Boolean(
+    withContents(tabId, (contents) => {
+      const nav = history(contents);
+      return nav.canGoBack() && (nav.goBack(), true);
+    })
+  );
 }
 
 function navGoForward(tabId) {
-  return Boolean(withContents(tabId, (contents) => contents.canGoForward() && (contents.goForward(), true)));
+  return Boolean(
+    withContents(tabId, (contents) => {
+      const nav = history(contents);
+      return nav.canGoForward() && (nav.goForward(), true);
+    })
+  );
 }
 
 function navReload(tabId) {

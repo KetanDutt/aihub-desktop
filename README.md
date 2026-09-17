@@ -35,12 +35,20 @@ your machine.
   domains, an optional *Strict mode*, live blocked-request counters.
 - **Memory aware** - a concurrent-tab limit plus **automatic hibernation** of
   idle tabs tears down background renderers and rebuilds them on demand.
+- **Full browser controls per tab** - back, forward, reload (plus
+  reload-ignoring-cache), stop and home, with reload swapping to stop while a
+  page loads; `Ctrl+Shift+T` reopens the last closed tab.
 - **Find in page** - `Ctrl+F` opens a floating find bar with match counter and
   next/previous navigation.
 - **Per-tab mute & zoom** - mute noisy tabs (`Ctrl+M`); zoom steps and mute
   state survive restarts.
 - **Offline-first** - a validated catalogue + rule set ships with the app; the
-  remote list refreshes in the background and can never corrupt the cache.
+  remote list refreshes in the background and can never corrupt the cache. An
+  audited menu catalogue (homepages, sign-in requirements, cached icons) means
+  the first paint is complete with no network round trip.
+- **Portable settings** - export your preferences and enabled services to JSON,
+  import them on another machine, or reset to defaults. Secrets and sessions are
+  never included.
 - **Privacy controls** - deny-by-default permissions with prompts, session
   wipe, proxy support, WebRTC IP policy, "open in browser" instead of pop-up
   windows.
@@ -156,6 +164,7 @@ Press `?` in the app for the full list. Highlights:
 | `Ctrl+T` | Open the service picker |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab |
 | `Ctrl+W` | Close the active tab |
+| `Ctrl+Shift+T` | Reopen the last closed tab |
 | `Ctrl+R` / `Ctrl+Shift+R` | Reload / reload ignoring the cache |
 | `Esc` | Stop loading the active tab |
 | `Alt+←` / `Alt+→` / `Alt+Home` | Back / forward / service home page |
@@ -180,6 +189,7 @@ On macOS use `⌘` instead of `Ctrl`. Full reference:
 | [Local API](docs/local-api.md) | the OpenAI-compatible endpoint: models, keys, limits |
 | [Development](docs/development.md) | setup, scripts, tests, conventions |
 | [Packaging](docs/packaging.md) | electron-builder, auto-update, one-click scripts |
+| [Production readiness](docs/production-readiness.md) | Release checklist, invariants, known limitations |
 | [Troubleshooting](docs/troubleshooting.md) | reading the log, common problems |
 | [API surface](docs/api.md) | IPC channels and preload bridge |
 | [Roadmap](docs/roadmap.md) | suggested next improvements |

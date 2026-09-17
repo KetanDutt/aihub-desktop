@@ -12,6 +12,7 @@ press `Ctrl+Tab` or click the tab strip to return to the chrome. On macOS use
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab |
 | `Ctrl+1` … `Ctrl+9` | Jump to tab *n* |
 | `Ctrl+W` | Close the active tab |
+| `Ctrl+Shift+T` | Reopen the last closed tab (up to 10 remembered) |
 | `Ctrl+R` / `F5` | Reload the active tab |
 | `Ctrl+Shift+R` | Reload, ignoring the cache |
 | `Esc` | Stop loading (when no dialog is open) |

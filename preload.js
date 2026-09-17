@@ -62,6 +62,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // -- Session / privacy -----------------------------------------------------
   clearSessionData: (options) => ipcRenderer.invoke('clear-session-data', options),
+  exportSettings: () => ipcRenderer.invoke('export-settings'),
+  importSettings: () => ipcRenderer.invoke('import-settings'),
+  resetSettings: () => ipcRenderer.invoke('reset-settings'),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   getBlockingStats: () => ipcRenderer.invoke('get-blocking-stats'),
 

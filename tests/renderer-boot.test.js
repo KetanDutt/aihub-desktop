@@ -395,6 +395,28 @@ describe('shell renderer', () => {
     );
   });
 
+  it('reopens the last closed tab with its url, zoom and mute state', async () => {
+    const api = installElectronApiStub();
+    loadShell();
+    await flush();
+
+    const tab = await window.AiHub.createTab({ serviceId: 'chatgpt', url: SERVICE.url, title: 'ChatGPT' });
+    window.AiHub.applyTabState({ tabId: tab.id, url: 'https://chatgpt.com/c/42', zoomFactor: 1.25, muted: true, active: true });
+
+    await window.AiHub.closeTab(tab.id);
+    expect(window.AiHub.state.tabs.length).toBe(0);
+    expect(window.AiHub.closedTabCount()).toBe(1);
+
+    api.createTab.mockClear();
+    const reopened = await window.AiHub.reopenClosedTab();
+    expect(reopened).toBeTruthy();
+    expect(api.createTab).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'https://chatgpt.com/c/42', zoomFactor: 1.25, muted: true })
+    );
+    // The stack is consumed, so a second attempt has nothing left.
+    expect(window.AiHub.closedTabCount()).toBe(0);
+  });
+
   it('uses the catalogue icon for tabs instead of fetching a favicon', async () => {
     const api = installElectronApiStub();
     loadShell();

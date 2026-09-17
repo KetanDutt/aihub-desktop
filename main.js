@@ -249,7 +249,9 @@ async function bootstrap() {
     }
     if (!started || started.ok === false) {
       log.error(`Headless API server failed to start: ${(started && started.error) || 'unknown error'}`);
-      app.quit(1);
+      // `app.quit()` takes no exit code — it would end the process with 0 and a
+      // supervisor (systemd, Docker, CI) would read the failure as success.
+      app.exit(1);
       return;
     }
     log.info(`Headless API server ready on ${status.baseUrl}`);
@@ -272,7 +274,7 @@ if (HEADLESS) {
     localApi
       .stop()
       .catch(() => {})
-      .finally(() => app.quit(0));
+      .finally(() => app.exit(0));
   };
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));

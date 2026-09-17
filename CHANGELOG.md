@@ -36,8 +36,43 @@ All notable changes to this project are documented here. The format follows
   `--win` / `--mac` / `--linux`, `--dir`, `--fast`, `--publish`.
   `scripts/windows/Build.ps1` now delegates to it.
 
+- **Settings backup.** Export your preferences and enabled services to a JSON
+  file, import them on another machine, or reset everything to defaults
+  (**Settings ▸ Privacy ▸ Backup**). The export deliberately excludes the local
+  API key, cookies and machine-specific state, and an imported file is
+  sanitised like any other untrusted input.
+- **Reopen closed tab** (`Ctrl+Shift+T`, also in the tab context menu), which
+  restores the tab's URL, zoom and mute state. The last 10 are remembered.
+
+### Fixed
+
+- **`strictBlocking` silently disabled the local API.** The API's hidden windows
+  never registered an allow-list with the request filter, so under strict mode —
+  which is fail-closed for unattributed requests — every request they made was
+  rejected. They now register the same allow-list a visible tab gets, so they
+  are filtered rather than trusted.
+- **Headless server exited 0 on failure.** `app.quit(1)` ignores its argument;
+  a server that failed to start reported success to systemd, Docker and CI. Now
+  uses `app.exit(1)`.
+- **Favicon misses were cached forever.** A single failed lookup (offline at
+  launch, a flaky CDN) meant the icon never returned until restart. Misses now
+  expire after 6 hours.
+- **Stale tab state after navigation.** `did-navigate` notified the renderer
+  with the tab record captured at view creation, so a replaced record sent the
+  old URL and back/forward flags.
+- **Toast storm on blocked requests.** A tracker-heavy page produced one toast
+  per blocked request; hosts are now coalesced into one summary toast.
+- Accessibility: the status bar, blocking indicator and tab counter announce
+  changes (`role="status"`, meaningful `aria-label`s), and the shortcuts dialog
+  now moves focus into itself and restores it on close.
+
 ### Changed
 
+- Migrated off the navigation APIs deprecated in Electron 30
+  (`canGoBack`/`goBack` → `contents.navigationHistory`), with a fallback for
+  older runtimes.
+- Login-state events no longer rebuild the settings catalogue when the settings
+  drawer is closed — repaints are scoped to what is actually on screen.
 - `get-services` returns the service list enriched with catalogue data
   (homepage, login URL, auth domains, icon), and `get-favicon` serves the
   cached icon before falling back to the live fetcher.

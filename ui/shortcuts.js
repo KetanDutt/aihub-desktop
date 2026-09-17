@@ -19,6 +19,7 @@ window.AiHub = window.AiHub || {};
     { keys: [`${MOD}+Shift+Tab`], description: 'Previous tab' },
     { keys: [`${MOD}+1…9`], description: 'Jump to tab n' },
     { keys: [`${MOD}+W`], description: 'Close the active tab' },
+    { keys: [`${MOD}+Shift+T`], description: 'Reopen the last closed tab' },
     { keys: [`${MOD}+R`, 'F5'], description: 'Reload the active tab' },
     { keys: [`${MOD}+Shift+R`], description: 'Reload, ignoring the cache' },
     { keys: ['Esc'], description: 'Stop loading the active tab' },
@@ -65,12 +66,31 @@ window.AiHub = window.AiHub || {};
     }
   }
 
+  /** Element that had focus before the modal opened, so it can be restored. */
+  let focusBeforeModal = null;
+
   app.toggleShortcutsModal = function toggleShortcutsModal(force) {
     const modal = app.elements.shortcutsModal;
     if (!modal) return;
     renderShortcutsModal();
-    const shouldShow = force === undefined ? modal.classList.contains('hidden') : force;
+
+    const wasHidden = modal.classList.contains('hidden');
+    const shouldShow = force === undefined ? wasHidden : force;
+    if (shouldShow === !wasHidden) return; // already in the requested state
+
     modal.classList.toggle('hidden', !shouldShow);
+    modal.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+
+    // The dialog declares aria-modal, so focus has to actually go into it —
+    // otherwise a keyboard or screen-reader user is left behind it.
+    if (shouldShow) {
+      focusBeforeModal = document.activeElement;
+      const close = app.elements.btnCloseShortcuts;
+      if (close && typeof close.focus === 'function') close.focus();
+    } else if (focusBeforeModal && typeof focusBeforeModal.focus === 'function') {
+      focusBeforeModal.focus();
+      focusBeforeModal = null;
+    }
   };
 
   app.initShortcuts = function initShortcuts() {
@@ -140,7 +160,9 @@ window.AiHub = window.AiHub || {};
 
       if (lower === 't') {
         event.preventDefault();
-        app.openSidebar();
+        // Shift+T reopens what you just closed, like a browser.
+        if (event.shiftKey) app.reopenClosedTab();
+        else app.openSidebar();
         return;
       }
 
