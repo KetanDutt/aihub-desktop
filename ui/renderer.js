@@ -235,6 +235,9 @@ window.AiHub = window.AiHub || {};
     initViewBounds();
 
     await app.loadConfig();
+    // Structure first: placeholders keep the sidebar from flashing empty while
+    // the catalogue resolves, and prevent a layout jump when it lands.
+    if (app.showServiceSkeletons) app.showServiceSkeletons();
     await app.loadServices();
     updateWelcomeCopy();
 

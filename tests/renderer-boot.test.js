@@ -16,6 +16,7 @@ const path = require('path');
 
 const UI_DIR = path.join(__dirname, '..', 'ui');
 const SCRIPTS = [
+  'icons.js',
   'utils.js',
   'state.js',
   'motion.js',
@@ -204,6 +205,17 @@ function loadShell() {
 }
 
 const flush = (ms = 800) => new Promise((resolve) => setTimeout(resolve, ms));
+
+describe('script manifest', () => {
+  // This list silently drifted from index.html once already: a new ui/*.js was
+  // added to the page but not here, so the harness booted a shell the user
+  // never sees. Assert the two stay in lockstep, in order.
+  it('matches the scripts index.html actually loads, in order', () => {
+    const html = fs.readFileSync(path.join(UI_DIR, 'index.html'), 'utf8');
+    const loaded = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map((m) => m[1]);
+    expect(loaded).toEqual(SCRIPTS);
+  });
+});
 
 describe('shell renderer', () => {
   it('boots, loads config + services and shows the welcome screen', async () => {

@@ -6,10 +6,6 @@
 window.AiHub = window.AiHub || {};
 
 (function (app) {
-  const PLUS_SVG =
-    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" ' +
-    'stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
-
   const LOGIN_LABELS = {
     'logged-in': 'Signed in',
     'logged-out': 'Signed out',
@@ -155,17 +151,14 @@ window.AiHub = window.AiHub || {};
     app.contextMenu(x, y, items);
   };
 
-  function emptyState(message, actionLabel) {
+  function emptyState(message, actionLabel, iconName = 'search') {
     const wrap = document.createElement('div');
     wrap.className = 'empty-state';
 
     const icon = document.createElement('span');
     icon.className = 'empty-state-icon';
     icon.setAttribute('aria-hidden', 'true');
-    icon.innerHTML =
-      '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" ' +
-      'stroke-linecap="round" stroke-linejoin="round">' +
-      '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>';
+    icon.appendChild(app.icon(iconName, 18));
     wrap.appendChild(icon);
 
     const text = document.createElement('p');
@@ -183,6 +176,50 @@ window.AiHub = window.AiHub || {};
     return wrap;
   }
 
+  /**
+   * Structural placeholder shown while the catalogue is still loading.
+   *
+   * The shape deliberately mirrors a real `.service-item` (avatar + two text
+   * lines) so the swap to live content causes no layout jump.
+   *
+   * @param {number} rows
+   * @returns {DocumentFragment}
+   */
+  function skeletonList(rows = 5) {
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < rows; i += 1) {
+      const row = document.createElement('div');
+      row.className = 'skeleton-row';
+      row.setAttribute('aria-hidden', 'true');
+
+      const avatar = document.createElement('span');
+      avatar.className = 'skeleton skeleton-avatar';
+
+      const lines = document.createElement('span');
+      lines.className = 'skeleton-lines';
+      const title = document.createElement('span');
+      title.className = 'skeleton skeleton-line';
+      const meta = document.createElement('span');
+      meta.className = 'skeleton skeleton-line short';
+      lines.append(title, meta);
+
+      row.append(avatar, lines);
+      frag.appendChild(row);
+    }
+    return frag;
+  }
+
+  /**
+   * Paint loading placeholders into the service lists.
+   * Called once before the catalogue resolves; the first real render clears it.
+   */
+  app.showServiceSkeletons = function showServiceSkeletons() {
+    const list = app.elements && app.elements.servicesList;
+    if (!list || list.childElementCount > 0) return;
+    list.setAttribute('aria-busy', 'true');
+    list.appendChild(skeletonList(5));
+  };
+
   // -- Sidebar ---------------------------------------------------------------
 
   app.renderEnabledServices = function renderEnabledServices() {
@@ -192,6 +229,8 @@ window.AiHub = window.AiHub || {};
     const query = app.elements.serviceSearch ? app.elements.serviceSearch.value : '';
     const services = app.filterServices(app.enabledServices(), query);
 
+    // Real content replaces any loading placeholders.
+    list.removeAttribute('aria-busy');
     list.innerHTML = '';
 
     if (app.state.services.length === 0) {
@@ -243,7 +282,7 @@ window.AiHub = window.AiHub || {};
 
       const add = document.createElement('span');
       add.className = 'service-card-add';
-      add.innerHTML = PLUS_SVG;
+      add.replaceChildren(app.icon('plus', 14));
       header.appendChild(add);
 
       const body = document.createElement('div');

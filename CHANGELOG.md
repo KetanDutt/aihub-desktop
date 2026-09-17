@@ -36,6 +36,12 @@ All notable changes to this project are documented here. The format follows
   `--win` / `--mac` / `--linux`, `--dir`, `--fast`, `--publish`.
   `scripts/windows/Build.ps1` now delegates to it.
 
+- **Shared icon system** (`ui/icons.js`). One geometric family on a 24px grid
+  with a single stroke weight, built with `createElementNS`. Replaces the text
+  characters that stood in for toast icons (`i`, `✓`, `×`) and the hand-rolled
+  SVG strings that had drifted apart in size and weight.
+- **Skeleton loading states** for the service sidebar, shaped like the rows they
+  replace so the first paint has structure and content lands without a jump.
 - **Settings backup.** Export your preferences and enabled services to a JSON
   file, import them on another machine, or reset everything to defaults
   (**Settings ▸ Privacy ▸ Backup**). The export deliberately excludes the local
@@ -62,12 +68,23 @@ All notable changes to this project are documented here. The format follows
   old URL and back/forward flags.
 - **Toast storm on blocked requests.** A tracker-heavy page produced one toast
   per blocked request; hosts are now coalesced into one summary toast.
+- `prefers-reduced-motion` now zeroes `transition-delay` as well as duration.
+  Staged reveals would otherwise withhold content permanently instead of simply
+  appearing without animation.
 - Accessibility: the status bar, blocking indicator and tab counter announce
   changes (`role="status"`, meaningful `aria-label`s), and the shortcuts dialog
   now moves focus into itself and restores it on close.
 
 ### Changed
 
+- **Design-system polish.** Every remaining raw pixel radius is now a token
+  (`--r-1…--r-6` cover nested geometry), modal content fades in a beat after the
+  surface, and toast badges tint to match their meaning.
+- **Intentional mobile behaviour.** Back/forward/reload are no longer hidden at
+  ≤640px — they were `display: none`, which left no way to navigate; only Home
+  drops, since the sidebar covers it. Touch targets grow to 40px on coarse
+  pointers, hover transforms are suppressed there, and `--blur-*` steps down on
+  small screens so mobile GPUs keep up without losing the material.
 - Migrated off the navigation APIs deprecated in Electron 30
   (`canGoBack`/`goBack` → `contents.navigationHistory`), with a fallback for
   older runtimes.

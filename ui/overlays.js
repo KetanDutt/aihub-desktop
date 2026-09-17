@@ -10,11 +10,12 @@ window.AiHub = window.AiHub || {};
 (function (app) {
   const TOAST_TIMEOUT_MS = 3400;
 
-  const TOAST_GLYPHS = {
-    info: 'i',
-    success: '✓',
-    warning: '!',
-    error: '×'
+  // Toast type -> icon name in the shared icon family (see icons.js).
+  const TOAST_ICONS = {
+    info: 'info',
+    success: 'success',
+    warning: 'warning',
+    error: 'error'
   };
 
   function toastRoot() {
@@ -35,7 +36,7 @@ window.AiHub = window.AiHub || {};
     const icon = document.createElement('span');
     icon.className = 'toast-icon';
     icon.setAttribute('aria-hidden', 'true');
-    icon.textContent = TOAST_GLYPHS[type] || TOAST_GLYPHS.info;
+    icon.appendChild(app.icon(TOAST_ICONS[type] || TOAST_ICONS.info, 14));
 
     const body = document.createElement('span');
     body.className = 'toast-body';
