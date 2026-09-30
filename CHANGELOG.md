@@ -8,6 +8,108 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **The shell is a Liquid Glass interface.** `ui/styles.css` was rebuilt around a
+  material system instead of per-component styling: four translucency strengths
+  (`sm`/`md`/`lg` plus a tinted accent surface), a named blur ladder, an ambient
+  backdrop the glass refracts, seven explicit depth layers (`--z-bg` …
+  `--z-toast`) and one motion vocabulary (90ms micro to 440ms dialogs). Navigation
+  is now a floating element that deepens as content scrolls beneath it, the
+  active tab is a pill that glides between tabs, and floating UI opens from the
+  control that owns it.
+- **Every screen was redesigned, not just the first one.** Sidebar, service
+  picker, welcome stage, settings drawer (all six tabs), services manager,
+  sessions, API panel, About, status bar, find bar, context menus, dialogs and
+  toasts share one visual language — lists are rows, cards are reserved for
+  decisions, and metadata is grouped rather than boxed.
+- **`npm run preview:shell`.** Serves `ui/` over HTTP with a stubbed
+  `window.electronAPI` built from the real catalogue, so the renderer can be
+  reviewed in a browser (`?light`, `?surface`) without launching Electron.
+  Preview only: it stubs IPC and never touches config or sessions on disk.
+- **Motion that explains state.** Pointer-tracked highlight inside service cards
+  (one delegated, rAF-throttled listener), digit-roll on the tab counter, glide
+  indicators on tabs and settings segments, skeleton rows that breathe in
+  sequence, and enter/exit asymmetry so surfaces arrive softly and leave fast.
+- **A reduced-motion path that keeps state changes.** Movement is switched off
+  rather than merely shortened, while colour and opacity changes still land.
+
+### Changed
+
+- **Dark and light are both first-class.** Light mode is no longer an inversion:
+  brighter neutrals, stronger white edge highlights, softer shadows and reduced
+  border contrast, with glass visible in both themes.
+- **Muted text meets WCAG AA.** `--text-3` measured ~2.9:1 against the base
+  surfaces; it now measures ≥4.5:1 (`5.2:1` dark, `4.85:1` light) so hints,
+  metadata and section labels stay readable.
+- **Indicators no longer carry `backdrop-filter`.** A blur travelling on every tab
+  switch cost more than it showed; the glide pill keeps its fill, border and edge
+  highlight and drops the blur.
+- **Mobile steps blur down instead of dropping the material** (`--blur-*` at
+  ≤640px), the service picker takes the whole row rather than leaving a sliver of
+  web view, the find bar moves to the bottom for thumb reach, and the settings
+  drawer goes edge-to-edge.
+
+### Fixed
+
+- **Unstyled component classes.** `service-group-title`, `services-manager` and
+  the `is-signin` group modifier were rendered by the shell with no rules behind
+  them; every class the renderer can produce now has a definition.
+
+- **The window remembers where it was.** Size, position and maximized state are
+  persisted and restored on the next launch — validated against the attached
+  displays first, so a window saved on a monitor you have since unplugged opens
+  at the default size instead of off-screen (`src/windowstate.js`).
+- **App shortcuts work inside a service tab.** A `WebContentsView` owns the
+  keyboard, so `Ctrl+W`, `Ctrl+Tab`, `Ctrl+F`, `Ctrl+R` and friends used to stop
+  working the moment you clicked into a chat. Recognised accelerators are now
+  replayed against the shell over the new `app-command` channel
+  (`src/accelerators.js`); everything a site owns — typing, `Esc`, `Ctrl+A/C/V`,
+  editor chords — is left untouched.
+- **Actionable toasts.** Toasts can carry one button, and a crashed tab now
+  offers **Reload** instead of only reporting the crash; the tab is flagged in
+  the strip until it loads again.
+- **`src/logger.js` as the single logging entry point.** One place configures
+  levels, the 5 MB rotation cap and the file permissions, with a no-op fallback
+  for a partial backend.
+
+### Fixed
+
+- **Domain-filter bypass through a look-alike hostname.** The "internal URL"
+  test (the escape hatch for the app shell, `blob:`/`data:` and loopback) used
+  `String.startsWith`, so `http://localhost.evil.com/` — a public domain that
+  merely begins with `localhost` — was classified as internal and skipped the
+  per-tab allow-list entirely. It now compares the parsed hostname, and
+  `127.0.0.0/8` / `.localhost` are recognised as loopback.
+- **Logging could break the domain filter.** Thirteen modules imported
+  `electron-log` directly instead of `src/logger.js`, so any backend that was
+  missing a level (an offline install, a unit-test mock, an older runtime) made
+  `updateTabDomains()` throw a `TypeError` instead of returning an allow-list.
+  Everything now goes through the wrapper, which forwards a level only when it
+  exists and never lets the backend break the caller. This was why the project's
+  own Jest suite was red on `main`.
+- **IPv6 loopback clients were rejected by the local API.** `Host: [::1]:8788`
+  was split on the first colon, leaving `"["` to compare against the allow-list.
+- `get-favicon` accepted any URL from the renderer; only `http(s)` is fetched
+  now, which keeps the main process from opening a socket on the renderer's
+  behalf.
+- `get-limits` reported the open tab count under the key `maxTabs`; it now
+  returns `{ openTabs, limit, minTabs, hardMax }`.
+- Removed the duplicate `.toast-*` tint rules from the stylesheet and the
+  unused `tab-loading` / `app-log` IPC constants.
+- A stale blocking test asserted that a destroyed tab's requests are blocked;
+  the documented policy is fail-open for unattributed webContents (fail-closed
+  under `strictBlocking`), and the test now pins both behaviours.
+
+### Changed
+
+- **Less disk churn while browsing.** The tab record list is serialized and
+  compared before writing, so a navigation that does not change the persisted
+  shape skips the synchronous store write; the tray menu is only rebuilt when
+  the open tabs actually change.
+- Window geometry is written on close/hide as well as on quit, so the position
+  survives even when `will-quit` runs after the window is gone.
+- The log file is created `0600` on POSIX (it names services, hosts and paths),
+  and native widgets follow the theme via `color-scheme`.
+
 - **Audited service catalogue with cached icons.** `scripts/audit-services.js`
   (`npm run services:audit`) "runs" every catalogue entry once and writes
   `data/catalog.json` plus `assets/icons/<id>.*`: the exact homepage, the

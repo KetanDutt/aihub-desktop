@@ -40,7 +40,8 @@ const {
   updateTabDomains,
   removeTabDomains,
   setupWebRequestBlocking,
-  updateBlockingState
+  updateBlockingState,
+  getBlockingSnapshot
 } = require('../src/blocking');
 
 describe('Domain Blocking Logic', () => {
@@ -137,7 +138,7 @@ describe('Tab-Specific Blocking Logic', () => {
     expect(callback).toHaveBeenCalledWith({ cancel: true });
   });
 
-  it('should remove tab domains correctly', () => {
+  it('forgets a webContents once its domains are removed', () => {
     const webContentsId = 4;
     const rules = {
       service_domains: {
@@ -146,13 +147,22 @@ describe('Tab-Specific Blocking Logic', () => {
     };
 
     updateTabDomains(webContentsId, 'chatgpt', rules);
+    const registered = getBlockingSnapshot().tabs;
+
     removeTabDomains(webContentsId);
-
+    expect(getBlockingSnapshot().tabs).toBe(registered - 1);
     const callback = jest.fn();
-    blockerCallback({ url: 'https://openai.com/path', webContentsId }, callback);
 
-    // Should block because domains were removed
-    expect(callback).toHaveBeenCalledWith({ cancel: true });
+    // An unattributed request (a straggler from a destroyed view) follows the
+    // documented policy: fail *open* by default so the app can never brick
+    // itself, fail *closed* when the user asked for strict blocking.
+    blockerCallback({ url: 'https://openai.com/path', webContentsId }, callback);
+    expect(callback).toHaveBeenCalledWith({});
+
+    updateBlockingState({ blockingEnabled: true, strictBlocking: true }, rules);
+    const strictCallback = jest.fn();
+    blockerCallback({ url: 'https://openai.com/path', webContentsId }, strictCallback);
+    expect(strictCallback).toHaveBeenCalledWith({ cancel: true });
   });
 
   it('should update blocking state correctly', () => {

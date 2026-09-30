@@ -54,8 +54,9 @@ you can move to another machine, read back, or keep as a known-good baseline.
 What is deliberately *not* in the file:
 
 - `apiToken` — a live credential; it stays on the machine that generated it.
-- `openTabs`, `activeTabId`, `sessionStates`, `serviceUsage` — machine-specific
-  state that would be meaningless (or wrong) elsewhere.
+- `openTabs`, `activeTabId`, `windowBounds`, `windowMaximized`, `sessionStates`,
+  `serviceUsage` — machine-specific state that would be meaningless (or wrong)
+  elsewhere.
 - Cookies and cached sessions. A settings file never signs you in anywhere.
 
 Import treats the file as untrusted: it goes through the same `sanitizeConfig()`
@@ -70,6 +71,8 @@ defaults** restores every preference without touching cookies or sessions.
 | `lastUpdate` | ISO timestamp of the last successful catalogue refresh. |
 | `openTabs` | Persisted session (ordered). |
 | `activeTabId` | Tab that was active on exit. |
+| `windowBounds` | `{x, y, width, height}` of the last normal (non-maximized) window, validated against the attached displays before it is restored. |
+| `windowMaximized` | Whether the window was maximized on exit. |
 | `remoteUrls` | Where the catalogue/rules are downloaded from. |
 | `apiToken` | Bearer key for the local endpoint. Generated on first launch and whenever it is missing/rotated; the renderer may only rotate it (`rotate-api-token`). |
 | `sessionStates` | Last known login state per service — the evidence re-login-on-open acts on. |

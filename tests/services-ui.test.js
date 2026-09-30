@@ -111,7 +111,7 @@ function installElectronApiStub() {
     getServices: jest.fn().mockResolvedValue({ schemaVersion: 1, ai_services: SERVICES, serviceCount: 2 }),
     getRules: jest.fn().mockResolvedValue({ service_domains: { chatgpt: ['openai.com'], perplexity: ['perplexity.ai'] } }),
     getFavicon: jest.fn().mockResolvedValue({ dataUrl: null }),
-    getLimits: jest.fn().mockResolvedValue({ maxTabs: 0, limit: 3, minTabs: 1, hardMax: 20 }),
+    getLimits: jest.fn().mockResolvedValue({ openTabs: 0, limit: 3, minTabs: 1, hardMax: 20 }),
     getTabStates: jest.fn().mockResolvedValue([]),
     getLoginStates: jest.fn().mockResolvedValue({
       chatgpt: { state: 'logged-out', reason: 'no-session' },

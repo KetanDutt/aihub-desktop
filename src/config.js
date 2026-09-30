@@ -12,7 +12,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const log = require('electron-log');
+const log = require('./logger');
 
 const {
   LIMITS,
@@ -69,6 +69,9 @@ const DEFAULTS = {
   },
   openTabs: [],
   activeTabId: null,
+  // Internal: window geometry, so the app reopens where you left it.
+  windowBounds: null,
+  windowMaximized: false,
   // Internal: last known login state per service (never renderer-writable).
   sessionStates: {}
 };
@@ -135,6 +138,17 @@ const schema = {
   },
   openTabs: { type: 'array', default: [] },
   activeTabId: { type: ['string', 'null'], default: null },
+  windowBounds: {
+    type: ['object', 'null'],
+    properties: {
+      x: { type: 'number' },
+      y: { type: 'number' },
+      width: { type: 'number' },
+      height: { type: 'number' }
+    },
+    default: null
+  },
+  windowMaximized: { type: 'boolean', default: false },
   sessionStates: { type: 'object', default: {} }
 };
 

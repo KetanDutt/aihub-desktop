@@ -9,6 +9,7 @@
 window.AiHub = window.AiHub || {};
 
 (function (app) {
+  const utils = window.AiHubUtils;
   const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
   const MOD = IS_MAC ? '⌘' : 'Ctrl';
 
@@ -30,8 +31,78 @@ window.AiHub = window.AiHub || {};
     { keys: [`${MOD}+=`, `${MOD}+-`, `${MOD}+0`], description: 'Zoom in, out, reset' },
     { keys: [`${MOD}+,`], description: 'Open settings' },
     { keys: ['Esc'], description: 'Close dialogs and panels' },
-    { keys: ['?'], description: 'Show this list' }
+    { keys: ['?', 'F1'], description: 'Show this list' }
   ];
+
+  // -- App commands (shortcuts pressed while a service tab had focus) --------
+  //
+  // A `WebContentsView` swallows the keyboard, so `src/window.js` forwards the
+  // accelerators it recognises over IPC. Everything below is the *same*
+  // behaviour as pressing the key in the app chrome: one implementation, two
+  // entry points.
+
+  const APP_COMMAND_HANDLERS = {
+    'new-tab': () => app.openSidebar(),
+    'reopen-tab': () => app.reopenClosedTab(),
+    'close-tab': () => {
+      if (app.state.currentTabId) app.closeTab(app.state.currentTabId);
+    },
+    'toggle-sidebar': () => app.toggleSidebar(),
+    'next-tab': () => app.switchToNextTab(1),
+    'prev-tab': () => app.switchToNextTab(-1),
+    reload: () => withActiveTab((id) => window.electronAPI.navReload(id)),
+    'reload-hard': () => withActiveTab((id) => window.electronAPI.navReloadHard(id)),
+    back: () => withActiveTab((id) => window.electronAPI.navGoBack(id)),
+    forward: () => withActiveTab((id) => window.electronAPI.navGoForward(id)),
+    home: () => withActiveTab((id) => window.electronAPI.navHome(id)),
+    find: () => app.openFindBar(),
+    mute: () => app.toggleMuteActiveTab(),
+    'zoom-in': () => app.adjustZoom(0.1),
+    'zoom-out': () => app.adjustZoom(-0.1),
+    'zoom-reset': () => app.adjustZoom(0, true),
+    settings: () => app.openSettings(),
+    shortcuts: () => app.toggleShortcutsModal()
+  };
+
+  function withActiveTab(fn) {
+    if (app.state.currentTabId) fn(app.state.currentTabId);
+  }
+
+  /**
+   * Jump to the nth tab (1-based). Out-of-range indexes land on the last tab,
+   * which is what `Ctrl+9` does in a browser.
+   */
+  app.selectTabIndex = function selectTabIndex(position) {
+    const index = Number(position);
+    if (!Number.isFinite(index) || index < 1 || app.state.tabs.length === 0) return false;
+    const tab = app.state.tabs[index - 1] || app.state.tabs[app.state.tabs.length - 1];
+    if (!tab) return false;
+    app.switchToTab(tab.id);
+    return true;
+  };
+
+  /**
+   * Run a command sent by the main process.
+   * @param {string} command
+   * @returns {boolean} whether it was a command we know
+   */
+  app.runAppCommand = function runAppCommand(command) {
+    if (typeof command !== 'string') return false;
+    if (command.startsWith('select-tab:')) return app.selectTabIndex(command.slice(11));
+    const handler = APP_COMMAND_HANDLERS[command];
+    if (!handler) return false;
+    try {
+      handler();
+    } catch (error) {
+      utils.showStatus(`Shortcut failed: ${command}`, 'error');
+    }
+    return true;
+  };
+
+  function initAppCommands() {
+    if (!window.electronAPI.onAppCommand) return;
+    window.electronAPI.onAppCommand((command) => app.runAppCommand(command));
+  }
 
   function isTypingTarget(target) {
     if (!target) return false;
@@ -224,8 +295,7 @@ window.AiHub = window.AiHub || {};
 
       if (/^[1-9]$/.test(key)) {
         event.preventDefault();
-        const tab = app.state.tabs[Number(key) - 1];
-        if (tab) app.switchToTab(tab.id);
+        app.selectTabIndex(Number(key));
       }
     });
 
@@ -235,6 +305,8 @@ window.AiHub = window.AiHub || {};
     if (app.elements.btnCloseShortcuts) {
       app.elements.btnCloseShortcuts.addEventListener('click', () => app.toggleShortcutsModal(false));
     }
+
+    initAppCommands();
   };
 
   app.adjustZoom = async function adjustZoom(delta, reset = false) {
@@ -265,4 +337,5 @@ window.AiHub = window.AiHub || {};
   };
 
   app.SHORTCUTS = SHORTCUTS;
+  app.APP_COMMAND_HANDLERS = APP_COMMAND_HANDLERS;
 })(window.AiHub);

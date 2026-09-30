@@ -16,7 +16,7 @@ const fsPromises = fs.promises;
 const https = require('https');
 const http = require('http');
 
-const log = require('electron-log');
+const log = require('./logger');
 const configStore = require('./config');
 const paths = require('./paths');
 const { LIMITS, STORAGE, STALE_DATA_MS } = require('./constants');

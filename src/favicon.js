@@ -14,7 +14,7 @@ const crypto = require('crypto');
 const https = require('https');
 const http = require('http');
 
-const log = require('electron-log');
+const log = require('./logger');
 const paths = require('./paths');
 const { LIMITS, STALE_DATA_MS } = require('./constants');
 

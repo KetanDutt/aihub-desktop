@@ -367,13 +367,36 @@ window.AiHub = window.AiHub || {};
       app.paintNavControls();
     }
 
+    // Any load that finished (including a reload after a crash) clears the flag.
+    if (payload.loading === false) markCrashed(payload.tabId, false);
+
     if (payload.crashed) {
-      app.toast('This tab crashed. Reload it to continue.', 'error');
+      // A crashed renderer keeps its tab record, so reloading recreates the
+      // page in place. Offer it: the alternative is closing and re-opening the
+      // service by hand.
+      markCrashed(payload.tabId, true);
+      app.toast('This tab crashed.', 'error', {
+        action: {
+          label: 'Reload',
+          onClick: () => {
+            markCrashed(payload.tabId, false);
+            window.electronAPI.navReload(payload.tabId);
+          }
+        }
+      });
+    } else if (payload.crashed === false) {
+      markCrashed(payload.tabId, false);
     }
 
     if (payload.requestFind && typeof app.openFindBar === 'function') {
       app.openFindBar();
     }
+  }
+
+  /** Mark a tab as crashed in the strip (cleared on the next successful load). */
+  function markCrashed(id, crashed) {
+    const el = tabNode(id);
+    if (el) el.classList.toggle('is-crashed', Boolean(crashed));
   }
 
   // -- Public actions --------------------------------------------------------

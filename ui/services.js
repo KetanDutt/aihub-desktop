@@ -191,6 +191,7 @@ window.AiHub = window.AiHub || {};
       const row = document.createElement('div');
       row.className = 'skeleton-row';
       row.setAttribute('aria-hidden', 'true');
+      row.style.setProperty('--i', String(i));
 
       const avatar = document.createElement('span');
       avatar.className = 'skeleton skeleton-avatar';
@@ -222,12 +223,44 @@ window.AiHub = window.AiHub || {};
 
   // -- Sidebar ---------------------------------------------------------------
 
+  /**
+   * Let the highlight inside a service card follow the cursor.
+   *
+   * One delegated listener for the whole list (not one per card) and one
+   * rAF-throttled write of two custom properties: the sheen is a background
+   * layer, so the browser compositor does the rest. This is what makes the
+   * card read as a lit surface rather than a flat panel.
+   */
+  function bindCardSheen(list) {
+    if (!list || list.dataset.sheen === 'on') return;
+    list.dataset.sheen = 'on';
+
+    const track = window.AiHubUtils.rafThrottle((event) => {
+      const card = event.target && event.target.closest ? event.target.closest('.service-card') : null;
+      if (!card) return;
+      const rect = card.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      card.style.setProperty('--px', `${Math.round(((event.clientX - rect.left) / rect.width) * 100)}%`);
+      card.style.setProperty('--py', `${Math.round(((event.clientY - rect.top) / rect.height) * 100)}%`);
+    });
+
+    list.addEventListener('pointermove', track);
+    list.addEventListener('pointerleave', () => {
+      for (const card of list.querySelectorAll('.service-card')) {
+        card.style.removeProperty('--px');
+        card.style.removeProperty('--py');
+      }
+    });
+  }
+
   app.renderEnabledServices = function renderEnabledServices() {
     const list = app.elements && app.elements.servicesList;
     if (!list) return;
 
     const query = app.elements.serviceSearch ? app.elements.serviceSearch.value : '';
     const services = app.filterServices(app.enabledServices(), query);
+
+    bindCardSheen(list);
 
     // Real content replaces any loading placeholders.
     list.removeAttribute('aria-busy');

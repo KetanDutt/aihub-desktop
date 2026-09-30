@@ -15,12 +15,13 @@ const {
   Menu,
   globalShortcut,
   WebContentsView,
-  nativeImage
+  nativeImage,
+  screen
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-const log = require('electron-log');
+const log = require('./logger');
 const configStore = require('./config');
 const dataStore = require('./data');
 const blocking = require('./blocking');
@@ -29,6 +30,8 @@ const stealth = require('./stealth');
 const sessionStore = require('./sessionstore');
 const loginMonitor = require('./logins');
 const catalog = require('./catalog');
+const windowState = require('./windowstate');
+const accelerators = require('./accelerators');
 const { TabManager } = require('./tabs');
 const {
   LAYOUT,
@@ -48,6 +51,10 @@ let hibernationTimer = null;
 let persistTimer = null;
 let viewBounds = null; // last bounds reported by the renderer
 let isQuitting = false;
+let geometryTimer = null; // debounces window-geometry writes
+let lastPersistedTabs = null; // serialized tab list, to skip no-op writes
+let lastTraySignature = null; // rebuilt only when the open tabs actually change
+let lastPersistedGeometry = null; // serialized geometry, to skip no-op writes
 
 const tabs = new TabManager({
   limit: LIMITS.DEFAULT_MAX_TABS,
@@ -69,13 +76,43 @@ function iconPath(name) {
   return candidates.find((candidate) => fs.existsSync(candidate)) || null;
 }
 
+/**
+ * Work areas of every attached display, for geometry validation.
+ * An empty array means "cannot tell" (no `screen` module yet, a headless
+ * environment, a test stub) and makes `restoreBounds` accept the saved value.
+ */
+function displayWorkAreas() {
+  try {
+    if (!screen || typeof screen.getAllDisplays !== 'function') return [];
+    return screen
+      .getAllDisplays()
+      .map((display) => display && display.workArea)
+      .filter(Boolean);
+  } catch (error) {
+    log.debug(`Unable to read the display list: ${error.message}`);
+    return [];
+  }
+}
+
+/**
+ * Where the window should open: the saved geometry when it is still on screen,
+ * otherwise the defaults. A window restored onto a display that has since been
+ * unplugged is invisible, which reads as "the app is broken".
+ */
+function initialWindowBounds() {
+  const saved = configStore.getConfigItem('windowBounds', null);
+  const restored = windowState.restoreBounds(saved, displayWorkAreas());
+  if (restored) return restored;
+  if (saved) log.info('Saved window position is off-screen, using the default size');
+  return { width: LAYOUT.DEFAULT_WIDTH, height: LAYOUT.DEFAULT_HEIGHT };
+}
+
 function createMainWindow() {
   const config = configStore.getConfig();
   tabs.setLimit(config.maxActiveServices);
 
   mainWindow = new BrowserWindow({
-    width: LAYOUT.DEFAULT_WIDTH,
-    height: LAYOUT.DEFAULT_HEIGHT,
+    ...initialWindowBounds(),
     minWidth: LAYOUT.MIN_WIDTH,
     minHeight: LAYOUT.MIN_HEIGHT,
     title: APP_NAME,
@@ -91,6 +128,8 @@ function createMainWindow() {
       spellcheck: false
     }
   });
+
+  if (configStore.getConfigItem('windowMaximized', false)) mainWindow.maximize();
 
   const icon = iconPath('icon.png');
   if (icon) mainWindow.setIcon(nativeImage.createFromPath(icon));
@@ -113,7 +152,22 @@ function createMainWindow() {
   mainWindow.on('maximize', () => applyViewBounds());
   mainWindow.on('unmaximize', () => applyViewBounds());
 
+  // Remember the geometry. `move`/`resize` fire continuously while dragging, so
+  // the write is debounced; only the *normal* bounds are stored, so restoring a
+  // maximized window does not also un-maximize it.
+  for (const event of ['resize', 'move', 'maximize', 'unmaximize']) {
+    mainWindow.on(event, scheduleGeometryPersist);
+  }
+
   mainWindow.on('close', (event) => {
+    // Save the geometry here as well: `will-quit` may run after the window is
+    // already destroyed, and hiding to the tray is a good moment to persist.
+    if (geometryTimer) {
+      clearTimeout(geometryTimer);
+      geometryTimer = null;
+    }
+    persistGeometryNow();
+
     if (isQuitting) return;
     if (configStore.getConfig().minimizeToTray !== false) {
       event.preventDefault();
@@ -124,6 +178,13 @@ function createMainWindow() {
   mainWindow.on('closed', () => {
     destroyAllViews();
     mainWindow = null;
+    lastPersistedTabs = null;
+    lastTraySignature = null;
+    lastPersistedGeometry = null;
+    if (geometryTimer) {
+      clearTimeout(geometryTimer);
+      geometryTimer = null;
+    }
   });
 
   // Deep links. On Windows the URL arrives on the command line, which in
@@ -219,8 +280,22 @@ function buildTrayMenu() {
   return Menu.buildFromTemplate(template);
 }
 
+/**
+ * Rebuild the tray menu, but only when the open tabs actually changed.
+ *
+ * `Menu.buildFromTemplate` walks every label and `setContextMenu` hands a new
+ * menu to the OS; doing that on every navigation event (twice a second on a
+ * busy page) is pure waste.
+ */
 function refreshTrayMenu() {
-  if (tray) tray.setContextMenu(buildTrayMenu());
+  if (!tray) return;
+  const signature = tabs
+    .list()
+    .map((tab) => `${tab.id}\u0000${tab.title || ''}`)
+    .join('\u0001');
+  if (signature === lastTraySignature) return;
+  lastTraySignature = signature;
+  tray.setContextMenu(buildTrayMenu());
 }
 
 function setupTray() {
@@ -375,6 +450,27 @@ function isLoginChallenge(url) {
 }
 
 /**
+ * Give the shell its keyboard shortcuts back.
+ *
+ * A `WebContentsView` owns every key press once the user clicks inside a
+ * service, so without this bridge `Ctrl+W`, `Ctrl+Tab`, `Ctrl+F` and friends
+ * stop working exactly where they are most useful — while reading an answer.
+ * `before-input-event` fires before the page sees the key: a recognised
+ * accelerator is cancelled here and replayed by the renderer, and everything
+ * else (typing, `Esc`, site chords) is left alone.
+ *
+ * @param {Electron.WebContents} contents
+ */
+function forwardAppCommands(contents) {
+  contents.on('before-input-event', (event, input) => {
+    const command = accelerators.commandForInput(input);
+    if (!command) return;
+    event.preventDefault();
+    send(IPC.APP_COMMAND, command);
+  });
+}
+
+/**
  * Remember that a service was used, for "most recently used" ordering in the
  * service picker. Written straight through to the store; the renderer never
  * touches this key.
@@ -397,10 +493,23 @@ function ensureChildView(view) {
   if (!children.includes(view)) mainWindow.contentView.addChildView(view);
 }
 
+/**
+ * Write the tab strip to the config store.
+ *
+ * `TabManager` emits `update` for every navigation, title change and load
+ * start/stop, so this runs often. The serialized payload is compared first:
+ * an unchanged list skips the (synchronous, atomic) `electron-store` write
+ * entirely, which keeps browsing from turning into a disk-write loop.
+ */
 function persistTabsNow() {
   if (!configStore) return;
   try {
-    configStore.updateConfigItem('openTabs', tabs.toJSON());
+    const records = tabs.toJSON();
+    const serialized = JSON.stringify({ records, activeTabId: tabs.activeTabId });
+    if (serialized === lastPersistedTabs) return;
+    lastPersistedTabs = serialized;
+
+    configStore.updateConfigItem('openTabs', records);
     configStore.updateConfigItem('activeTabId', tabs.activeTabId);
   } catch (error) {
     log.error('Unable to persist tabs:', error.message);
@@ -416,6 +525,41 @@ function schedulePersist() {
     refreshTrayMenu();
   }, 400);
   if (typeof persistTimer.unref === 'function') persistTimer.unref();
+}
+
+/**
+ * Persist the window geometry, debounced: `resize`/`move` fire dozens of times
+ * per drag and each write is a synchronous file replace.
+ */
+function scheduleGeometryPersist() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (geometryTimer) clearTimeout(geometryTimer);
+  geometryTimer = setTimeout(() => {
+    geometryTimer = null;
+    persistGeometryNow();
+  }, 500);
+  if (typeof geometryTimer.unref === 'function') geometryTimer.unref();
+}
+
+function persistGeometryNow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  try {
+    const maximized = Boolean(mainWindow.isMaximized());
+    const bounds = maximized
+      ? null
+      : windowState.normalizeBounds(
+          mainWindow.getNormalBounds ? mainWindow.getNormalBounds() : mainWindow.getBounds()
+        );
+
+    const serialized = JSON.stringify({ maximized, bounds });
+    if (serialized === lastPersistedGeometry) return;
+    lastPersistedGeometry = serialized;
+
+    configStore.updateConfigItem('windowMaximized', maximized);
+    if (bounds) configStore.updateConfigItem('windowBounds', bounds);
+  } catch (error) {
+    log.debug(`Unable to persist the window geometry: ${error.message}`);
+  }
 }
 
 function proxyUrlFor(url) {
@@ -488,6 +632,9 @@ function createViewForTab(tab) {
   });
 
   const contents = view.webContents;
+
+  // Keyboard: app shortcuts must survive the focus moving into a service tab.
+  forwardAppCommands(contents);
 
   // Anti-bot hardening: main-world patch ahead of page scripts. Failure is
   // non-fatal (DevTools owns the debugger, or CDP is unavailable) — the tab
@@ -1024,36 +1171,6 @@ function hibernateIdleTabs() {
   return hibernated;
 }
 
-// -- Session restore ---------------------------------------------------------
-
-/** Rebuild the tab strip from persisted records. */
-function restoreTabs(records) {
-  if (!Array.isArray(records) || records.length === 0) return { restored: 0 };
-
-  const services = dataStore.getServicesCache();
-  const knownIds = new Set((services && services.ai_services ? services.ai_services : []).map((s) => s.id));
-  let restored = 0;
-
-  for (const record of records.slice(0, LIMITS.MAX_TABS)) {
-    const serviceId = record.serviceId || record.id;
-    if (knownIds.size > 0 && !knownIds.has(serviceId)) {
-      log.warn(`Skipping unknown service during restore: ${serviceId}`);
-      continue;
-    }
-    const result = createTab({
-      tabId: record.id,
-      serviceId,
-      url: record.url,
-      title: record.title || serviceId,
-      zoomFactor: record.zoomFactor || 1,
-      muted: Boolean(record.muted)
-    });
-    if (result.success) restored += 1;
-  }
-
-  return { restored };
-}
-
 // ---------------------------------------------------------------------------
 // Lifecycle helpers
 // ---------------------------------------------------------------------------
@@ -1064,6 +1181,11 @@ function shutdown() {
     clearTimeout(persistTimer);
     persistTimer = null;
   }
+  if (geometryTimer) {
+    clearTimeout(geometryTimer);
+    geometryTimer = null;
+  }
+  persistGeometryNow();
   persistTabsNow();
   unregisterGlobalShortcuts();
   destroyAllViews();
@@ -1168,7 +1290,6 @@ module.exports = {
   setViewBounds,
   applyViewBounds,
   hibernateIdleTabs,
-  restoreTabs,
   getTabStates,
   setTabLimit,
   reloginService,

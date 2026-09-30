@@ -92,7 +92,7 @@ function validateServiceId(serviceId) {
 function deliverDeepLink(serviceId) {
   const mainWindow = windowManager.getMainWindow();
   if (mainWindow && !mainWindow.isDestroyed() && shellReady) {
-    mainWindow.webContents.send('deep-link-open', serviceId);
+    mainWindow.webContents.send(IPC.DEEP_LINK_OPEN, serviceId);
     return true;
   }
   pendingDeepLinks.push(serviceId);
@@ -104,7 +104,7 @@ function flushPendingDeepLinks() {
   const mainWindow = windowManager.getMainWindow();
   if (!mainWindow || mainWindow.isDestroyed()) return;
   while (pendingDeepLinks.length > 0) {
-    mainWindow.webContents.send('deep-link-open', pendingDeepLinks.shift());
+    mainWindow.webContents.send(IPC.DEEP_LINK_OPEN, pendingDeepLinks.shift());
   }
 }
 

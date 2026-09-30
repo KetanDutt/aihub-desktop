@@ -227,23 +227,6 @@ class TabManager {
         now - (tab.lastActiveAt || now) >= idleMs
     );
   }
-
-  /**
-   * Rebuild state from persisted records (session restore).
-   * @param {object[]} records
-   */
-  restore(records) {
-    if (!Array.isArray(records)) return;
-    for (const record of records) {
-      if (!record || typeof record !== 'object') continue;
-      this.add({
-        id: record.id,
-        serviceId: record.serviceId || record.id,
-        url: record.url,
-        title: record.title
-      });
-    }
-  }
 }
 
 module.exports = { TabManager };

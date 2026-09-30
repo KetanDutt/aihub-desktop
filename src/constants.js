@@ -206,7 +206,12 @@ const IPC = {
   QUIT_APP: 'quit-app',
   // main -> renderer
   DEEP_LINK_OPEN: 'deep-link-open',
-  TAB_LOADING: 'tab-loading',
+  /**
+   * App-level shortcut pressed while a service tab had focus (see
+   * `src/accelerators.js`). The renderer re-uses its own command handlers, so
+   * `Ctrl+W` means the same thing wherever the keyboard focus happens to be.
+   */
+  APP_COMMAND: 'app-command',
   TAB_STATE: 'tab-state',
   TAB_CREATED: 'tab-created',
   TAB_CLOSED: 'tab-closed',
@@ -217,8 +222,7 @@ const IPC = {
   LOGIN_STATE: 'login-state',
   SESSION_STATE: 'session-state',
   API_STATE: 'api-state',
-  UPDATE_STATE: 'update-state',
-  APP_LOG: 'app-log'
+  UPDATE_STATE: 'update-state'
 };
 
 module.exports = {

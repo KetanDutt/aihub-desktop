@@ -93,6 +93,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // -- Events (each returns an unsubscribe function) -------------------------
   onDeepLinkOpen: (callback) => subscribe('deep-link-open', callback),
+  /**
+   * A shortcut pressed while a service tab had focus (Ctrl+W, Ctrl+Tab, …
+   * — see `src/accelerators.js`). The renderer replays it against the shell, so
+   * one command means one behaviour wherever the keyboard focus happens to be.
+   */
+  onAppCommand: (callback) => subscribe('app-command', callback),
   onTabState: (callback) => subscribe('tab-state', callback),
   onTabCreated: (callback) => subscribe('tab-created', callback),
   onTabClosed: (callback) => subscribe('tab-closed', callback),

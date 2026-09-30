@@ -24,13 +24,19 @@ window.AiHub = window.AiHub || {};
 
   /**
    * Non-blocking notification.
+   *
    * @param {string} message
    * @param {'info'|'success'|'warning'|'error'} [type]
+   * @param {{action?: {label: string, onClick: Function}, timeout?: number}} [options]
+   *   `action` adds a button ("Reload", "Retry", …) and keeps the toast up
+   *   longer, because something with a button is worth acting on.
+   * @returns {HTMLElement} the toast element
    */
-  app.toast = function toast(message, type = 'info') {
+  app.toast = function toast(message, type = 'info', options = {}) {
+    const { action = null, timeout = null } = options || {};
     const root = toastRoot();
     const el = document.createElement('div');
-    el.className = `toast toast-${type}`;
+    el.className = `toast toast-${type}${action ? ' toast-has-action' : ''}`;
     el.setAttribute('role', 'status');
 
     const icon = document.createElement('span');
@@ -43,20 +49,43 @@ window.AiHub = window.AiHub || {};
     body.textContent = message;
 
     el.append(icon, body);
-    root.appendChild(el);
-
-    requestAnimationFrame(() => el.classList.add('visible'));
 
     const remove = () => {
       el.classList.remove('visible');
       setTimeout(() => el.remove(), 220);
     };
 
-    const timer = setTimeout(remove, TOAST_TIMEOUT_MS);
-    el.addEventListener('click', () => {
-      clearTimeout(timer);
+    let timer = null;
+    const dismiss = () => {
+      if (timer) clearTimeout(timer);
       remove();
-    });
+    };
+
+    if (action && typeof action.onClick === 'function') {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'toast-action';
+      button.textContent = String(action.label || 'Do it');
+      // The button is the only interactive part: clicking it must not also
+      // trigger the click-anywhere-to-dismiss handler on the card.
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        dismiss();
+        try {
+          action.onClick();
+        } catch (error) {
+          /* the action owns its own errors */
+        }
+      });
+      el.appendChild(button);
+    }
+
+    root.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('visible'));
+
+    const lifetime = Number.isFinite(timeout) ? timeout : action ? TOAST_TIMEOUT_MS * 2.6 : TOAST_TIMEOUT_MS;
+    timer = setTimeout(remove, lifetime);
+    el.addEventListener('click', dismiss);
     return el;
   };
 

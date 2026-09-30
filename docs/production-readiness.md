@@ -28,6 +28,11 @@ tag push.
 | Login profiles and adapters resolve to real services | `tests/sessionstore.test.js`, `tests/api-adapters.test.js` |
 | Secrets never leave the machine in an export | `tests/config-backup.test.js` |
 | Hidden API windows stay inside their service's allow-list | `tests/blocking-api-windows.test.js` |
+| A public hostname that only *looks* internal cannot skip the domain filter | `tests/blocking-internal.test.js` |
+| A logging call can never break the caller, even with a partial backend | `tests/logger.test.js` |
+| Shortcuts are forwarded only for keys the app owns | `tests/accelerators.test.js` |
+| A window is never restored onto a display that is gone | `tests/windowstate.test.js` |
+| Tab create/switch/close/hibernate/bounds/geometry behave under a stubbed Electron | `tests/window-manager.test.js` |
 | The shell boots and drives its flows under jsdom | `tests/renderer-boot.test.js` |
 
 ## Bugs found and fixed
@@ -84,6 +89,34 @@ One toast per blocked request meant a tracker-heavy page buried the screen and
 kept the renderer busy. Hosts are now coalesced into a single summary toast per
 1.2 s window.
 
+### Domain-filter bypass through a look-alike hostname
+
+The escape hatch for URLs that can never leave the machine (the shell, devtools,
+`blob:`/`data:`, loopback) was a `String.startsWith` test. `http://localhost.evil.com/`
+therefore looked internal and skipped the allow-list completely — a public
+domain could receive requests from any tab. The check now parses the URL and
+compares the **hostname** (`localhost`, `.localhost`, `127.0.0.0/8`, `::1`),
+with scheme matching kept for hostless URLs.
+→ `tests/blocking-internal.test.js`
+
+### A log statement crashed the domain filter
+
+Thirteen modules required `electron-log` directly rather than the configured
+`src/logger.js`. Any backend without a `debug` method — a mocked module in a
+test, an offline install, an older major version — made `updateTabDomains()`
+throw a `TypeError`, so a tab could not get an allow-list at all. Everything now
+goes through the wrapper, which forwards only levels the backend implements and
+swallows backend failures. This is also why the Jest suite was red on `main`
+before this change.
+→ `tests/logger.test.js`
+
+### IPv6 loopback clients rejected by the local API
+
+`Host: [::1]:8788` was split on its first colon, leaving `"["` to compare
+against the loopback allow-list, so the header was rejected. The parser now
+strips the brackets and the port. (The default bind is IPv4, so this only
+affected clients on an IPv6-literal setup.)
+
 ### Wasted repaints on login events
 
 Login state arrives for every service on every cookie change. Each event
@@ -106,5 +139,8 @@ Worth stating plainly, because none of these are bugs to be "fixed later":
   [security.md](security.md).
 - **`--online` service audits depend on the network.** Offline regeneration is
   the default so builds stay reproducible; real favicons need a networked run.
+- **Window geometry is per-machine.** A position saved on a laptop's internal
+  display is ignored (not "translated") when that display is absent, because
+  guessing a sensible position on an unknown monitor is worse than the default.
 - **Cross-OS installer builds are not supported.** Build each target on its own
   OS (or in CI); `--all` only expands to what the current host can produce.

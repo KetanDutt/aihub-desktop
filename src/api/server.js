@@ -36,10 +36,31 @@ function isLoopbackHost(host) {
   return API.LOOPBACK_HOSTS.includes(String(host).toLowerCase());
 }
 
+/**
+ * Is the request's `Host` header one of the addresses we bind to?
+ *
+ * Guards against DNS rebinding: a page on `evil.example` that resolves to
+ * 127.0.0.1 still sends `Host: evil.example`, and is rejected here. The header
+ * carries an optional port and, for IPv6, a bracketed literal (`[::1]:8788`),
+ * both of which are stripped before the comparison.
+ *
+ * @param {string} header
+ * @returns {boolean}
+ */
 function hostHeaderIsLoopback(header) {
-  const value = String(header || '').toLowerCase();
+  const value = String(header || '').trim().toLowerCase();
   if (!value) return false;
-  const host = value.replace(/^\[[0-9a-f:]+\]$/, '::1').split(':')[0];
+
+  let host = value;
+  if (host.startsWith('[')) {
+    const end = host.indexOf(']');
+    if (end === -1) return false; // malformed literal
+    host = host.slice(1, end);
+  } else {
+    const colon = host.lastIndexOf(':');
+    if (colon > -1 && /^\d+$/.test(host.slice(colon + 1))) host = host.slice(0, colon);
+  }
+
   return API.LOOPBACK_HOSTS.includes(host);
 }
 

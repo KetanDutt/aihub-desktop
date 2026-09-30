@@ -119,7 +119,7 @@ function installElectronApiStub() {
     reorderTabs: jest.fn(),
     getTabStates: jest.fn().mockResolvedValue([]),
     hibernateTabs: jest.fn().mockResolvedValue({ hibernated: [] }),
-    getLimits: jest.fn().mockResolvedValue({ maxTabs: 0, limit: 3, minTabs: 1, hardMax: 20 }),
+    getLimits: jest.fn().mockResolvedValue({ openTabs: 0, limit: 3, minTabs: 1, hardMax: 20 }),
     setActiveService: jest.fn(),
     setViewBounds: jest.fn(),
     navGoBack: jest.fn(),
@@ -175,6 +175,7 @@ function installElectronApiStub() {
     close: jest.fn(),
     quit: jest.fn(),
     onDeepLinkOpen: noopSubscribe,
+    onAppCommand: noopSubscribe,
     onTabState: noopSubscribe,
     onTabCreated: noopSubscribe,
     onTabClosed: noopSubscribe,
@@ -440,5 +441,137 @@ describe('shell renderer', () => {
     expect(api.getFavicon).not.toHaveBeenCalled();
     const img = document.querySelector('.tab-item .tab-favicon img');
     expect(img.src).toBe(SERVICE.icon);
+  });
+});
+
+describe('app commands from a focused service tab', () => {
+  it('replays documented shortcuts against the shell', async () => {
+    installElectronApiStub();
+    loadShell();
+    await flush();
+
+    const tab = await window.AiHub.createTab({ serviceId: 'chatgpt', url: SERVICE.url, title: 'ChatGPT' });
+    expect(tab).toBeTruthy();
+
+    // Ctrl+B — sidebar visibility is a pure shell concern.
+    expect(window.AiHub.elements.sidebar.classList.contains('hidden')).toBe(true);
+    expect(window.AiHub.runAppCommand('toggle-sidebar')).toBe(true);
+    expect(window.AiHub.elements.sidebar.classList.contains('hidden')).toBe(false);
+
+    // Ctrl+W closes the active tab.
+    expect(window.AiHub.runAppCommand('close-tab')).toBe(true);
+    expect(window.AiHub.state.tabs.length).toBe(0);
+  });
+
+  it('routes navigation commands to the main process', async () => {
+    const api = installElectronApiStub();
+    loadShell();
+    await flush();
+
+    const tab = await window.AiHub.createTab({ serviceId: 'chatgpt', url: SERVICE.url, title: 'ChatGPT' });
+    api.navReload.mockClear();
+
+    expect(window.AiHub.runAppCommand('reload')).toBe(true);
+    expect(api.navReload).toHaveBeenCalledWith(tab.id);
+    expect(window.AiHub.runAppCommand('reload-hard')).toBe(true);
+    expect(api.navReloadHard).toHaveBeenCalledWith(tab.id);
+    expect(window.AiHub.runAppCommand('find')).toBe(true);
+    expect(window.AiHub.isFindBarOpen()).toBe(true);
+    window.AiHub.closeFindBar();
+  });
+
+  it('ignores unknown commands instead of throwing', async () => {
+    installElectronApiStub();
+    loadShell();
+    await flush();
+
+    for (const command of ['format-c:', '', 'select-tab:99', null, 42]) {
+      expect(() => window.AiHub.runAppCommand(command)).not.toThrow();
+    }
+    expect(window.AiHub.runAppCommand('definitely-not-a-command')).toBe(false);
+  });
+
+  it('keeps Ctrl+1…9 and Ctrl+9-is-last in sync with the chrome handler', async () => {
+    installElectronApiStub();
+    loadShell();
+    await flush();
+
+    await window.AiHub.createTab({ serviceId: 'chatgpt', url: SERVICE.url, title: 'One' });
+    await window.AiHub.createTab({ serviceId: 'chatgpt', url: `${SERVICE.url}c/2`, title: 'Two' });
+
+    expect(window.AiHub.runAppCommand('select-tab:2')).toBe(true);
+    expect(window.AiHub.state.currentTabId).toBe(window.AiHub.state.tabs[1].id);
+
+    // A browser treats Ctrl+9 as "last tab", even with fewer tabs open.
+    expect(window.AiHub.runAppCommand('select-tab:9')).toBe(true);
+    expect(window.AiHub.state.currentTabId).toBe(window.AiHub.state.tabs[1].id);
+  });
+});
+
+describe('visual system coverage', () => {
+  it('styles every class the running shell actually renders', async () => {
+    // The static audit in design-system.test.js reads class strings out of the
+    // source; this one boots the real shell and looks at what the DOM ended up
+    // with, which is the only way to catch a class that only appears once real
+    // data flows through a builder.
+    installElectronApiStub();
+    loadShell();
+    await flush();
+
+    window.AiHub.openSidebar();
+    for (const tab of ['services', 'sessions', 'api', 'privacy', 'about', 'general']) {
+      window.AiHub.openSettings(tab);
+    }
+    window.AiHub.toast('Session cleared', 'success', { action: { label: 'Undo', onClick() {} } });
+    window.AiHub.contextMenu(60, 90, [
+      { type: 'header', label: 'ChatGPT' },
+      { label: 'Open', onClick() {} },
+      { type: 'separator' },
+      { label: 'Forget session', danger: true, onClick() {} }
+    ]);
+    await flush();
+
+    const css = fs.readFileSync(path.join(UI_DIR, 'styles.css'), 'utf8');
+    const declared = new Set([...css.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)].map((m) => m[1]));
+
+    const used = new Set();
+    for (const el of document.querySelectorAll('*')) {
+      for (const cls of el.classList) used.add(cls);
+    }
+
+    expect([...used].filter((cls) => !declared.has(cls)).sort()).toEqual([]);
+    // Guard against the assertion passing because nothing rendered at all.
+    expect(used.size).toBeGreaterThan(60);
+  });
+});
+
+describe('settings drawer exit', () => {
+  it('plays the panel out before removing it from the layout', async () => {
+    installElectronApiStub();
+    loadShell();
+    await flush();
+
+    const panel = document.getElementById('settings-panel');
+    window.AiHub.openSettings('general');
+    expect(panel.classList.contains('hidden')).toBe(false);
+
+    window.AiHub.closeSettings();
+    // Still on screen, wearing the exit animation: a 560px surface that
+    // disappears between frames is the one jarring transition in the shell.
+    expect(panel.classList.contains('is-closing')).toBe(true);
+    expect(panel.classList.contains('hidden')).toBe(false);
+    expect(panel.getAttribute('aria-hidden')).toBe('true');
+
+    panel.dispatchEvent(new Event('animationend'));
+    expect(panel.classList.contains('hidden')).toBe(true);
+    expect(panel.classList.contains('is-closing')).toBe(false);
+
+    // Reopening mid-exit cancels it instead of hiding the panel under the user.
+    window.AiHub.openSettings('general');
+    window.AiHub.closeSettings();
+    window.AiHub.openSettings('api');
+    await flush(400);
+    expect(panel.classList.contains('hidden')).toBe(false);
+    expect(panel.classList.contains('is-closing')).toBe(false);
   });
 });

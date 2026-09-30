@@ -20,13 +20,13 @@ new code — import the constant.
 | `get-rules` | — | normalised rule set |
 | `update-remote-data` | — | `{ success, services?, rules?, error? }` |
 | `toggle-service` | serviceId | enabledServices array |
-| `get-favicon` | url | `{ dataUrl }` or null fields |
+| `get-favicon` | url, serviceId? | `{ dataUrl, source }`; the catalogue icon is served first, and the URL is validated as `http(s)` before any fetch |
 | `open-external` | url | boolean |
 | `clear-session-data` | — | `{ success, error? }` |
 | `create-tab` | `{ tabId, serviceId, url, title?, userAgent?, zoomFactor?, muted? }` | `{ success, error?, tabId? }` |
 | `get-tab-states` | — | tab state array |
 | `hibernate-tabs` | — | `{ hibernated: string[] }` |
-| `get-limits` | — | `{ maxTabs, limit, minTabs, hardMax }` |
+| `get-limits` | — | `{ openTabs, limit, minTabs, hardMax }` |
 | `set-zoom` | tabId, factor | clamped factor or null |
 | `set-muted` | tabId, muted | boolean or null |
 | `find-in-page` | tabId, text, options? | `{ requestId }` or `{ matches: 0 }` |
@@ -58,12 +58,14 @@ new code — import the constant.
 | `nav-go-back` / `nav-go-forward` / `nav-reload` | tabId |
 | `set-active-service` | serviceId |
 | `minimize-window` / `maximize-window` / `close-window` / `quit-app` | — |
+| `set-zoom` / `set-muted` / `find-in-page` / `stop-find-in-page` | tabId (+ args) |
 
 ### Main → renderer
 
 | Channel | Payload |
 |---------|---------|
 | `deep-link-open` | serviceId |
+| `app-command` | command string — a shortcut pressed while a service tab had focus (`new-tab`, `close-tab`, `next-tab`, `prev-tab`, `select-tab:1…9`, `reload`, `reload-hard`, `back`, `forward`, `home`, `find`, `mute`, `toggle-sidebar`, `zoom-in`, `zoom-out`, `zoom-reset`, `settings`, `shortcuts`). Produced and validated in `src/accelerators.js`; the renderer ignores anything unrecognised |
 | `tab-state` | `{ tabId, title, url, loading, canGoBack, canGoForward, hibernated, active, zoomFactor, muted, crashed?, requestFind? }` |
 | `tab-created` | `{ tabId, serviceId, url, title }` |
 | `tab-closed` | `{ tabId, nextActiveId }` |

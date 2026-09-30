@@ -22,7 +22,7 @@
  */
 
 const { BrowserWindow } = require('electron');
-const log = require('electron-log');
+const log = require('../logger');
 
 const configStore = require('./../config');
 const dataStore = require('./../data');

@@ -11,6 +11,12 @@ npm run check     # ESLint + Jest
 npm run doctor    # environment sanity (optional, non-fatal warnings ok)
 ```
 
+UI work additionally has to keep `tests/design-system.test.js` green (tokens,
+layering, motion, icons) and `docs/design.md` up to date — that document is the
+design system's source of truth. `npm run preview:shell` serves the renderer
+with a stubbed main process if you want to look at a change without launching
+Electron.
+
 Tests live in `tests/`. Main-process code is unit-tested under an Electron stub
 (`jest.mock`); keep new logic dependency-free so it stays testable that way.
 
@@ -32,12 +38,16 @@ Tests live in `tests/`. Main-process code is unit-tested under an Electron stub
   `slugify(name)`); a test verifies the two stay consistent. The same rule covers
   `data/logins.json` (login fingerprints) and `data/adapters.json` (chat
   adapters) — a tests file asserts every id resolves to a known service.
-- Pure logic (classification, cookie math, fingerprint profiles, the OpenAI wire
-  format, adapter validation) must not import Electron: `src/loginstate.js`,
-  `src/cookies.js`, `src/fingerprint.js` and `src/api/{openai,template,queue,
-  adapters,server}.js` are unit-tested without a display. Electron-facing glue
-  lives in `src/logins.js`, `src/sessionstore.js`, `src/stealth.js` and
+- Pure logic (classification, cookie math, fingerprint profiles, accelerator
+  mapping, window geometry, the OpenAI wire format, adapter validation) must not
+  import Electron: `src/loginstate.js`, `src/cookies.js`, `src/fingerprint.js`,
+  `src/accelerators.js`, `src/windowstate.js` and `src/api/{openai,template,
+  queue,adapters,server}.js` are unit-tested without a display. Electron-facing
+  glue lives in `src/logins.js`, `src/sessionstore.js`, `src/stealth.js` and
   `src/api/{engine,index}.js`.
+- Log through `src/logger.js` (never `require('electron-log')` directly): it is
+  the only place levels, rotation and file permissions are configured, and it
+  tolerates a backend that is missing a level or throws.
 - Cookie values are secrets: never send them over IPC to the renderer, never log
   them, and keep the on-disk snapshot behind `safeStorage` with `0600` perms.
   The same applies to `apiToken`: it is excluded from `exportSettings()` and a

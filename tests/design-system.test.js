@@ -161,3 +161,116 @@ describe('icon system', () => {
     expect([...weights]).toEqual(['1.75']);
   });
 });
+
+/**
+ * Class coverage.
+ *
+ * A design system is only as good as its reach: a component that renders
+ * unstyled looks "not redesigned yet" no matter how good the tokens are. This
+ * block reads every class the renderer can put on an element and asserts the
+ * stylesheet has a rule for it, so adding or renaming a component cannot
+ * silently ship without styling.
+ */
+describe('class coverage', () => {
+  const SHELL_FILES = [
+    'index.html',
+    ...fs.readdirSync(UI_DIR).filter((f) => f.endsWith('.js'))
+  ];
+
+  const read = (file) => fs.readFileSync(path.join(UI_DIR, file), 'utf8');
+
+  /** Class strings from `class=`, `className =`, `classList.*()` and `setAttribute`. */
+  function classStrings() {
+    const out = [];
+    for (const file of SHELL_FILES) {
+      const source = read(file);
+      const patterns = [
+        /\bclass\s*=\s*(?:"([^"]*)"|'([^']*)'|`([^`]*)`)/g,
+        /\bclassName\s*=\s*(?:"([^"]*)"|'([^']*)'|`([^`]*)`)/g,
+        // Only the first argument: the rest are booleans and comparisons.
+        /classList\.(?:add|remove|toggle|contains)\(\s*(?:'([^']*)'|"([^"]*)"|`([^`]*)`)/g,
+        /setAttribute\(\s*['"]class['"]\s*,\s*(?:"([^"]*)"|'([^']*)')/g
+      ];
+      for (const pattern of patterns) {
+        for (const match of source.matchAll(pattern)) {
+          const value = match[1] ?? match[2] ?? match[3] ?? '';
+          for (const token of value.split(/\s+/)) {
+            if (token) out.push(token);
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  const declared = new Set([...css.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)].map((m) => m[1]));
+
+  /**
+   * Values behind template fragments, read from their real source of truth so
+   * this list cannot rot: login states from the pure module that classifies
+   * them, toast types from the icon table, status types from the call sites,
+   * group ids from the access groups, avatar sizes from the factory call.
+   */
+  function fragmentValues(prefix) {
+    const utils = read('utils.js');
+
+    switch (prefix) {
+      case 'login-':
+        // `login-${record.state}` — states come from the module that classifies them.
+        return Object.values(require('../src/loginstate.js').STATE).map((state) => prefix + state);
+      case 'toast-': {
+        // `toast-${type}` — types are the keys of the toast icon table.
+        const table = /TOAST_ICONS\s*=\s*\{([\s\S]*?)\}/.exec(read('overlays.js'));
+        return [...(table ? table[1].matchAll(/(\w+)\s*:/g) : [])].map((m) => prefix + m[1]);
+      }
+      case 'is-':
+        // `is-${group.id}` — the two access groups the picker splits into.
+        return [...utils.matchAll(/id:\s*'(free|signin)'/g)].map((m) => prefix + m[1]);
+      case 'service-avatar':
+        return ['sm', 'md'].map((size) => `${prefix} ${size}`);
+      default:
+        return [];
+    }
+  }
+
+  it('styles every class the shell can put on an element', () => {
+    const fragments = new Set();
+    const missing = [];
+
+    for (const raw of classStrings()) {
+      if (raw.includes('${')) {
+        // `is-${group.id}` → remember the `is-` family, not the expression.
+        const prefix = raw.split('${')[0];
+        if (prefix) fragments.add(prefix);
+        continue;
+      }
+      if (!/^[a-z][a-z0-9-]*$/.test(raw)) continue;
+      if (!declared.has(raw)) missing.push(raw);
+    }
+
+    expect([...new Set(missing)].sort()).toEqual([]);
+    expect([...fragments].sort()).toEqual(
+      expect.arrayContaining(['is-', 'login-', 'toast-'])
+    );
+  });
+
+  it('styles every value those fragments can take', () => {
+    const missing = [];
+    for (const prefix of ['login-', 'toast-', 'is-']) {
+      const values = fragmentValues(prefix);
+      expect(values.length).toBeGreaterThan(1);
+      for (const value of values) {
+        for (const cls of value.split(' ')) {
+          if (!declared.has(cls)) missing.push(cls);
+        }
+      }
+    }
+    // State chips also come from the status bar's own type list.
+    const statusTypes = [...read('utils.js').matchAll(/showStatus\(\s*[^,]+,\s*'([a-z]+)'/g)]
+      .map((m) => m[1]);
+    for (const type of new Set(statusTypes)) {
+      if (!declared.has('status-message') || !declared.has(type)) missing.push(`status-message.${type}`);
+    }
+    expect([...new Set(missing)].sort()).toEqual([]);
+  });
+});
