@@ -14,7 +14,7 @@
   <a href="https://github.com/SilentCoderHere/aihub-desktop/actions/workflows/ci.yml"><img src="https://github.com/SilentCoderHere/aihub-desktop/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/SilentCoderHere/aihub-desktop" alt="License"></a>
   <a href="https://www.electronjs.org"><img src="https://img.shields.io/badge/Electron-41-47848F?logo=electron" alt="Electron"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-1.3.0-blue" alt="Version"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-1.5.0-blue" alt="Version"></a>
 </p>
 
 ---
@@ -37,7 +37,12 @@ your machine.
   idle tabs tears down background renderers and rebuilds them on demand.
 - **Full browser controls per tab** - back, forward, reload (plus
   reload-ignoring-cache), stop and home, with reload swapping to stop while a
-  page loads; `Ctrl+Shift+T` reopens the last closed tab.
+  page loads; `Ctrl+Shift+T` reopens the last closed tab. Shortcuts keep working
+  *inside* a service - `Ctrl+W`, `Ctrl+Tab`, `Ctrl+F`, `Ctrl+R` and the rest are
+  forwarded to the shell, while site chords (typing, `Esc`, `Ctrl+C/V`) stay
+  with the page.
+- **Remembers your window** - size, position and maximized state are restored on
+  the next launch, and validated against the screens you actually have attached.
 - **Find in page** - `Ctrl+F` opens a floating find bar with match counter and
   next/previous navigation.
 - **Per-tab mute & zoom** - mute noisy tabs (`Ctrl+M`); zoom steps and mute
@@ -72,8 +77,12 @@ your machine.
   type, recency, cached cookies or "free first".
 - **System integration** - tray with open-tab menu, global show/hide shortcut,
   launch-at-login, `aihub://` deep links, auto-update.
-- **Polished shell** - Liquid Glass dark/light themes, sidebar search, toasts,
-  context menus, keyboard shortcuts and a shortcut reference (`?`).
+- **Polished shell** - a Liquid Glass interface built from one material system:
+  four translucency strengths over an ambient backdrop, seven depth layers, dark
+  and light themes designed side by side, gliding active indicators, sidebar
+  search, toasts (with actions, e.g. *Reload* after a renderer crash), context
+  menus, keyboard shortcuts and a shortcut reference (`?`). Preview the whole
+  interface without Electron with `npm run preview:shell`.
 
 ## Quick start
 
@@ -182,7 +191,7 @@ On macOS use `⌘` instead of `Ctrl`. Full reference:
 | | |
 |---|---|
 | [Architecture](docs/architecture.md) | process model, IPC, tab lifecycle, hibernation |
-| [Design system](docs/design.md) | Liquid Glass tokens, materials, motion |
+| [Design system](docs/design.md) | Liquid Glass tokens, materials, layers, motion |
 | [Configuration](docs/configuration.md) | every setting and its effect |
 | [Security model](docs/security.md) | what the filter does and does not do |
 | [Sessions & anti-bot](docs/sessions.md) | login detection, cookie cache, re-login, hardening |

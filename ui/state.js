@@ -8,6 +8,14 @@
 window.AiHub = window.AiHub || {};
 
 (function (app) {
+  /**
+   * First-paint fallback only.
+   *
+   * `src/config.js#DEFAULTS` is the source of truth and the main process always
+   * answers `get-config` with the real store; this copy exists so the shell can
+   * render before that round trip resolves. Keep the keys the UI reads in the
+   * first frames in sync with it.
+   */
   const DEFAULT_CONFIG = {
     enabledServices: ['chatgpt', 'claude', 'gemini'],
     blockingEnabled: true,

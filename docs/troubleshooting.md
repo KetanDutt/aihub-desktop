@@ -30,6 +30,17 @@ Settings → General, or close/hibernate tabs. Right-click a tab → *Free memor
 *Minimise to tray on close* is on by default: the app keeps running in the
 system tray. Quit from the tray menu, or disable the setting.
 
+**A shortcut does nothing while I am typing in a service.**
+App shortcuts (`Ctrl+W`, `Ctrl+Tab`, `Ctrl+R`, `Ctrl+F`, …) are forwarded from a
+focused tab, but anything a text field legitimately owns is not: `Ctrl+A`,
+`Ctrl+C/V/X/Z`, `Esc` and the site's own chords stay with the page. `F5` and
+`F1` work everywhere. See [keyboard-shortcuts.md](keyboard-shortcuts.md).
+
+**The window opens smaller than I left it, or centred.**
+The saved position is only reused when it is still on an attached display; a
+position remembered on a monitor you have since unplugged falls back to the
+default size on purpose. Resize once and it is remembered again.
+
 **Global shortcut does nothing.**
 Another app owns `Ctrl+Shift+A`. Change it in Settings → General; the log
 records `Global shortcut unavailable` on conflict.
@@ -49,6 +60,7 @@ this automatically).
 **`RUN.bat` / one-click fails with no package manager.**
 Install Node.js 20+ from https://nodejs.org, then re-run. On Windows the
 script tries winget, then Chocolatey, then Scoop.
+
 ## Reporting a bug
 
 Attach the log file, your OS/arch (Settings → About) and the steps to

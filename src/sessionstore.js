@@ -20,7 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 const { session, safeStorage, app } = require('electron');
-const log = require('electron-log');
+const log = require('./logger');
 
 const configStore = require('./config');
 const paths = require('./paths');

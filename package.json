@@ -34,6 +34,7 @@
     "one-click": "node scripts/one-click-run.js",
     "one-click-build": "node scripts/one-click-build.js",
     "build:all": "node scripts/one-click-build.js --all",
+    "preview:shell": "node scripts/preview-shell.js",
     "services:audit": "node scripts/audit-services.js",
     "services:audit:online": "node scripts/audit-services.js --online",
     "services:check": "node scripts/audit-services.js --check",

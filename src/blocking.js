@@ -11,7 +11,7 @@
  */
 
 const { session } = require('electron');
-const log = require('electron-log');
+const log = require('./logger');
 const { normalizeHostname } = require('./utils');
 
 const state = {
@@ -170,21 +170,81 @@ function resetStats() {
   stats.allowed = 0;
 }
 
-/** Protocols/hosts that must never be filtered (local UI, devtools, …). */
+/** Schemes with no remote host: they can never reach the network. */
+const INTERNAL_SCHEMES = [
+  'file:',
+  'devtools:',
+  'chrome:',
+  'chrome-extension:',
+  'chrome-untrusted:',
+  'view-source:',
+  'data:',
+  'blob:',
+  'about:',
+  'javascript:'
+];
+
+/**
+ * Hostnames that mean "this machine".
+ *
+ * `localhost` and the whole 127.0.0.0/8 block are loopback; the `.localhost`
+ * TLD is reserved for loopback by RFC 6761. Anything else — a public domain
+ * that merely *starts* with `localhost` — is not internal.
+ *
+ * @param {string} hostname
+ * @returns {boolean}
+ */
+function isLoopbackHostname(hostname) {
+  if (typeof hostname !== 'string') return false;
+  const host = hostname.trim().toLowerCase();
+  if (!host) return false;
+  if (host === 'localhost' || host.endsWith('.localhost')) return true;
+  if (host === '::1') return true;
+  // 127.0.0.0/8 — every address in the block is loopback.
+  const parts = host.split('.');
+  return parts.length === 4 && parts[0] === '127' && parts.every((part) => /^\d{1,3}$/.test(part));
+}
+
+/**
+ * Is this a URL the filter must never see?
+ *
+ * Exported for tests. `evaluateRequest` calls {@link decisionForParsedUrl}
+ * directly so the hot path parses each URL exactly once.
+ *
+ * @param {string} url
+ * @returns {boolean}
+ */
 function isInternalUrl(url) {
-  return (
-    url.startsWith('file://') ||
-    url.startsWith('devtools://') ||
-    url.startsWith('chrome://') ||
-    url.startsWith('chrome-extension://') ||
-    url.startsWith('data:') ||
-    url.startsWith('blob:') ||
-    url.startsWith('about:') ||
-    url.startsWith('http://localhost') ||
-    url.startsWith('https://localhost') ||
-    url.startsWith('http://127.0.0.1') ||
-    url.startsWith('https://127.0.0.1')
-  );
+  if (typeof url !== 'string' || url.length === 0) return false;
+
+  let parsed = null;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(url) || /^(about|data|blob|javascript):/i.test(url)) {
+    try {
+      parsed = new URL(url);
+    } catch (e) {
+      parsed = null;
+    }
+  }
+  if (parsed) return isInternalParsed(parsed);
+
+  const lower = url.trim().toLowerCase();
+  return INTERNAL_SCHEMES.some((scheme) => lower.startsWith(scheme));
+}
+
+/**
+ * Internal check for an already-parsed URL: scheme first, then loopback host.
+ *
+ * Crucially this compares the *hostname*, so `http://localhost.example.com/`
+ * (which only shares a prefix with `http://localhost`) is still filtered — the
+ * previous prefix match let any look-alike domain skip the allow-list entirely.
+ *
+ * @param {URL} parsed
+ * @returns {boolean}
+ */
+function isInternalParsed(parsed) {
+  if (INTERNAL_SCHEMES.includes(parsed.protocol)) return true;
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+  return isLoopbackHostname(parsed.hostname.replace(/^\[|\]$/g, ''));
 }
 
 /**
@@ -199,8 +259,6 @@ function evaluateRequest(details) {
     return { allow: true, reason: 'no-url' };
   }
 
-  if (isInternalUrl(details.url)) return { allow: true, reason: 'internal' };
-
   if (!state.enabled) return { allow: true, reason: 'disabled' };
 
   let url;
@@ -211,6 +269,8 @@ function evaluateRequest(details) {
     // deal with them (it will reject genuinely malformed ones).
     return { allow: true, reason: 'unparsable' };
   }
+
+  if (isInternalParsed(url)) return { allow: true, reason: 'internal' };
 
   const webContentsId = details.webContentsId;
   if (webContentsId !== undefined && trustedWebContents.has(webContentsId)) {
@@ -316,6 +376,8 @@ module.exports = {
   resetStats,
   evaluateRequest,
   isInternalUrl,
+  isInternalParsed,
+  isLoopbackHostname,
   setupWebRequestBlocking,
   teardownWebRequestBlocking,
   _resetForTests

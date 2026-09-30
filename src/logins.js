@@ -20,7 +20,7 @@
  */
 
 const { ipcMain } = require('electron');
-const log = require('electron-log');
+const log = require('./logger');
 
 const configStore = require('./config');
 const dataStore = require('./data');
@@ -65,6 +65,35 @@ function loadRecords() {
       keepAliveAt: typeof record.keepAliveAt === 'number' ? record.keepAliveAt : null
     });
   }
+}
+
+/**
+ * Force a service's cached record into the signed-out state.
+ *
+ * Called after the user wipes one service's cookies; without it the record
+ * would keep claiming "logged in" until the next check.
+ *
+ * @param {string} serviceId
+ * @param {string} [reason]
+ * @returns {boolean} whether a record existed
+ */
+function markLoggedOut(serviceId, reason = 'cleared-by-user') {
+  const record = records.get(serviceId);
+  if (!record) return false;
+  record.state = STATE.LOGGED_OUT;
+  record.reason = reason;
+  record.signedInAt = null;
+  return true;
+}
+
+/**
+ * Forget every cached login record ("sign out of everything").
+ * @returns {string[]} the service ids that were forgotten
+ */
+function forgetAll() {
+  const ids = [...records.keys()];
+  records.clear();
+  return ids;
 }
 
 function persistRecords() {
@@ -550,6 +579,8 @@ module.exports = {
   stopSweeps,
   flush,
   persistRecords,
+  markLoggedOut,
+  forgetAll,
   _records: records,
   _watched: watched
 };

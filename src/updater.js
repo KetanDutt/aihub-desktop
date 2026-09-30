@@ -7,7 +7,7 @@
  */
 
 const { app, dialog, Notification } = require('electron');
-const log = require('electron-log');
+const log = require('./logger');
 const { IPC } = require('./constants');
 
 const state = {

@@ -9,7 +9,7 @@
 const { ipcMain, app, session, dialog } = require('electron');
 const fsPromises = require('fs').promises;
 
-const log = require('electron-log');
+const log = require('./logger');
 const configStore = require('./config');
 const dataStore = require('./data');
 const windowManager = require('./window');
@@ -298,6 +298,10 @@ function setupIpcHandlers() {
       const cached = catalog.iconDataUrl(id);
       if (cached) return { dataUrl: cached, source: 'catalog' };
     }
+    // The renderer picks the URL, so it is untrusted: only http(s) is fetched
+    // (this is the only IPC path that makes the main process open a socket to
+    // an address the renderer chose).
+    if (!isSafeHttpUrl(url)) return { dataUrl: null, error: 'invalid_url' };
     return favicon.getFavicon(url);
   });
 
@@ -324,7 +328,7 @@ function setupIpcHandlers() {
             /* one bad service must not abort the wipe */
           }
         }
-        for (const record of [...loginMonitor._records.keys()]) loginMonitor._records.delete(record);
+        loginMonitor.forgetAll();
         loginMonitor.persistRecords();
       } else if (session.defaultSession && typeof session.defaultSession.clearCache === 'function') {
         await session.defaultSession.clearCache();
@@ -353,12 +357,7 @@ function setupIpcHandlers() {
 
     try {
       const result = await sessionStore.clearService(id);
-      const record = loginMonitor._records.get(id);
-      if (record) {
-        record.state = loginMonitor.STATE.LOGGED_OUT;
-        record.reason = 'cleared-by-user';
-        record.signedInAt = null;
-      }
+      loginMonitor.markLoggedOut(id);
       loginMonitor.persistRecords();
       const tabId = windowManager.tabIdForService(id);
       if (tabId) windowManager.navReload(tabId);
@@ -496,10 +495,11 @@ function setupIpcHandlers() {
     app.quit();
   });
 
-  // Sanity guard: the renderer cannot open more tabs than the configured limit
-  // even if it loses track of its own state.
+  // Where the tab limit currently stands. `openTabs` is the live count and
+  // `limit` the configured maximum, so the shell can show "2 of 3" without
+  // keeping its own tally.
   ipcMain.handle(IPC.GET_LIMITS, () => ({
-    maxTabs: windowManager.getTabStates().length,
+    openTabs: windowManager.getTabStates().length,
     limit: configStore.getConfigItem('maxActiveServices', LIMITS.DEFAULT_MAX_TABS),
     minTabs: LIMITS.MIN_TABS,
     hardMax: LIMITS.MAX_TABS

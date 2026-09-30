@@ -12,7 +12,7 @@
  */
 
 const { shell, dialog, session } = require('electron');
-const log = require('electron-log');
+const log = require('./logger');
 const { isSafeHttpUrl } = require('./utils');
 
 /**

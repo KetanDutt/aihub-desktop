@@ -30,7 +30,8 @@ ChatGPT, `notopenai.com` is not. Requests that fail are cancelled in
 
 | Sender | Decision |
 |--------|----------|
-| Shell UI, devtools, `file:`/`data:`/`localhost` | always allowed |
+| Shell UI, devtools, hostless schemes (`file:`, `data:`, `blob:`, `about:`) | always allowed |
+| `localhost`, `*.localhost`, `127.0.0.0/8`, `::1` | always allowed |
 | Registered tab, domain in list | allowed |
 | Registered tab, domain not in list | **blocked** |
 | Unknown webContents (pop-ups, workers) | allowed by default; blocked when `strictBlocking` is on |
@@ -38,6 +39,12 @@ ChatGPT, `notopenai.com` is not. Requests that fail are cancelled in
 Failing open for unknown senders is intentional: a bad update to the rule data
 must never render the app unusable. Turn on **Strict mode** if you prefer
 fail-closed.
+
+The "always allowed" row is a match on the **parsed hostname**, not on the URL
+text: `http://localhost.evil.com/` is an ordinary public host and is filtered
+like any other. (It used to be a prefix match, which let any look-alike domain
+skip the allow-list — see
+[production-readiness.md](production-readiness.md#domain-filter-bypass-through-a-look-alike-hostname).)
 
 ### What it does NOT do
 

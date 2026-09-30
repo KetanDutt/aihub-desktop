@@ -10,7 +10,7 @@ window.AiHub = window.AiHub || {};
   app.openSettings = function openSettings(tabName = 'general') {
     const panel = app.elements.settingsPanel;
     if (!panel) return;
-    panel.classList.remove('hidden');
+    panel.classList.remove('is-closing', 'hidden');
     panel.setAttribute('aria-hidden', 'false');
     app.selectSettingsTab(tabName);
     app.refreshAbout();
@@ -27,9 +27,32 @@ window.AiHub = window.AiHub || {};
 
   app.closeSettings = function closeSettings() {
     const panel = app.elements.settingsPanel;
-    if (!panel) return;
-    panel.classList.add('hidden');
+    if (!panel || panel.classList.contains('hidden') || panel.classList.contains('is-closing')) return;
     panel.setAttribute('aria-hidden', 'true');
+
+    const settle = () => {
+      panel.classList.remove('is-closing');
+      panel.classList.add('hidden');
+    };
+
+    const reduced =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) {
+      settle();
+      return;
+    }
+
+    // Play the exit before taking the panel out of the layout — an instant cut
+    // on a 560px surface is the one abrupt transition left in the shell. The
+    // timer is a safety net for a window that is hidden or throttled, where
+    // animation events may never arrive.
+    panel.classList.add('is-closing');
+    const finish = () => {
+      if (panel.classList.contains('is-closing')) settle();
+    };
+    panel.addEventListener('animationend', finish, { once: true });
+    setTimeout(finish, 300);
   };
 
   app.selectSettingsTab = function selectSettingsTab(name) {

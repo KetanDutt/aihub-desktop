@@ -20,6 +20,8 @@ settings, status bar) and one **`WebContentsView` per open service tab**.
           src/ipc.js     validated IPC surface
           src/window.js  window/tray/shortcuts + WebContentsView host
           src/tabs.js    pure tab state machine (no Electron imports)
+          src/accelerators.js  keyboard accelerators -> shell commands (pure)
+          src/windowstate.js   window geometry restore/validate (pure)
           src/blocking.js  per-tab domain allow-list + request filter
           src/security.js  permissions, navigation guards, external links
           src/data.js    service catalogue + rules (remote + bundled)
@@ -42,7 +44,7 @@ settings, status bar) and one **`WebContentsView` per open service tab**.
             template.js   `{placeholder}` rendering, path get/set (pure)
             queue.js      concurrency + rate limits (pure)
             http.js       outbound transport, cookie header assembly
-          src/logger.js  electron-log configuration
+          src/logger.js  the only place electron-log is configured
           src/paths.js   bundled/user data directory resolution
           src/utils.js   pure helpers (slugify, clamp, URL checks)
 ```
@@ -54,6 +56,37 @@ API. `WebContentsView` gives each tab a real, sandboxed renderer that the main
 process positions over the `#webviews-container` element. The shell reports the
 container's real bounds over IPC; `constants.js` only provides a fallback for
 the first frames.
+
+## Logging
+
+Every main-process module logs through `src/logger.js`. It owns the file
+transport (5 MB cap with a single `.old` rotation, `0600` on POSIX, `debug`
+during development and `info` when packaged), mirrors to the console in
+development, and forwards a level to `electron-log` only when the backend
+implements it — so a partial or missing backend degrades to a no-op instead of
+turning a logging call into an exception. Secrets (cookie values, the local API
+key) never go into it; see [security.md](security.md).
+
+## Keyboard bridge
+
+The shell receives key events only while *it* has focus. A service tab is a
+separate `WebContentsView`, so `src/window.js` inspects every key press there
+with `before-input-event` and hands it to `src/accelerators.js`. That module —
+a pure function of the input event, the platform and nothing else — returns a
+command (`close-tab`, `next-tab`, `select-tab:3`, …) for accelerators the app
+owns and `null` for everything else, which keeps site chords and typing with the
+page. Recognised commands travel to the renderer on the one-way `app-command`
+channel and are executed by the same handlers the chrome's own keydown listener
+uses, so a shortcut means one thing regardless of where the focus is.
+
+## Window geometry
+
+Size, position and maximized state are stored in the config store
+(`windowBounds`, `windowMaximized`) and restored on launch. `src/windowstate.js`
+validates the saved rectangle against the current `screen` work areas first: a
+window that would land off-screen (the monitor it was saved on is gone) falls
+back to the default size, and one whose display shrank is pulled back inside.
+Writes are debounced (500 ms) and flushed on close and quit.
 
 ## Layering constraint (important)
 
