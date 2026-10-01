@@ -118,6 +118,13 @@
   --status-height: 30px;
   --shell-pad: 10px;
   --shell-gap: 10px;
+  /* The whole floating nav bar: title row + tab strip + its 1px hairline top
+     and bottom. Surfaces that must clear the chrome (settings drawer, find
+     bar) anchor to this instead of re-deriving the sum themselves. */
+  --nav-height: calc(var(--header-height) + var(--tabs-height) + 2px);
+  /* Top edge of the stage — where the sidebar, the web view and any drawer
+     that clears the chrome all begin. */
+  --stage-top: calc(var(--shell-pad) + var(--nav-height) + var(--shell-gap));
 
   /* -- Controls ------------------------------------------------------------ */
   --ctrl: 32px;
@@ -556,10 +563,11 @@ body.light-mode .app-bg-grain {
 /* --------------------------------------------------------------------------
    5. Shell layout (layer 1)
 
-   `--header-height` and `--tabs-height` are reported to the main process in
-   src/constants.js#LAYOUT; the floating bar keeps its own metrics, so those
-   values were reduced to zero there and the fallback bounds in window.js are
-   computed from the live element sizes instead.
+   `--header-height`, `--tabs-height` and `--status-height` are mirrored in
+   src/constants.js#LAYOUT, which builds the same stage rectangle the renderer
+   reports (`src/window.js#calculateViewBounds`): shell padding + nav + gap on
+   top, status bar + padding + gap at the bottom. Keep the two in sync when a
+   metric changes.
    -------------------------------------------------------------------------- */
 .app-container {
   position: relative;
@@ -1251,20 +1259,28 @@ body:not(.light-mode) .toggle-slider::before {
    child `WebContentsView`s always paint above the shell, so an absolutely
    positioned panel would be hidden behind the active tab. They collapse their
    grid column instead.
+
+   Both columns are placed explicitly. Auto-placement would put the stage in
+   the zero-width first column whenever the sidebar is `display: none` (a
+   collapsed drawer is not a grid item), leaving the stage as a 2px sliver and
+   the web view nowhere to paint.
    -------------------------------------------------------------------------- */
 .main-row {
   position: relative;
   display: grid;
-  grid-template-columns: 0 1fr;
+  grid-template-columns: 0 minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   min-height: 0;
   transition: grid-template-columns var(--t-slow) var(--ease-soft);
 }
 
 .main-row:has(.sidebar:not(.hidden)) {
-  grid-template-columns: 306px 1fr;
+  grid-template-columns: 306px minmax(0, 1fr);
 }
 
 .main-content {
+  grid-column: 2;
+  grid-row: 1;
   position: relative;
   min-width: 0;
   min-height: 0;
@@ -1282,6 +1298,8 @@ body:not(.light-mode) .toggle-slider::before {
 
 /* -- Sidebar --------------------------------------------------------------- */
 .sidebar {
+  grid-column: 1;
+  grid-row: 1;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -1700,11 +1718,15 @@ body:not(.light-mode) .toggle-slider::before {
    11. Settings drawer
 
    A drawer, not a dialog: it keeps the tab strip usable and never hides the
-   service you were reading behind a scrim.
+   service you were reading behind a scrim. That also means it must not cover
+   the navigation bar — it starts at the top of the stage, alongside the
+   sidebar and the web view, instead of at the window edge. (At ≤640px it
+   becomes a full-bleed sheet and moves up a layer so its own controls stay
+   above the nav.)
    -------------------------------------------------------------------------- */
 .settings-panel {
   position: fixed;
-  top: var(--shell-pad);
+  top: var(--stage-top);
   right: var(--shell-pad);
   bottom: calc(var(--status-height) + var(--shell-pad) + var(--shell-gap));
   z-index: var(--z-panel);
@@ -1749,6 +1771,8 @@ body:not(.light-mode) .toggle-slider::before {
 }
 
 .panel-header {
+  /* Fixed furniture: only `.settings-content` below absorbs a short window. */
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1770,6 +1794,9 @@ body:not(.light-mode) .toggle-slider::before {
 
 /* Segmented control: the gliding pill *is* the selected tab. */
 .settings-tabs {
+  /* It scrolls horizontally, so its automatic minimum size is 0 and a short
+     window would squeeze the segmented control until the labels clip. */
+  flex: 0 0 auto;
   position: relative;
   display: flex;
   gap: 2px;
@@ -2700,19 +2727,28 @@ body:not(.light-mode) .toggle-slider::before {
   background: var(--scrim);
   -webkit-backdrop-filter: var(--blur-0);
   backdrop-filter: var(--blur-0);
+  /* Closed means *inert*, not just transparent: an opacity-0 sheet that still
+     spans the window swallows every click on the shell and leaves its buttons
+     in the tab order. */
   opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
   transition:
     opacity var(--t-fast) var(--ease-out),
+    visibility var(--t-fast),
     -webkit-backdrop-filter var(--t-fast) var(--ease-out),
     backdrop-filter var(--t-fast) var(--ease-out);
 }
 
 .modal-backdrop.visible {
   opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
   -webkit-backdrop-filter: var(--blur-veil);
   backdrop-filter: var(--blur-veil);
   transition:
     opacity var(--t-slow) var(--ease-out),
+    visibility var(--t-slow),
     -webkit-backdrop-filter var(--t-slow) var(--ease-out),
     backdrop-filter var(--t-slow) var(--ease-out);
 }
@@ -2865,7 +2901,7 @@ body:not(.light-mode) .toggle-slider::before {
 /* -- Find bar ------------------------------------------------------------- */
 .find-bar {
   position: fixed;
-  top: calc(var(--shell-pad) + var(--header-height) + var(--tabs-height) + var(--sp-2));
+  top: calc(var(--stage-top) + var(--sp-2));
   right: calc(var(--shell-pad) + var(--sp-4));
   z-index: var(--z-popover);
   display: flex;
@@ -3183,11 +3219,15 @@ body:not(.light-mode) .toggle-slider::before {
   }
 
   .settings-panel {
+    /* Full-bleed sheet: it covers the chrome, so it has to outrank it —
+       otherwise the nav bar's controls paint over the drawer's own header
+       and its close button stops responding. */
     top: var(--shell-pad);
     right: var(--shell-pad);
     bottom: var(--shell-pad);
     left: var(--shell-pad);
     width: auto;
+    z-index: var(--z-dialog);
   }
 
   .settings-tabs {

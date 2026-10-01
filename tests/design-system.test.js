@@ -125,6 +125,70 @@ describe('accessibility and performance guarantees', () => {
   });
 });
 
+/**
+ * Overlap regressions.
+ *
+ * The shell is a stack of surfaces, and a handful of them have to share the
+ * window without covering each other. Each assertion here pins a bug that
+ * shipped: a collapsed stage, a drawer sitting under the navigation bar, a
+ * dialog that swallowed every click while invisible, and a segmented control
+ * squeezed until its labels clipped.
+ */
+describe('surfaces do not overlap', () => {
+  /** Body of the first rule whose selector matches exactly. */
+  function ruleBody(selector) {
+    const match = css.match(new RegExp(`(?:^|\\n)${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{([^}]*)\\}`));
+    return match ? match[1] : '';
+  }
+
+  it('places the stage in its own column so a collapsed sidebar cannot collapse it', () => {
+    // `display: none` takes the sidebar out of the grid entirely, so the stage
+    // must be placed explicitly rather than auto-placed into column 1.
+    expect(ruleBody('.main-content')).toMatch(/grid-column:\s*2/);
+    expect(ruleBody('.sidebar')).toMatch(/grid-column:\s*1/);
+    expect(ruleBody('.main-row')).toMatch(/grid-template-columns:\s*0 minmax\(0, 1fr\)/);
+  });
+
+  it('starts the settings drawer at the top of the stage, clear of the nav bar', () => {
+    expect(css).toMatch(/--stage-top:\s*calc\(var\(--shell-pad\) \+ var\(--nav-height\) \+ var\(--shell-gap\)\)/);
+    expect(ruleBody('.settings-panel')).toMatch(/top:\s*var\(--stage-top\)/);
+  });
+
+  it('outranks the nav bar when the drawer goes full-bleed on a phone', () => {
+    const phone = css.slice(css.indexOf('@media (max-width: 640px)'));
+    // Several rules mention `.settings-panel` (it also appears in a grouped
+    // selector), so look at every body in the block.
+    const bodies = [...phone.matchAll(/\.settings-panel \{([^}]*)\}/g)].map((m) => m[1]);
+    expect(bodies.some((body) => /z-index:\s*var\(--z-dialog\)/.test(body))).toBe(true);
+  });
+
+  it('keeps a closed dialog inert instead of merely transparent', () => {
+    // An opacity-0 sheet that still spans the window eats every click on the
+    // shell behind it, and leaves its buttons in the tab order.
+    const closed = ruleBody('.modal-backdrop');
+    expect(closed).toMatch(/visibility:\s*hidden/);
+    expect(closed).toMatch(/pointer-events:\s*none/);
+    const open = ruleBody('.modal-backdrop.visible');
+    expect(open).toMatch(/visibility:\s*visible/);
+    expect(open).toMatch(/pointer-events:\s*auto/);
+  });
+
+  it('closes and opens that dialog in lockstep with the class it toggles', () => {
+    const html = fs.readFileSync(path.join(UI_DIR, 'index.html'), 'utf8');
+    expect(html).toMatch(/class="modal-backdrop hidden"/);
+    const shortcuts = fs.readFileSync(path.join(UI_DIR, 'shortcuts.js'), 'utf8');
+    expect(shortcuts).toMatch(/classList\.toggle\('hidden', !shouldShow\)/);
+    expect(shortcuts).toMatch(/classList\.toggle\('visible', shouldShow\)/);
+  });
+
+  it('never lets a horizontal scroller be squeezed out of its own height', () => {
+    // `.settings-tabs` scrolls sideways, so its automatic minimum size is 0:
+    // without an explicit flex basis the labels clip in a short window.
+    expect(ruleBody('.settings-tabs')).toMatch(/flex:\s*0 0 auto/);
+    expect(ruleBody('.panel-header')).toMatch(/flex:\s*0 0 auto/);
+  });
+});
+
 describe('icon system', () => {
   const iconsJs = fs.readFileSync(path.join(UI_DIR, 'icons.js'), 'utf8');
 

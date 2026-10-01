@@ -323,6 +323,32 @@ describe('tabs', () => {
     expect(bounds.height).toBeLessThanOrEqual(height);
   });
 
+  it('falls back to the shell stage, not the whole window, before the renderer reports', () => {
+    // Used for the first frames only, but the view paints *above* the shell: a
+    // fallback that ignored the shell padding would cover the nav bar until the
+    // renderer's report lands. The numbers mirror ui/styles.css (--shell-pad,
+    // --nav-height, --shell-gap, --status-height).
+    jest.isolateModules(() => {
+      const fresh = require('../src/window');
+      fresh.createMainWindow();
+      fresh.createTab(tabPayload());
+
+      const view = fresh._views.get('chatgpt-1');
+      const bounds = view.setBounds.mock.calls[0][0];
+      const [width, height] = fresh.getMainWindow().getContentSize();
+      const pad = LAYOUT.SHELL_PAD;
+      const top = pad + LAYOUT.NAV_HEIGHT + LAYOUT.SHELL_GAP;
+
+      expect(bounds).toEqual({
+        x: pad,
+        y: top,
+        width: width - pad * 2,
+        height: height - top - (LAYOUT.STATUS_BAR_HEIGHT + pad + LAYOUT.SHELL_GAP)
+      });
+      expect(bounds.y).toBeGreaterThan(LAYOUT.HEADER_HEIGHT + LAYOUT.TABS_HEIGHT);
+    });
+  });
+
   it('accepts a collapsed container so a view can be hidden by layout', () => {
     // The renderer reports the real box of #webviews-container. On a narrow
     // window the service picker takes the whole row and that box collapses to

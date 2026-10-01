@@ -12,16 +12,27 @@ const GLOBAL_SHORTCUT_DEFAULT = 'CommandOrControl+Shift+A';
 
 // -- Layout fallbacks (px, CSS pixels) ---------------------------------------
 // Keep in sync with the CSS custom properties in ui/styles.css
-// (--header-height, --tabs-height, --status-height). The renderer reports the
-// real #webviews-container bounds; these only cover the first frames.
+// (--header-height, --tabs-height, --status-height, --shell-pad,
+// --shell-gap). The renderer reports the real #webviews-container bounds;
+// these only cover the first frames, before that report arrives — so they have
+// to describe the same stage the stylesheet builds, shell padding and gaps
+// included, or the first frame paints the view over the navigation bar.
 const HEADER_HEIGHT = 54;
 const TABS_HEIGHT = 44;
 const STATUS_BAR_HEIGHT = 30;
+const SHELL_PAD = 10;
+const SHELL_GAP = 10;
+// The whole floating navigation bar: title row + tab strip, plus the 1px
+// hairline above and below the strip (mirrors `--nav-height` in the CSS).
+const NAV_HEIGHT = HEADER_HEIGHT + TABS_HEIGHT + 2;
 
 const LAYOUT = {
   HEADER_HEIGHT,
   TABS_HEIGHT,
   STATUS_BAR_HEIGHT,
+  SHELL_PAD,
+  SHELL_GAP,
+  NAV_HEIGHT,
   MIN_WIDTH: 800,
   MIN_HEIGHT: 600,
   DEFAULT_WIDTH: 1200,
