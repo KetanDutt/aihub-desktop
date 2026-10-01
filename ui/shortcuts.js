@@ -149,7 +149,18 @@ window.AiHub = window.AiHub || {};
     const shouldShow = force === undefined ? wasHidden : force;
     if (shouldShow === !wasHidden) return; // already in the requested state
 
+    // `hidden` keeps the backdrop out of layout (and out of the tab order)
+    // while closed; `visible` drives the fade/blur ramp in styles.css. Both
+    // have to move together — see `.modal-backdrop` in `ui/styles.css` — and
+    // the read between them flushes the `display` change so the ramp has a
+    // start state to run from on the way in.
     modal.classList.toggle('hidden', !shouldShow);
+    if (shouldShow) {
+      void modal.offsetWidth;
+      modal.classList.add('visible');
+    } else {
+      modal.classList.remove('visible');
+    }
     modal.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
 
     // The dialog declares aria-modal, so focus has to actually go into it —

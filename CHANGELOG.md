@@ -50,6 +50,45 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **The first painted frame no longer covers the navigation bar.** The view
+  bounds fallback in `src/window.js` (used until the renderer reports the real
+  `#webviews-container` box) assumed a full-bleed viewport: it ignored the shell
+  padding, the gaps and the tab strip's hairlines, so the native view started
+  22px too high and 50px too tall. It now derives the same stage rectangle the
+  stylesheet builds, from `LAYOUT.SHELL_PAD`/`LAYOUT.NAV_HEIGHT`/`LAYOUT.SHELL_GAP`
+  (a test pins the arithmetic).
+
+- **The stage collapsed to a 2px sliver when no service was open.** The sidebar
+  and the stage were grid-auto-placed, so a collapsed sidebar (`display: none`,
+  and therefore not a grid item) pushed the stage into the zero-width first
+  column. The welcome screen had 2px to render in and the window looked empty
+  until you opened a tab. Both columns are now placed explicitly
+  (`.sidebar` → column 1, `.main-content` → column 2), which also gives the
+  renderer honest `#webviews-container` bounds to report to the main process.
+
+- **The settings drawer overlapped the navigation bar and lost to it.** It was
+  anchored to the window edge at `--z-panel`, *below* the nav's `--z-nav`, so
+  the drawer's title, its close button and the top of its segmented control were
+  painted under the header and tabs — visible only where the nav is translucent,
+  and unclickable. The drawer now starts at `--stage-top`, clear of the chrome,
+  alongside the sidebar and the web view. On phones, where it is deliberately a
+  full-bleed sheet, it moves up to `--z-dialog` so its own header stays on top.
+
+- **Clicking anywhere in the window did nothing once the shortcuts dialog had
+  been opened and closed.** `ui/shortcuts.js` toggled `hidden` while the
+  stylesheet only reacted to `visible`; the `hidden` rule was never written, so
+  the closed backdrop stayed `display: flex` at full window size, transparent
+  but hit-testable, and ate every click. Closing now also sets
+  `visibility: hidden` and `pointer-events: none` (with `.visible` restoring
+  both), so a closed dialog is inert instead of merely invisible — and its
+  buttons are out of the tab order while it is closed.
+
+- **The settings segmented control clipped its own labels in a short window.**
+  It scrolls horizontally, so its automatic minimum size is 0 and the flex
+  column squeezed it until the tab labels were cut in half. The header and the
+  segmented control are now fixed-height furniture and only the scrollable
+  content below them shrinks.
+
 - **Unstyled component classes.** `service-group-title`, `services-manager` and
   the `is-signin` group modifier were rendered by the shell with no rules behind
   them; every class the renderer can produce now has a definition.

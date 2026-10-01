@@ -42,7 +42,7 @@ Every value the shell can express lives here. Component rules compose tokens.
 | Field | `--field-bg`, `--field-bg-strong` | inputs, code, segmented controls |
 | Colour | `--bg-0/1/2`, `--text-1/2/3`, `--accent`, `--accent-2`, `--accent-soft`, `--accent-line`, `--on-accent`, `--ok/--warn/--err` (+ `-soft`), `--separator`, `--scrim`, `--focus`, `--focus-ring` | dark by default, `body.light-mode` overrides |
 | Backdrop | `--field-a/b/c`, `--grain-opacity` | ambient colour fields |
-| Layout | `--header-height`, `--tabs-height`, `--status-height`, `--shell-pad`, `--shell-gap`, `--ctrl`, `--ctrl-sm`, `--ctrl-lg`, `--hit` | `--header-height`/`--tabs-height`/`--status-height` are the metrics reported to the main process by `src/constants.js#LAYOUT` |
+| Layout | `--header-height`, `--tabs-height`, `--status-height`, `--nav-height`, `--shell-pad`, `--shell-gap`, `--stage-top`, `--ctrl`, `--ctrl-sm`, `--ctrl-lg`, `--hit` | `--header-height`/`--tabs-height`/`--status-height` are the metrics reported to the main process by `src/constants.js#LAYOUT`; `--nav-height` is the whole floating bar and `--stage-top` is where the stage (and any edge-anchored drawer) begins below it |
 | Runtime | `--px`, `--py` | written per card by `ui/services.js`, read by the card sheen |
 
 Layout metric changes must be mirrored in `src/constants.js` and
@@ -87,8 +87,26 @@ list cannot turn into dozens of animated blur layers.
 **Important:** child `WebContentsView`s always paint above the shell
 webContents, so nothing in the renderer can overlay the tab content. The sidebar
 collapses its grid column instead of floating over the stage, and the settings
-drawer is a fixed panel anchored to the window edge — never a scrim over the
-service you are reading.
+drawer is a fixed panel anchored to the stage — never a scrim over the service
+you are reading.
+
+Two rules keep those surfaces from fighting over the same pixels:
+
+- **Grid placement is explicit.** `.sidebar` is `grid-column: 1` and
+  `.main-content` is `grid-column: 2`. Auto-placement is not an option here: a
+  collapsed drawer is `display: none`, which removes it as a grid item, and the
+  stage would then be placed in the zero-width first column.
+- **A drawer never covers the chrome.** Anything anchored to the window edge
+  (settings drawer, find bar) starts at `--stage-top`, the line where the
+  sidebar and the web view begin. The navigation bar stays visible and usable
+  while the drawer is open. The one exception is the ≤640px phone layout, where
+  the drawer becomes a full-bleed sheet and moves up to `--z-dialog` so the nav
+  cannot paint over its header.
+- **A closed dialog is inert.** `.modal-backdrop` fades out *and* sets
+  `visibility: hidden` + `pointer-events: none`; `.visible` restores both.
+  Transparency alone is not closed — an invisible sheet that still spans the
+  window swallows every click on the shell behind it and leaves its buttons in
+  the tab order.
 
 ## Backdrop
 
@@ -188,9 +206,10 @@ Breakpoints adapt behaviour, not just sizes:
 - **≤900px** — shell padding drops, tab strip tightens, tips stack, the About
   grid narrows.
 - **≤640px** — the service picker takes the whole row instead of leaving a
-  sliver of web view; the settings drawer becomes edge-to-edge; dialogs stack
-  their actions; the find bar moves to the bottom (thumb reach); the tab count
-  and tab badges drop; radii step down one notch.
+  sliver of web view; the settings drawer becomes an edge-to-edge sheet that
+  outranks the nav bar (`--z-dialog`); dialogs stack their actions; the find bar
+  moves to the bottom (thumb reach); the tab count and tab badges drop; radii
+  step down one notch.
 - **Coarse pointers / no hover** — hover-only affordances (close-tab, add
   service) become permanently visible and hit targets grow to 40px.
 
