@@ -178,7 +178,8 @@ describe('surfaces do not overlap', () => {
     expect(html).toMatch(/class="modal-backdrop hidden"/);
     const shortcuts = fs.readFileSync(path.join(UI_DIR, 'shortcuts.js'), 'utf8');
     expect(shortcuts).toMatch(/classList\.toggle\('hidden', !shouldShow\)/);
-    expect(shortcuts).toMatch(/classList\.toggle\('visible', shouldShow\)/);
+    expect(shortcuts).toMatch(/classList\.add\('visible'\)/);
+    expect(shortcuts).toMatch(/classList\.remove\('visible'\)/);
   });
 
   it('never lets a horizontal scroller be squeezed out of its own height', () => {
