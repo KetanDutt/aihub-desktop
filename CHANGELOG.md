@@ -34,6 +34,16 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **A calmer, more readable material pass.** The shared type scale is slightly
+  larger for body copy and metadata, container radii are more restrained, and
+  the elevation tokens use softer shadows. The welcome stage now has a clear
+  workspace kicker and grouped quick-start section.
+- **The service picker is row-first.** Service entries no longer sit in a stack
+  of permanently raised cards; hover and open states receive a quiet glass wash,
+  while the same search, context-menu and open-service interactions remain.
+- **Ambient blur is tokenized and responsive.** The backdrop keeps its low-key
+  depth on desktop and uses a smaller blur radius on phones to reduce compositor
+  work.
 - **Dark and light are both first-class.** Light mode is no longer an inversion:
   brighter neutrals, stronger white edge highlights, softer shadows and reduced
   border contrast, with glass visible in both themes.
