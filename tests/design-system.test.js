@@ -31,7 +31,7 @@ describe('tokens', () => {
     for (const token of ['--r-sm', '--r-md', '--r-lg', '--r-xl', '--r-pill']) {
       expect(css).toContain(`${token}:`);
     }
-    for (const token of ['--blur-1', '--blur-2', '--blur-3', '--blur-veil']) {
+    for (const token of ['--blur-1', '--blur-2', '--blur-3', '--blur-veil', '--blur-ambient']) {
       expect(css).toContain(`${token}:`);
     }
     for (const token of ['--t-instant', '--t-fast', '--t-med', '--t-slow', '--t-modal']) {
@@ -108,9 +108,10 @@ describe('accessibility and performance guarantees', () => {
     expect(css).toContain('@media (forced-colors: active)');
   });
 
-  it('steps blur down on small screens so mobile GPUs keep up', () => {
+  it('steps structural and ambient blur down on small screens so mobile GPUs keep up', () => {
     const mobile = css.slice(css.indexOf('@media (max-width: 640px)'));
     expect(mobile).toMatch(/--blur-1:/);
+    expect(mobile).toMatch(/--blur-ambient:\s*blur\(56px\)/);
   });
 
   it('keeps core navigation controls available on small screens', () => {
@@ -187,6 +188,14 @@ describe('surfaces do not overlap', () => {
     // without an explicit flex basis the labels clip in a short window.
     expect(ruleBody('.settings-tabs')).toMatch(/flex:\s*0 0 auto/);
     expect(ruleBody('.panel-header')).toMatch(/flex:\s*0 0 auto/);
+  });
+
+  it('keeps the service picker light at rest and surfaces rows on interaction', () => {
+    const card = ruleBody('.service-card');
+    expect(card).toMatch(/background:\s*transparent/);
+    expect(card).toMatch(/box-shadow:\s*none/);
+    expect(ruleBody('.service-card:hover')).toMatch(/background:\s*var\(--glass-hover\)/);
+    expect(ruleBody('.service-card.is-open')).toMatch(/var\(--accent-soft\)/);
   });
 });
 

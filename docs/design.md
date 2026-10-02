@@ -37,7 +37,7 @@ Every value the shell can express lives here. Component rules compose tokens.
 | Layers | `--z-bg`, `--z-content`, `--z-panel`, `--z-nav`, `--z-popover`, `--z-dialog`, `--z-toast` | strictly increasing |
 | Glass fill | `--glass-1/2/3/float/hover/active`, `--glass-sm/md/lg` | four strengths (see below) |
 | Glass edge | `--glass-border(-strong)`, `--hairline`, `--glass-edge(-strong)` | 1px translucent border + top edge highlight |
-| Blur | `--blur-1/2/3/veil/0`, `--blur-sm/md/lg` | `-sm/md/lg` are the named aliases, `-0` exists so a blur can be *animated in* |
+| Blur | `--blur-1/2/3/veil/ambient/0`, `--blur-sm/md/lg` | `-sm/md/lg` are the named aliases, `-0` exists so a blur can be *animated in*; ambient field blur steps down on mobile |
 | Depth | `--elev-1..--elev-4` (aliases `--shadow-1/2/3/float`) | ambient, never black-heavy |
 | Field | `--field-bg`, `--field-bg-strong` | inputs, code, segmented controls |
 | Colour | `--bg-0/1/2`, `--text-1/2/3`, `--accent`, `--accent-2`, `--accent-soft`, `--accent-line`, `--on-accent`, `--ok/--warn/--err` (+ `-soft`), `--separator`, `--scrim`, `--focus`, `--focus-ring` | dark by default, `body.light-mode` overrides |
@@ -68,9 +68,11 @@ deepening on scroll, a card lifting on hover, a drawer animating in). If you add
 a surface, express its states with tokens rather than adding a fifth utility.
 
 Backdrop blur is applied to **structural surfaces** and **floating objects**
-(header, drawers, status bar, menus, dialogs, toasts, find bar). Cards and rows
-use translucent fills with an edge highlight and no per-item blur, so a long
-list cannot turn into dozens of animated blur layers.
+(header, drawers, status bar, menus, dialogs, toasts, find bar). The service
+picker stays row-first: entries are clear at rest and receive a restrained
+surface on hover or selection. Decision cards use translucent fills with an
+edge highlight and no per-item blur, so a long list cannot turn into dozens of
+animated blur layers.
 
 ## Spatial layers
 
@@ -113,19 +115,20 @@ Two rules keep those surfaces from fighting over the same pixels:
 `.app-bg` holds:
 
 1. A quiet dual radial wash on a deep gradient base
-2. Three large, heavily blurred colour fields that drift slowly (`--t-ambient`)
+2. Three large, pre-blurred colour fields (`--blur-ambient`) that drift slowly (`--t-ambient`)
 3. Near-invisible grain, blended to prevent banding
 
 Fields stay below ~20% opacity: they should be almost invisible until a glass
-surface moves over them. No saturated blobs, no animated gradients.
+surface moves over them. No saturated blobs, no animated gradients. The ambient
+blur drops at the phone breakpoint to reduce compositor cost.
 
 ## Typography
 
-- Display titles: 30px, weight 650, tight tracking (`--tracking-tighter`)
-- Page titles: 20px (`--fs-headline`); section headings: 16px (`--fs-title`)
+- Display titles: 32px, weight 650, tight tracking (`--tracking-tighter`)
+- Page titles: 21px (`--fs-headline`); section headings: 16px (`--fs-title`)
 - Section labels: 11px uppercase, wide tracking, muted
-- Body: 13.5px with 1.5 line-height; supporting copy: 12.5px
-- Metadata: 11px, muted but still AA contrast
+- Body: 14px with 1.5 line-height; supporting copy: 13px
+- Metadata: 12px, muted but still AA contrast
 
 Never put translucent text on glass: text uses `--text-1/2/3` only, and
 `--text-3` is tuned to measure ≥4.5:1 against the base surfaces in both themes.
@@ -208,14 +211,16 @@ Breakpoints adapt behaviour, not just sizes:
 - **≤640px** — the service picker takes the whole row instead of leaving a
   sliver of web view; the settings drawer becomes an edge-to-edge sheet that
   outranks the nav bar (`--z-dialog`); dialogs stack their actions; the find bar
-  moves to the bottom (thumb reach); the tab count and tab badges drop; radii
+  moves to the bottom (thumb reach); the welcome stage safe-centres short copy
+  and scrolls taller content from the top; the tab count and badges drop; radii
   step down one notch.
 - **Coarse pointers / no hover** — hover-only affordances (close-tab, add
   service) become permanently visible and hit targets grow to 40px.
 
 Blur is the most expensive part of this language and the least affordable on
-mobile GPUs, so `--blur-*` steps down at ≤640px rather than the material being
-dropped: the design survives, the compositor keeps up.
+mobile GPUs, so structural `--blur-*` levels and the ambient field blur step
+down at ≤640px rather than the material being dropped: the design survives,
+the compositor keeps up.
 
 ## Accessibility
 

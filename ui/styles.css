@@ -43,13 +43,13 @@
     'Inter', 'Segoe UI', system-ui, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
 
-  --fs-display: 30px;
-  --fs-headline: 20px;
+  --fs-display: 32px;
+  --fs-headline: 21px;
   --fs-title: 16px;
   --fs-section: 11px;
-  --fs-body: 13.5px;
-  --fs-small: 12.5px;
-  --fs-meta: 11px;
+  --fs-body: 14px;
+  --fs-small: 13px;
+  --fs-meta: 12px;
 
   --lh-tight: 1.22;
   --lh-body: 1.5;
@@ -69,10 +69,10 @@
   --r-5: 8px;
   --r-6: 9px;
   --r-sm: 10px;
-  --r-md: 14px;
-  --r-lg: 18px;
-  --r-xl: 22px;
-  --r-2xl: 26px;
+  --r-md: 13px;
+  --r-lg: 17px;
+  --r-xl: 20px;
+  --r-2xl: 24px;
   --r-pill: 999px;
 
   /* -- Space --------------------------------------------------------------- */
@@ -181,16 +181,17 @@
   --blur-2: blur(14px) saturate(140%);
   --blur-3: blur(32px) saturate(165%);
   --blur-veil: blur(10px) saturate(125%);
+  --blur-ambient: blur(88px);
   --blur-0: blur(0px);
   --blur-sm: var(--blur-2);
   --blur-md: var(--blur-1);
   --blur-lg: var(--blur-3);
 
   /* Elevation — two soft layers (contact + ambient), never black-heavy */
-  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.24), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
-  --elev-2: 0 6px 16px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.14);
-  --elev-3: 0 14px 34px rgba(0, 0, 0, 0.3), 0 3px 8px rgba(0, 0, 0, 0.16);
-  --elev-4: 0 28px 64px rgba(0, 0, 0, 0.4), 0 6px 16px rgba(0, 0, 0, 0.2);
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.16), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+  --elev-2: 0 5px 14px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.09);
+  --elev-3: 0 12px 28px rgba(0, 0, 0, 0.22), 0 3px 8px rgba(0, 0, 0, 0.12);
+  --elev-4: 0 22px 54px rgba(0, 0, 0, 0.28), 0 6px 16px rgba(0, 0, 0, 0.14);
   /* Aliases kept for the documented shadow scale */
   --shadow-1: var(--elev-1);
   --shadow-2: var(--elev-2);
@@ -475,7 +476,7 @@ code {
 .app-bg-field {
   position: absolute;
   border-radius: var(--r-pill);
-  filter: blur(90px);
+  filter: var(--blur-ambient);
   opacity: 0.7;
   transform: translate3d(0, 0, 0);
   will-change: transform;
@@ -1354,24 +1355,24 @@ body:not(.light-mode) .toggle-slider::before {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-1);
   padding: 0 var(--sp-3) var(--sp-4);
   overscroll-behavior: contain;
 }
 
-/* -- Service cards ---------------------------------------------------------
-   One card = one decision (open this service). Everything else in the app is a
-   row, not a card, so this shape keeps its meaning. */
+/* -- Service picker entries ------------------------------------------------
+   Entries are clickable rows rather than a stack of raised cards. The glass
+   surface appears only on hover or selection, keeping a long picker calm. */
 .service-card {
   position: relative;
   display: block;
   width: 100%;
   text-align: left;
-  padding: var(--sp-3);
+  padding: var(--sp-2);
   border-radius: var(--r-md);
-  background: var(--glass-2);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-edge);
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
   cursor: pointer;
   transition:
     transform var(--t-med) var(--ease-spring),
@@ -1399,21 +1400,28 @@ body:not(.light-mode) .toggle-slider::before {
 }
 
 .service-card:hover {
-  transform: translateY(-1px);
-  background: color-mix(in srgb, var(--glass-2) 80%, var(--glass-1));
-  border-color: var(--glass-border-strong);
-  box-shadow: var(--glass-edge), var(--elev-2);
+  transform: translateY(-0.5px);
+  background: var(--glass-hover);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-edge);
 }
 
 .service-card:hover::after {
-  opacity: 1;
+  opacity: 0.55;
 }
 
 .service-card:active {
   transform: translateY(0) scale(0.995);
+  background: var(--glass-active);
 }
 
 .service-card.is-open {
+  background: color-mix(in srgb, var(--accent-soft) 58%, transparent);
+  border-color: color-mix(in srgb, var(--accent-line) 78%, transparent);
+}
+
+.service-card.is-open:hover {
+  background: color-mix(in srgb, var(--accent-soft) 78%, var(--glass-hover));
   border-color: var(--accent-line);
 }
 
@@ -1453,7 +1461,8 @@ body:not(.light-mode) .toggle-slider::before {
     color var(--t-fast) var(--ease-out);
 }
 
-.service-card:hover .service-card-add {
+.service-card:hover .service-card-add,
+.service-card:focus-visible .service-card-add {
   opacity: 1;
   transform: scale(1);
   color: var(--accent);
@@ -1541,7 +1550,7 @@ body:not(.light-mode) .toggle-slider::before {
   inset: 0;
   z-index: 2;
   display: flex;
-  align-items: center;
+  align-items: safe center;
   justify-content: center;
   overflow-y: auto;
   padding: var(--sp-6) var(--sp-4);
@@ -1567,6 +1576,32 @@ body:not(.light-mode) .toggle-slider::before {
   flex-direction: column;
   gap: var(--sp-5);
   animation: fade-rise var(--t-slow) var(--ease-out) both;
+}
+
+.welcome-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.welcome-kicker {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--text-3);
+  font-size: var(--fs-section);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.welcome-kicker > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .welcome-screen h2 {
@@ -1596,7 +1631,9 @@ body:not(.light-mode) .toggle-slider::before {
 .quick-start-guide {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--separator);
 }
 
 .quick-start-services-grid {
@@ -3173,6 +3210,7 @@ body:not(.light-mode) .toggle-slider::before {
     --blur-2: blur(8px) saturate(115%);
     --blur-3: blur(16px) saturate(125%);
     --blur-veil: blur(6px) saturate(110%);
+    --blur-ambient: blur(56px);
     --header-height: 50px;
     --tabs-height: 42px;
     --status-height: 28px;
