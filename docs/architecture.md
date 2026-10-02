@@ -91,9 +91,12 @@ Writes are debounced (500 ms) and flushed on close and quit.
 ## Layering constraint (important)
 
 Child views always paint **above** the shell's own webContents. Therefore the
-sidebar and settings panel are *in-layout* drawers (the flex row collapses
-their width) rather than absolutely positioned overlays - an overlay would be
-hidden underneath the active tab. `ui/styles.css` documents this.
+sidebar and settings panel are *in-layout* drawers (the grid row collapses the
+sidebar's column) rather than absolutely positioned overlays - an overlay would
+be hidden underneath the active tab. `ui/styles.css` documents this, including
+why both columns are placed explicitly: a collapsed drawer is `display: none`,
+so it is not a grid item, and auto-placement would drop the stage into the
+zero-width column.
 
 ## Tab lifecycle
 

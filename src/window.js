@@ -365,16 +365,28 @@ function unregisterGlobalShortcuts() {
 // View bounds
 // ---------------------------------------------------------------------------
 
+/**
+ * Fallback stage rectangle, used only until the renderer reports the real
+ * `#webviews-container` box.
+ *
+ * It mirrors the shell grid: a padded container with the navigation bar on top
+ * and the status bar at the bottom. Native views always paint above the shell,
+ * so a fallback that ignored the padding would cover the nav bar on the first
+ * frame; the numbers here match `ui/styles.css` (`--shell-pad`, `--nav-height`,
+ * `--shell-gap`). When the fallback mode at ≤640px collapses the stage, the
+ * renderer reports a zero-width box and the view follows it there.
+ */
 function calculateViewBounds() {
   if (viewBounds) return viewBounds;
   if (!mainWindow) return { x: 0, y: 0, width: 0, height: 0 };
   const [width, height] = mainWindow.getContentSize();
-  const top = LAYOUT.HEADER_HEIGHT + LAYOUT.TABS_HEIGHT;
+  const top = LAYOUT.SHELL_PAD + LAYOUT.NAV_HEIGHT + LAYOUT.SHELL_GAP;
+  const bottom = LAYOUT.STATUS_BAR_HEIGHT + LAYOUT.SHELL_PAD + LAYOUT.SHELL_GAP;
   return {
-    x: 0,
+    x: LAYOUT.SHELL_PAD,
     y: top,
-    width: Math.max(0, width),
-    height: Math.max(0, height - top - LAYOUT.STATUS_BAR_HEIGHT)
+    width: Math.max(0, width - LAYOUT.SHELL_PAD * 2),
+    height: Math.max(0, height - top - bottom)
   };
 }
 
