@@ -348,3 +348,37 @@ describe('class coverage', () => {
     expect([...new Set(missing)].sort()).toEqual([]);
   });
 });
+
+describe('spatial glass', () => {
+  it('uses layered translucent fills in both themes', () => {
+    expect(css).toContain('--material-primary: rgba(21, 25, 34, 0.68);');
+    expect(css).toContain('--glass-1: var(--material-primary);');
+    expect(css).toContain('--material-primary: rgba(250, 251, 253, 0.74);');
+  });
+
+  it('keeps ambient fields static without changing native stage geometry', () => {
+    const field = css.match(/\.app-bg-field \{([^}]*)\}/)[1];
+    expect(field).toMatch(/animation:\s*none/);
+    expect(field).toMatch(/display:\s*block/);
+    const sheen = css.match(/\.service-card::after \{([^}]*)\}/)[1];
+    expect(sheen).toMatch(/display:\s*none/);
+    expect(css).toContain('--header-height: 54px;');
+    expect(css).toContain('--tabs-height: 44px;');
+  });
+
+  it('presents session facts as a list and headings in sentence case', () => {
+    const row = css.match(/\.session-row \{([^}]*)\}/)[1];
+    expect(row).toMatch(/background:\s*transparent/);
+    expect(row).toMatch(/border-bottom:\s*1px solid var\(--separator\)/);
+    const heading = css.match(/\.setting-section-title \{([^}]*)\}/)[1];
+    expect(heading).toMatch(/text-transform:\s*none/);
+  });
+});
+
+ describe('material accessibility', () => {
+  it('provides opaque fallbacks for unsupported and reduced transparency', () => {
+    expect(css).toContain('@supports not ((backdrop-filter:');
+    expect(css).toContain('@media (prefers-reduced-transparency: reduce)');
+    expect(css).toContain('--glass-float: var(--bg-2);');
+  });
+});

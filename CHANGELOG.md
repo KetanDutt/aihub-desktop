@@ -1,3 +1,12 @@
+## Unreleased
+
+### Interface
+- Refined both themes into a Spatial Glass using the supplied charcoal / cool-white palette, blue accents, translucent materials and silver hub mark.
+- Added static low-contrast ambient fields, layered glass, soft edge highlights and restrained depth throughout shell chrome and floating UI.
+- Added reduced-transparency and unsupported-backdrop-filter fallbacks; retained reduced-motion support.
+- Improved launcher targets, settings hierarchy, session rows and catalogue readability.
+- Preserved existing service, session, privacy and local API functionality.
+
 # Changelog
 
 All notable changes to this project are documented here. The format follows
